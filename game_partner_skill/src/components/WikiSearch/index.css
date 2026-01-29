@@ -1,0 +1,142 @@
+.wiki-search-container {
+  padding: 0px;
+  max-width: 1200px;
+  margin: 0 auto;
+  height: calc(100% - 300px);
+}
+
+.search-header {
+  margin-bottom: 24px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+  border-radius: 12px;
+}
+
+.search-header .ant-card-body {
+  padding: 32px;
+}
+
+.header-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 24px;
+}
+
+.header-content h2 {
+  color: white;
+  margin-bottom: 8px;
+}
+
+.header-content .ant-typography {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.stats-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.stats-info .ant-tag {
+  font-size: 14px;
+  padding: 4px 12px;
+}
+
+.stats-info .ant-typography {
+  color: rgba(255, 255, 255, 0.95);
+  font-size: 14px;
+}
+
+.warning-message {
+  padding: 12px;
+  background: rgba(250, 173, 20, 0.15);
+  border-radius: 6px;
+  margin-top: -8px;
+}
+
+.search-results {
+  height: calc(100% - 200px);
+  overflow-y: auto;
+}
+
+.loading-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 100px 0;
+}
+
+.result-card {
+  transition: all 0.3s ease;
+  border-radius: 8px;
+}
+
+.result-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+}
+
+.result-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.result-title-section {
+  flex: 1;
+}
+
+.result-meta {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.empty-state {
+  padding: 60px 0;
+  text-align: center;
+}
+
+.empty-state .ant-typography {
+  line-height: 2;
+  color: #8c8c8c;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .wiki-search-container {
+    padding: 16px;
+  }
+
+  .search-header .ant-card-body {
+    padding: 20px;
+  }
+
+  .header-content {
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .result-header {
+    flex-direction: column;
+  }
+
+  .result-card {
+    margin-bottom: 12px;
+  }
+}
+
+/* 深色模式支持 */
+@media (prefers-color-scheme: dark) {
+  .result-card {
+    background: #1f1f1f;
+    border-color: #303030;
+  }
+
+  .result-card:hover {
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
+  }
+}

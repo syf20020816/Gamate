@@ -1,0 +1,50 @@
+.wiki-knowledge-container {
+  padding: 24px;
+  max-width: 1400px;
+  margin: 0 auto;
+  height: 100%;
+  overflow-y: hidden;
+}
+
+.import-section {
+  max-width: 800px;
+  margin: 60px auto;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.import-section .ant-card-body {
+  padding: 40px;
+}
+
+.import-section h3 {
+  margin-bottom: 0;
+}
+
+.import-section .ant-alert {
+  border-radius: 8px;
+}
+
+.import-section ul {
+  margin: 12px 0;
+  padding-left: 24px;
+}
+
+.import-section li {
+  margin: 8px 0;
+  color: #595959;
+}
+
+@media (max-width: 768px) {
+  .wiki-knowledge-container {
+    padding: 16px;
+  }
+
+  .import-section {
+    margin: 20px auto;
+  }
+
+  .import-section .ant-card-body {
+    padding: 24px 20px;
+  }
+}

@@ -9,6 +9,7 @@ import {
   FileText,
   ChevronLeft,
   ChevronRight,
+  BookOpen,
 } from "lucide-react";
 import type { MenuProps } from "antd";
 import "./styles.scss";
@@ -35,6 +36,11 @@ const Sidebar: React.FC<SidebarProps> = ({ selectedMenu, onMenuChange }) => {
       key: "screen-capture",
       icon: <Monitor size={20} />,
       label: "屏幕识别",
+    },
+    {
+      key: "wiki-search",
+      icon: <BookOpen size={20} />,
+      label: "Wiki 搜索",
     },
     {
       key: "game-library",

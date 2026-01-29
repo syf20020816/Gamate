@@ -4,6 +4,7 @@ import SkillDatabase from "../SkillDatabase";
 import Home from "../Home";
 import Logs from "../Logs";
 import SettingsPanel from "../Settings";
+import WikiKnowledgeBase from "../WikiKnowledgeBase";
 import "./styles.scss";
 
 interface MainContentProps {
@@ -18,6 +19,8 @@ const MainContent: React.FC<MainContentProps> = ({ selectedMenu, onMenuChange })
         return <Home onNavigate={onMenuChange} />;
       case "screen-capture":
         return <ScreenCapture />;
+      case "wiki-search":
+        return <WikiKnowledgeBase />;
       case "game-library":
         return <GameLibrary />;
       case "skill-database":

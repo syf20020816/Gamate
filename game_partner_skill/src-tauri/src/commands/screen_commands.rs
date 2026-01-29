@@ -1,6 +1,6 @@
 use crate::screenshot::*;
 use std::sync::Mutex;
-use tauri::{AppHandle, State};
+use tauri::State;
 
 /// 全局截图器状态
 pub struct ScreenshotState {
@@ -88,40 +88,6 @@ pub async fn refresh_displays(state: State<'_, ScreenshotState>) -> std::result:
         .map_err(|e| format!("刷新失败: {}", e))?;
     
     Ok(capturer.list_displays())
-}
-
-/// 显示区域选择窗口
-#[tauri::command]
-pub async fn show_area_selector_window(
-    app: AppHandle,
-) -> std::result::Result<CaptureArea, String> {
-    log::info!("📍 调用区域选择窗口");
-    
-    crate::screenshot::show_area_selector(&app)
-        .await
-        .map_err(|e| e.to_string())
-}
-
-/// 设置选择的区域（由前端 selector.html 调用）
-#[tauri::command]
-pub async fn set_selected_area(
-    area: CaptureArea,
-    state: State<'_, AreaSelectorState>,
-) -> std::result::Result<(), String> {
-    log::info!("✅ 接收到选择区域: {}x{} @ ({}, {})", 
-        area.width, area.height, area.x, area.y);
-    state.set_area(area);
-    Ok(())
-}
-
-/// 取消区域选择
-#[tauri::command]
-pub async fn cancel_area_selection(
-    state: State<'_, AreaSelectorState>,
-) -> std::result::Result<(), String> {
-    log::info!("❌ 取消区域选择");
-    state.cancel();
-    Ok(())
 }
 
 /// 列出所有窗口

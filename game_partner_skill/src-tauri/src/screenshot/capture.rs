@@ -1,6 +1,6 @@
 use super::types::*;
 use base64::{engine::general_purpose, Engine};
-use image::ImageFormat;
+use image::{DynamicImage, ImageFormat};
 use screenshots::Screen;
 use std::io::Cursor;
 use std::time::{SystemTime, UNIX_EPOCH};

@@ -21,18 +21,26 @@ pub fn list_windows() -> Result<Vec<WindowInfo>> {
     
     let window_list: Vec<WindowInfo> = windows
         .into_iter()
-        .filter(|w| {
-            // 过滤掉太小的窗口
-            w.width() > 100 && w.height() > 100
+        .filter_map(|w| {
+            // 过滤掉太小的窗口或获取信息失败的窗口
+            let width = w.width().ok()?;
+            let height = w.height().ok()?;
+            if width > 100 && height > 100 {
+                Some(w)
+            } else {
+                None
+            }
         })
-        .map(|w| WindowInfo {
-            id: w.id(),
-            title: w.title().to_string(),
-            app_name: w.app_name().to_string(),
-            width: w.width(),
-            height: w.height(),
-            x: w.x(),
-            y: w.y(),
+        .filter_map(|w| {
+            Some(WindowInfo {
+                id: w.id().ok()?,
+                title: w.title().ok()?,
+                app_name: w.app_name().ok()?,
+                width: w.width().ok()?,
+                height: w.height().ok()?,
+                x: w.x().ok()?,
+                y: w.y().ok()?,
+            })
         })
         .collect();
     
@@ -51,10 +59,12 @@ pub fn capture_window(window_id: u32) -> Result<Screenshot> {
     // 查找目标窗口
     let target_window = windows
         .into_iter()
-        .find(|w| w.id() == window_id)
+        .find(|w| w.id().ok() == Some(window_id))
         .ok_or_else(|| ScreenshotError::CaptureFailed(format!("未找到窗口 ID: {}", window_id)))?;
     
-    log::info!("📸 捕获窗口: {} ({})", target_window.title(), target_window.app_name());
+    let title = target_window.title().unwrap_or_else(|_| "Unknown".to_string());
+    let app_name = target_window.app_name().unwrap_or_else(|_| "Unknown".to_string());
+    log::info!("📸 捕获窗口: {} ({})", title, app_name);
     
     // 捕获窗口图像
     let image = target_window

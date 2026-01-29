@@ -1,0 +1,63 @@
+# Game Partner Skill - 应用配置文件
+# 此文件定义了应用的所有配置项
+
+# ========================================
+# 通用设置
+# ========================================
+[general]
+# 界面语言 (zh-CN, zh-TW, en, ja, ko)
+language = "zh-CN"
+# 主题 (auto, light, dark)
+theme = "auto"
+
+# ========================================
+# 技能库设置
+# ========================================
+[skill_library]
+# 技能库主存储目录（相对于可执行文件，或使用绝对路径）
+storage_base_path = "./data/skills"
+# 保留的历史版本数量 (1-10)
+max_versions_to_keep = 3
+# 是否自动更新
+auto_update = false
+# 更新检查间隔（小时）
+update_check_interval = 24
+
+  # 爬虫配置
+  [skill_library.crawler]
+  # 请求延迟（毫秒）- 避免对服务器造成压力
+  request_delay_ms = 1000
+  # 最大并发请求数 (1-20)
+  max_concurrent_requests = 5
+  # 超时时间（秒）
+  timeout_seconds = 30
+
+# ========================================
+# AI 模型设置
+# ========================================
+[ai_models]
+  # Embedding 模型（用于向量搜索）
+  [ai_models.embedding]
+  # 提供商类型 (local, openai, azure, custom)
+  provider = "local"
+  # API 地址
+  api_base = "http://localhost:11434/v1"
+  # API Key（本地模型可为空，远程 API 必填）
+  api_key = ""
+  # 模型名称
+  model_name = "qwen3-embedding:4b"
+  # 是否启用
+  enabled = true
+
+  # 多模态模型（用于语音、图片识别等）
+  [ai_models.multimodal]
+  # 提供商类型 (local, openai, azure, custom)
+  provider = "local"
+  # API 地址
+  api_base = "http://localhost:11434/v1"
+  # API Key（本地模型可为空，远程 API 必填）
+  api_key = ""
+  # 模型名称
+  model_name = "qwen3-vl:latest"
+  # 是否启用
+  enabled = true

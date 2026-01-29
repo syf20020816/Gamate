@@ -38,12 +38,46 @@ import "./styles.scss";
 
 const { Title, Text, Paragraph } = Typography;
 
+interface SkillLibraryConfig {
+  storageBasePath: string;
+  maxVersionsToKeep: number;
+  autoUpdate: boolean;
+  updateCheckInterval: number;
+}
+
 const SkillDatabase: React.FC = () => {
-  const { config, downloadedLibraries, updateConfig, removeDownloadedLibrary, setActiveVersion } =
-    useSkillLibraryStore();
+  const { downloadedLibraries, removeDownloadedLibrary, setActiveVersion } = useSkillLibraryStore();
+  const [config, setConfig] = useState<SkillLibraryConfig | null>(null);
   const [configModalVisible, setConfigModalVisible] = useState(false);
   const [form] = Form.useForm();
   const [validating, setValidating] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  // 从后端加载配置
+  useEffect(() => {
+    const loadConfig = async () => {
+      try {
+        const settings = await invoke<any>('get_app_settings');
+        
+        // 后端返回的是 snake_case，前端需要 camelCase
+        const skillLibConfig: SkillLibraryConfig = {
+          storageBasePath: settings.skillLibrary?.storageBasePath || settings.skill_library?.storage_base_path || './data/skills',
+          maxVersionsToKeep: settings.skillLibrary?.maxVersionsToKeep || settings.skill_library?.max_versions_to_keep || 3,
+          autoUpdate: settings.skillLibrary?.autoUpdate ?? settings.skill_library?.auto_update ?? false,
+          updateCheckInterval: settings.skillLibrary?.updateCheckInterval || settings.skill_library?.update_check_interval || 24,
+        };
+        
+        setConfig(skillLibConfig);
+        setLoading(false);
+      } catch (error) {
+        console.error('❌ 加载配置失败:', error);
+        message.error(`加载配置失败: ${error}`);
+        setLoading(false);
+      }
+    };
+    
+    loadConfig();
+  }, []);
 
   // 启动时验证所有已下载的库
   useEffect(() => {
@@ -139,12 +173,45 @@ const SkillDatabase: React.FC = () => {
   };
 
   // 处理配置保存
-  const handleConfigSave = () => {
-    form.validateFields().then((values) => {
-      updateConfig(values);
+  const handleConfigSave = async () => {
+    try {
+      const values = await form.validateFields();
+      
+      // 获取完整的应用配置
+      const settings = await invoke<any>('get_app_settings');
+      
+      // 后端使用 snake_case
+      if (settings.skill_library) {
+        // 后端返回 snake_case
+        settings.skill_library.storage_base_path = values.storageBasePath;
+        settings.skill_library.max_versions_to_keep = values.maxVersionsToKeep;
+        settings.skill_library.auto_update = values.autoUpdate;
+        settings.skill_library.update_check_interval = values.updateCheckInterval;
+      } else if (settings.skillLibrary) {
+        // 前端使用 camelCase（Tauri 自动转换）
+        settings.skillLibrary.storageBasePath = values.storageBasePath;
+        settings.skillLibrary.maxVersionsToKeep = values.maxVersionsToKeep;
+        settings.skillLibrary.autoUpdate = values.autoUpdate;
+        settings.skillLibrary.updateCheckInterval = values.updateCheckInterval;
+      }
+      
+      // 保存到后端
+      await invoke('save_app_settings', { settings });
+      
+      // 更新本地状态
+      setConfig({
+        storageBasePath: values.storageBasePath,
+        maxVersionsToKeep: values.maxVersionsToKeep,
+        autoUpdate: values.autoUpdate,
+        updateCheckInterval: values.updateCheckInterval,
+      });
+      
       message.success("配置已保存");
       setConfigModalVisible(false);
-    });
+    } catch (error) {
+      console.error('❌ 保存配置失败:', error);
+      message.error(`保存配置失败: ${error}`);
+    }
   };
 
   // 处理更新技能库
@@ -258,6 +325,17 @@ const SkillDatabase: React.FC = () => {
   const totalSize = downloadedLibraries.reduce((sum, lib) => sum + lib.storageSize, 0);
   const activeLibraries = downloadedLibraries.filter((lib) => lib.status === "active");
 
+  // 如果配置还在加载中
+  if (loading || !config) {
+    return (
+      <div className="skill-database">
+        <Card loading>
+          <Empty description="正在加载配置..." />
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="skill-database">
       <motion.div
@@ -297,7 +375,7 @@ const SkillDatabase: React.FC = () => {
             <Tooltip title="打开存储目录">
               <Button
                 icon={<FolderOpen size={18} />}
-                onClick={() => handleOpenFolder(config.storageBasePath)}
+                onClick={() => config && handleOpenFolder(config.storageBasePath)}
               >
                 打开目录
               </Button>
@@ -580,8 +658,9 @@ const SkillDatabase: React.FC = () => {
             label="更新检查间隔"
             name="updateCheckInterval"
             rules={[{ required: true, message: "请选择检查间隔" }]}
+            dependencies={['autoUpdate']}
           >
-            <Select disabled={!form.getFieldValue("autoUpdate")}>
+            <Select>
               <Select.Option value={6}>每 6 小时</Select.Option>
               <Select.Option value={12}>每 12 小时</Select.Option>
               <Select.Option value={24}>每 24 小时</Select.Option>
