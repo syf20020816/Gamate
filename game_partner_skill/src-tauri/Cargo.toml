@@ -1,0 +1,61 @@
+[package]
+name = "game_partner_skill"
+version = "0.1.0"
+description = "A Tauri App"
+authors = ["you"]
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+# The `_lib` suffix may seem redundant but it is necessary
+# to make the lib name unique and wouldn't conflict with the bin name.
+# This seems to be only an issue on Windows, see https://github.com/rust-lang/cargo/issues/8519
+name = "game_partner_skill_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-opener = "2"
+tauri-plugin-dialog = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# HTTP 客户端
+reqwest = { version = "0.12", features = ["json", "rustls-tls"] }
+# HTML 解析
+scraper = "0.22"
+# 异步运行时
+tokio = { version = "1", features = ["full"] }
+# 正则表达式
+regex = "1"
+# URL 解析
+url = "2"
+# Markdown 解析
+pulldown-cmark = "0.12"
+# 错误处理
+anyhow = "1"
+thiserror = "1"
+# 日志
+log = "0.4"
+env_logger = "0.11"
+# GitHub API
+octocrab = "0.41"
+# 文件操作
+walkdir = "2"
+# 时间处理
+chrono = { version = "0.4", features = ["serde"] }
+# Base64 编解码
+base64 = "0.22"
+# TOML 解析
+toml = "0.9"
+
+# 屏幕截图
+screenshots = "0.8"
+# 图片处理
+image = "0.24"
+# 窗口捕获 (跨平台)
+xcap = "0.0.9"

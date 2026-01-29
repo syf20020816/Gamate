@@ -1,0 +1,63 @@
+.app-sidebar {
+  height: 100vh;
+  position: relative;
+  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.15);
+  background-color: #1e1e1e;
+  .sidebar-header {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px 16px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    gap: 12px;
+
+    .logo-icon {
+      color: #1890ff;
+      flex-shrink: 0;
+    }
+
+    .logo-title {
+      margin: 0;
+      font-size: 18px;
+      font-weight: 600;
+      color: #fff;
+      white-space: nowrap;
+    }
+  }
+
+  .sidebar-footer {
+    position: absolute;
+    bottom: 0;
+    width: 100%;
+    padding: 16px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+
+    .collapse-btn {
+      width: 100%;
+      color: rgba(255, 255, 255, 0.65);
+
+      &:hover {
+        color: #fff;
+        background: rgba(255, 255, 255, 0.1);
+      }
+    }
+  }
+
+  :global {
+    .ant-menu-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 4px 8px;
+      border-radius: 8px;
+
+      &:hover {
+        background-color: rgba(255, 255, 255, 0.1) !important;
+      }
+
+      &.ant-menu-item-selected {
+        background-color: #1890ff !important;
+      }
+    }
+  }
+}

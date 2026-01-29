@@ -1,0 +1,44 @@
+.skill-database {
+  .database-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 24px;
+
+    h3 {
+      margin: 0;
+      color: #fff;
+    }
+  }
+
+  .game-skill-card {
+    border: 1px solid rgba(255, 255, 255, 0.1);
+
+    :global {
+      .ant-card-head {
+        background: rgba(255, 255, 255, 0.02);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      }
+    }
+  }
+
+  .version-card {
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    transition: all 0.3s;
+
+    &:hover {
+      border-color: rgba(24, 144, 255, 0.3);
+      box-shadow: 0 2px 8px rgba(24, 144, 255, 0.1);
+    }
+
+    &.active {
+      border-color: #52c41a;
+      background: rgba(82, 196, 26, 0.05);
+
+      &:hover {
+        border-color: #52c41a;
+        box-shadow: 0 2px 8px rgba(82, 196, 26, 0.2);
+      }
+    }
+  }
+}

@@ -1,0 +1,100 @@
+.game-library {
+  .library-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 24px;
+
+    h3 {
+      margin: 0;
+      color: #fff;
+    }
+  }
+
+  .filter-card {
+    margin-bottom: 16px;
+  }
+
+  .game-card {
+    height: 100%;
+    transition: all 0.3s;
+
+    &:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 8px 24px rgba(24, 144, 255, 0.2);
+    }
+
+    &.game-card-added {
+      border: 2px solid #52c41a;
+    }
+
+    .game-banner {
+      position: relative;
+      height: 200px;
+      background: #000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+
+      .game-banner-placeholder {
+        font-size: 64px;
+        font-weight: bold;
+        color: rgba(255, 255, 255, 0.8);
+        height: 100%;
+        width: 100%;
+        & > img {
+          object-fit:cover;
+          width: 100%;
+          height: 100%;
+        }
+      }
+
+      .added-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(82, 196, 26, 0.9);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #fff;
+        animation: fadeIn 0.3s;
+      }
+    }
+
+    .game-description {
+      margin-top: 12px;
+    }
+
+    .game-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 16px;
+      padding-top: 16px;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+    }
+  }
+
+  .skill-config-card {
+    cursor: pointer;
+    transition: all 0.2s;
+
+    &:hover {
+      border-color: #1890ff;
+      box-shadow: 0 4px 12px rgba(24, 144, 255, 0.15);
+    }
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}

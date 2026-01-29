@@ -1,0 +1,76 @@
+.screen-capture {
+  .control-panel {
+    .control-item {
+      width: 100%;
+    }
+  }
+
+  .preview-canvas {
+    .canvas-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+
+      h5 {
+        margin: 0;
+      }
+    }
+
+    .canvas-area {
+      position: relative;
+      width: 100%;
+      height: 500px;
+      background: #000;
+      border: 2px dashed rgba(255, 255, 255, 0.2);
+      border-radius: 8px;
+      overflow: hidden;
+      cursor: crosshair;
+
+      .placeholder {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 100%;
+        gap: 16px;
+        color: rgba(255, 255, 255, 0.3);
+      }
+
+      .capturing-indicator {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 100%;
+        gap: 16px;
+
+        .pulse {
+          width: 16px;
+          height: 16px;
+          background: #52c41a;
+          border-radius: 50%;
+          animation: pulse 1.5s infinite;
+        }
+      }
+
+      .selection-box {
+        position: absolute;
+        border: 2px solid #1890ff;
+        background: rgba(24, 144, 255, 0.1);
+        pointer-events: none;
+      }
+    }
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(1.2);
+  }
+}

@@ -1,0 +1,88 @@
+.right-panel {
+  height: 100vh;
+  background: #1f1f1f !important;
+  border-left: 1px solid rgba(255, 255, 255, 0.1);
+
+  .panel-content {
+    padding: 24px 16px;
+    height: 100%;
+    overflow-y: auto;
+
+    &::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    &::-webkit-scrollbar-track {
+      background: #1f1f1f;
+    }
+
+    &::-webkit-scrollbar-thumb {
+      background: #3a3a3a;
+      border-radius: 3px;
+
+      &:hover {
+        background: #4a4a4a;
+      }
+    }
+
+    :global {
+      .ant-card {
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 12px;
+
+        .ant-card-body {
+          padding: 16px;
+        }
+
+        h5 {
+          display: flex;
+          align-items: center;
+          margin-bottom: 12px;
+          color: #fff;
+          font-size: 14px;
+        }
+      }
+    }
+
+    .stat-item {
+      .ant-progress {
+        margin-top: 4px;
+      }
+    }
+
+    .category-item {
+      padding: 8px 12px;
+      background: rgba(255, 255, 255, 0.02);
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      transition: all 0.2s;
+
+      &:hover {
+        background: rgba(255, 255, 255, 0.05);
+        border-color: rgba(255, 255, 255, 0.1);
+      }
+    }
+
+    .activity-item {
+      padding: 12px;
+      background: rgba(255, 255, 255, 0.02);
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      transition: all 0.2s;
+
+      &:hover {
+        background: rgba(255, 255, 255, 0.05);
+        transform: translateX(-4px);
+      }
+    }
+
+    .skill-stat {
+      margin-bottom: 8px;
+
+      .ant-progress {
+        margin-top: 4px;
+      }
+    }
+  }
+}

@@ -1,0 +1,141 @@
+use crate::screenshot::*;
+use std::sync::Mutex;
+use tauri::{AppHandle, State};
+
+/// 全局截图器状态
+pub struct ScreenshotState {
+    capturer: Mutex<Option<ScreenCapturer>>,
+}
+
+impl ScreenshotState {
+    pub fn new() -> Self {
+        Self {
+            capturer: Mutex::new(None),
+        }
+    }
+
+    pub fn get_or_init(&self) -> Result<ScreenCapturer> {
+        let mut capturer = self.capturer.lock().unwrap();
+        
+        if capturer.is_none() {
+            *capturer = Some(ScreenCapturer::new()?);
+        }
+        
+        Ok(capturer.as_ref().unwrap().clone_capturer())
+    }
+
+    pub fn refresh(&self) -> Result<ScreenCapturer> {
+        let mut capturer = self.capturer.lock().unwrap();
+        let new_capturer = ScreenCapturer::new()?;
+        *capturer = Some(new_capturer.clone_capturer());
+        Ok(new_capturer)
+    }
+}
+
+impl Default for ScreenshotState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// 为 ScreenCapturer 添加克隆支持
+impl ScreenCapturer {
+    fn clone_capturer(&self) -> ScreenCapturer {
+        ScreenCapturer::new().expect("无法创建截图器")
+    }
+}
+
+/// 列出所有显示器
+#[tauri::command]
+pub async fn list_displays(state: State<'_, ScreenshotState>) -> std::result::Result<Vec<DisplayInfo>, String> {
+    let capturer = state.get_or_init()
+        .map_err(|e| format!("初始化失败: {}", e))?;
+    
+    Ok(capturer.list_displays())
+}
+
+/// 全屏截图
+#[tauri::command]
+pub async fn capture_fullscreen(
+    display_id: Option<usize>,
+    state: State<'_, ScreenshotState>,
+) -> std::result::Result<Screenshot, String> {
+    let capturer = state.get_or_init()
+        .map_err(|e| format!("初始化失败: {}", e))?;
+    
+    capturer.capture_fullscreen(display_id)
+        .map_err(|e| format!("截图失败: {}", e.to_string()))
+}
+
+/// 区域截图
+#[tauri::command]
+pub async fn capture_area(
+    area: CaptureArea,
+    display_id: Option<usize>,
+    state: State<'_, ScreenshotState>,
+) -> std::result::Result<Screenshot, String> {
+    let capturer = state.get_or_init()
+        .map_err(|e| format!("初始化失败: {}", e))?;
+    
+    capturer.capture_area(area, display_id)
+        .map_err(|e| format!("截图失败: {}", e.to_string()))
+}
+
+/// 刷新显示器列表
+#[tauri::command]
+pub async fn refresh_displays(state: State<'_, ScreenshotState>) -> std::result::Result<Vec<DisplayInfo>, String> {
+    let capturer = state.refresh()
+        .map_err(|e| format!("刷新失败: {}", e))?;
+    
+    Ok(capturer.list_displays())
+}
+
+/// 显示区域选择窗口
+#[tauri::command]
+pub async fn show_area_selector_window(
+    app: AppHandle,
+) -> std::result::Result<CaptureArea, String> {
+    log::info!("📍 调用区域选择窗口");
+    
+    crate::screenshot::show_area_selector(&app)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// 设置选择的区域（由前端 selector.html 调用）
+#[tauri::command]
+pub async fn set_selected_area(
+    area: CaptureArea,
+    state: State<'_, AreaSelectorState>,
+) -> std::result::Result<(), String> {
+    log::info!("✅ 接收到选择区域: {}x{} @ ({}, {})", 
+        area.width, area.height, area.x, area.y);
+    state.set_area(area);
+    Ok(())
+}
+
+/// 取消区域选择
+#[tauri::command]
+pub async fn cancel_area_selection(
+    state: State<'_, AreaSelectorState>,
+) -> std::result::Result<(), String> {
+    log::info!("❌ 取消区域选择");
+    state.cancel();
+    Ok(())
+}
+
+/// 列出所有窗口
+#[tauri::command]
+pub async fn list_windows_command() -> std::result::Result<Vec<crate::screenshot::WindowInfo>, String> {
+    log::info!("📋 获取窗口列表");
+    crate::screenshot::list_windows()
+        .map_err(|e| e.to_string())
+}
+
+/// 捕获指定窗口
+#[tauri::command]
+pub async fn capture_window_command(window_id: u32) -> std::result::Result<Screenshot, String> {
+    log::info!("🪟 捕获窗口 ID: {}", window_id);
+    crate::screenshot::capture_window(window_id)
+        .map_err(|e| e.to_string())
+}

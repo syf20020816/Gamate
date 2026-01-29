@@ -1,0 +1,93 @@
+# Game Partner Skill - 游戏配置文件
+# 此文件定义了所有支持的游戏及其技能库配置
+
+# ========================================
+# 恐鬼症 (Phasmophobia)
+# ========================================
+[[games]]
+id = "phasmophobia"
+name = "恐鬼症"
+name_en = "Phasmophobia"
+icon = "/games/phasmophobia.png"
+banner = "/games/phasmophobia-banner.jpg"
+description = "恐鬼症是一款4人在线合作心理恐怖游戏。你和你的超自然现象调查小组将进入闹鬼的地点，收集尽可能多的超自然现象证据。"
+category = "horror"
+tags = ["合作", "多人", "恐怖", "调查", "VR支持"]
+release_date = "2020-09-18"
+developer = "Kinetic Games"
+publisher = "Kinetic Games"
+
+  # 技能库配置
+  [[games.skill_configs]]
+  id = "phasmophobia-skill-1"
+  name = "Phasmophobia Wiki (Fandom)"
+  description = "官方 Phasmophobia Wiki，包含所有鬼魂类型、证据、道具、地图等详细信息"
+  repo = "https://phasmophobia.fandom.com/wiki/"
+  version = "1.0.0"
+  source_type = "FandomWiki"  # 关键：与后端一致
+  max_pages = 500
+  max_depth = 5
+  request_delay_ms = 500
+
+# ========================================
+# 艾尔登法环 (Elden Ring)
+# ========================================
+[[games]]
+id = "elden-ring"
+name = "艾尔登法环"
+name_en = "Elden Ring"
+icon = "/games/elden-ring.png"
+banner = "/games/elden-ring-banner.jpg"
+description = "由宫崎英高与乔治·R·R·马丁共同创作的黑暗奇幻动作RPG游戏。"
+category = "action-rpg"
+tags = ["魂系", "开放世界", "高难度", "动作"]
+release_date = "2022-02-25"
+developer = "FromSoftware"
+publisher = "Bandai Namco"
+
+  [[games.skill_configs]]
+  id = "elden-ring-skill-1"
+  name = "Elden Ring Wiki (Fandom)"
+  description = "艾尔登法环完整攻略Wiki，包含Boss、装备、魔法、地图等"
+  repo = "https://eldenring.fandom.com/wiki/"
+  version = "1.0.0"
+  source_type = "FandomWiki"
+  max_pages = 1000
+  max_depth = 6
+  request_delay_ms = 500
+
+# ========================================
+# 博德之门3 (Baldur's Gate 3)
+# ========================================
+[[games]]
+id = "baldurs-gate-3"
+name = "博德之门3"
+name_en = "Baldur's Gate 3"
+icon = "/games/bg3.png"
+banner = "/games/bg3-banner.jpg"
+description = "基于龙与地下城规则的角色扮演游戏，由拉瑞安工作室开发。"
+category = "action-rpg"
+tags = ["RPG", "回合制", "剧情", "多人"]
+release_date = "2023-08-03"
+developer = "Larian Studios"
+publisher = "Larian Studios"
+
+  [[games.skill_configs]]
+  id = "bg3-skill-1"
+  name = "Baldur's Gate 3 Wiki"
+  description = "博德之门3官方Wiki，包含职业、法术、任务、角色等"
+  repo = "https://bg3.wiki/"
+  version = "1.0.0"
+  source_type = "CustomWeb"
+  max_pages = 800
+  max_depth = 5
+  request_delay_ms = 600
+
+# ========================================
+# 源类型说明
+# ========================================
+# source_type 可选值:
+# - "FandomWiki"    : Fandom Wiki (如 phasmophobia.fandom.com)
+# - "GamepediaWiki" : Gamepedia Wiki
+# - "GitHub"        : GitHub 仓库
+# - "CustomWeb"     : 自定义网页 Wiki

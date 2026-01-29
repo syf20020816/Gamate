@@ -1,0 +1,23 @@
+.main-content {
+  padding: 24px;
+  height: 100vh;
+  overflow-y: auto;
+  background: #141414;
+
+  &::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: #1f1f1f;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: #3a3a3a;
+    border-radius: 4px;
+
+    &:hover {
+      background: #4a4a4a;
+    }
+  }
+}
