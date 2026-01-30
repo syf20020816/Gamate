@@ -61,6 +61,33 @@ pub struct AIModelSettings {
     pub embedding: ModelConfig,
     /// 多模态模型配置 (用于语音、图片识别)
     pub multimodal: ModelConfig,
+    /// 向量数据库配置
+    #[serde(default)]
+    pub vector_db: VectorDBSettings,
+}
+
+/// 向量数据库设置
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub struct VectorDBSettings {
+    /// 数据库模式 (local, qdrant, ai_direct)
+    pub mode: String,
+    /// Qdrant URL (仅在 mode=qdrant 时使用)
+    #[serde(default)]
+    pub qdrant_url: Option<String>,
+    /// 本地存储路径 (仅在 mode=local 时使用)
+    #[serde(default)]
+    pub local_storage_path: Option<String>,
+}
+
+impl Default for VectorDBSettings {
+    fn default() -> Self {
+        Self {
+            mode: "local".to_string(),
+            qdrant_url: Some("http://localhost:6333".to_string()),
+            local_storage_path: Some("./data/vector_db".to_string()),
+        }
+    }
 }
 
 /// 模型配置
@@ -112,6 +139,11 @@ impl Default for AppSettings {
                     api_key: None,
                     model_name: "qwen3-vl:latest".to_string(),
                     enabled: true,
+                },
+                vector_db: VectorDBSettings {
+                    mode: "local".to_string(),
+                    qdrant_url: None,
+                    local_storage_path: Some("./data/vector_db".to_string()),
                 },
             },
         }

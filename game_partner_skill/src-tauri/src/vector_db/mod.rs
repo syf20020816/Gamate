@@ -1,6 +1,23 @@
-﻿use anyhow::Result;
+﻿mod local_db;
+mod ai_search;
+
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
-use serde_json::json;
+use std::path::PathBuf;
+
+pub use local_db::LocalVectorDB;
+pub use ai_search::{AIDirectSearch, SearchResult as AISearchResult};
+
+/// 向量数据库模式
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum VectorDBMode {
+    /// 本地文件型数据库（默认，无需配置）
+    Local,
+    /// 外部 Qdrant 服务器（需要用户自己搭建）
+    Qdrant,
+    /// AI 直接检索（无向量数据库，适合小数据集）
+    AIDirect,
+}
 
 /// 向量数据库服务 (使用 Qdrant REST API)
 pub struct VectorDB {

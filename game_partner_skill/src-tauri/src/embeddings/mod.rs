@@ -26,16 +26,15 @@ struct EmbeddingData {
 
 impl EmbeddingService {
     /// 创建新的 Embedding 服务
-    pub async fn new() -> Result<Self> {
+    /// 
+    /// # 参数
+    /// - `api_base`: API 基础地址
+    /// - `api_key`: API 密钥 (可选,本地模型可传 None)
+    /// - `model`: 模型名称
+    pub async fn new(api_base: String, api_key: Option<String>, model: String) -> Result<Self> {
         log::info!("🤖 初始化 Embedding 服务...");
         
-        // 从环境变量读取配置，或使用默认值
-        let api_key = std::env::var("OPENAI_API_KEY")
-            .unwrap_or_else(|_| "ollama".to_string());
-        let api_base = std::env::var("OPENAI_API_BASE")
-            .unwrap_or_else(|_| "http://localhost:11434/v1".to_string());
-        let model = std::env::var("EMBEDDING_MODEL")
-            .unwrap_or_else(|_| "nomic-embed-text".to_string());
+        let api_key = api_key.unwrap_or_else(|| "ollama".to_string());
 
         log::info!("✅ Embedding 服务配置完成");
         log::info!("   API Base: {}", api_base);

@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { invoke } from "@tauri-apps/api/core";
 import type { CaptureStrategy } from "../../types/ai";
 import "./styles.scss";
+import { InfoCircleOutlined } from "@ant-design/icons";
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -278,8 +279,6 @@ const ScreenCapture: React.FC = () => {
               </Paragraph>
             </div>
 
-            <Divider />
-
             {/* 捕获模式选择 */}
             <div className="control-item">
               <Text strong>捕获模式</Text>
@@ -397,7 +396,7 @@ const ScreenCapture: React.FC = () => {
                 disabled={isCapturing}
               />
               <Text type="secondary" style={{ fontSize: 12, marginTop: 4, display: "block" }}>
-                💡 {aiControlled 
+                <InfoCircleOutlined></InfoCircleOutlined> {aiControlled 
                   ? '此间隔仅用于活跃期 (战斗/闯关),闲置期固定 15s' 
                   : '固定间隔,不受 AI 控制。推荐 3-5 秒'}
               </Text>

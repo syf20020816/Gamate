@@ -61,3 +61,15 @@ update_check_interval = 24
   model_name = "qwen3-vl:latest"
   # 是否启用
   enabled = true
+
+  # 向量数据库配置
+  [ai_models.vector_db]
+  # 数据库模式:
+  #   - local: 本地文件型数据库（推荐，无需额外配置）
+  #   - qdrant: 外部 Qdrant 服务器（需要 Docker，性能最佳）
+  #   - ai_direct: AI 直接检索（无需数据库，适合小数据集）
+  mode = "local"
+  # Qdrant 服务器地址（仅在 mode=qdrant 时使用）
+  qdrant_url = "http://localhost:6333"
+  # 本地存储路径（仅在 mode=local 时使用）
+  local_storage_path = "./data/vector_db"

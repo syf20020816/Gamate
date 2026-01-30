@@ -72,13 +72,14 @@ pub fn run() {
             get_vector_db_stats,
             check_game_vector_db,
             list_imported_games,
+            get_latest_wiki_jsonl,
+            auto_import_latest_wiki,
             // 设置命令
             get_app_settings,
             save_app_settings,
             reset_app_settings,
-            import_wiki_to_vector_db,
-            search_wiki,
-            get_vector_db_stats,
+            // 向量数据库测试命令
+            test_vector_db_connection,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

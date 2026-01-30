@@ -10,7 +10,7 @@
     "tauri": "tauri"
   },
   "dependencies": {
-    "@ant-design/icons": "~6.1.0",
+    "@ant-design/icons": "6.x",
     "@tanstack/react-query": "^5.90.20",
     "@tauri-apps/api": "^2",
     "@tauri-apps/plugin-dialog": "^2.6.0",
@@ -21,6 +21,8 @@
     "lucide-react": "^0.563.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1",
     "sass": "^1.97.3",
     "zustand": "^5.0.10"
   },
