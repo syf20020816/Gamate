@@ -10,6 +10,7 @@ import {
   ChevronLeft,
   ChevronRight,
   BookOpen,
+  MessageCircle,
 } from "lucide-react";
 import type { MenuProps } from "antd";
 import "./styles.scss";
@@ -41,6 +42,11 @@ const Sidebar: React.FC<SidebarProps> = ({ selectedMenu, onMenuChange }) => {
       key: "wiki-search",
       icon: <BookOpen size={20} />,
       label: "Wiki 搜索",
+    },
+    {
+      key: "ai-assistant",
+      icon: <MessageCircle size={20} />,
+      label: "AI 陪玩助手",
     },
     {
       key: "game-library",

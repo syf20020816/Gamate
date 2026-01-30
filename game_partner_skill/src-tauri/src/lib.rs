@@ -4,6 +4,7 @@ mod config;
 mod screenshot;
 mod embeddings;
 mod settings;
+mod rag;
 pub mod vector_db;
 
 use commands::*;
@@ -80,6 +81,8 @@ pub fn run() {
             reset_app_settings,
             // 向量数据库测试命令
             test_vector_db_connection,
+            // AI 命令
+            generate_ai_response,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

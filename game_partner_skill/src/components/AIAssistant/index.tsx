@@ -1,159 +1,380 @@
-/**
- * AI 助手组件示例
- * 演示如何使用 AI 控制截图策略
- */
-import { useState } from 'react';
-import { Card, Input, Button, Space, Typography, Tag } from 'antd';
-import { Send } from 'lucide-react';
-import { parseAIControl, AI_SYSTEM_PROMPT } from '../../types/ai';
+import React, { useState, useEffect, useRef } from "react";
+import {
+  Card,
+  Input,
+  Button,
+  Empty,
+  message as antdMessage,
+  Tag,
+  Collapse,
+  Select,
+} from "antd";
+import { SendOutlined, DeleteOutlined, ClearOutlined } from "@ant-design/icons";
+import {
+  MessageCircle,
+  Image as ImageIcon,
+  BookOpen,
+  Loader2,
+} from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
+import { useAIAssistantStore, Message } from "../../stores/aiAssistantStore";
+import { useUserStore } from "../../stores/userStore";
+import { useSkillLibraryStore } from "../../stores/skillLibraryStore";
+import { getGameById } from "../../data/games";
+import "./index.css";
 
-const { Text, Paragraph } = Typography;
 const { TextArea } = Input;
+const { Panel } = Collapse;
 
-const AIAssistantDemo: React.FC = () => {
-  const [userInput, setUserInput] = useState('');
-  const [aiResponse, setAiResponse] = useState('');
-  const [lastControl, setLastControl] = useState<{ active: boolean; now: boolean } | null>(null);
+const AIAssistant: React.FC = () => {
+  const {
+    messages,
+    currentGame,
+    isThinking,
+    latestScreenshot,
+    lastWikiSearch,
+    sendMessage,
+    receiveAIResponse,
+    updateContext,
+    setCurrentGame,
+    clearMessages,
+    deleteMessage,
+  } = useAIAssistantStore();
 
-  /**
-   * 模拟 AI 响应 (实际项目中调用 OpenAI API)
-   */
-  const handleSend = async () => {
-    if (!userInput.trim()) return;
+  const { user } = useUserStore();
+  const { downloadedLibraries } = useSkillLibraryStore();
 
-    // 模拟 AI 响应
-    const mockResponse = generateMockAIResponse(userInput);
-    setAiResponse(mockResponse);
+  const [inputValue, setInputValue] = useState("");
+  const [useScreenshot, setUseScreenshot] = useState(true);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
-    // 解析控制指令
-    const control = parseAIControl(mockResponse);
-    setLastControl({ active: control.active, now: control.now });
+  // 可用的游戏列表
+  const gamesWithSkills = [
+    ...new Set(downloadedLibraries.map((lib) => lib.gameId)),
+  ];
+  const selectedGames =
+    user?.config.selectedGames.map((id) => getGameById(id)).filter(Boolean) ||
+    [];
+  const availableGames = selectedGames.filter((game) =>
+    gamesWithSkills.includes(game!.id),
+  );
 
-    // 触发截图控制事件
-    const event = new CustomEvent('ai-control', {
-      detail: {
-        active: control.active,
-        now: control.now,
-        suggested_interval: control.suggested_interval,
-      },
-    });
-    window.dispatchEvent(event);
+  // 自动滚动到底部
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
-  return (
-    <Card title="AI 助手 (演示)" style={{ marginTop: 16}}>
-      <Space direction="vertical" size="middle" style={{ width: '100%' }}>
-        <div>
-          <Text type="secondary" style={{ fontSize: 12 }}>
-            💡 系统提示词 (已配置):
-          </Text>
-          <Paragraph 
-            style={{ 
-              fontSize: 11, 
-              background: '#f5f5f5', 
-              padding: 8, 
-              borderRadius: 4,
-              maxHeight: 150,
-              overflow: 'auto',
-            }}
-          >
-            {AI_SYSTEM_PROMPT.substring(0, 200)}...
-          </Paragraph>
-        </div>
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
 
-        <div>
-          <Text strong>用户消息:</Text>
-          <TextArea
-            value={userInput}
-            onChange={(e) => setUserInput(e.target.value)}
-            placeholder="试试输入: '这个 Boss 怎么打?' 或 '我在商店看装备'"
-            rows={3}
-            style={{ marginTop: 8 }}
+  // 监听截图事件
+  useEffect(() => {
+    const unlisten = listen("screenshot_captured", (event: any) => {
+      const screenshot = event.payload as string;
+      updateContext(screenshot);
+      console.log("📸 收到新截图,已更新上下文");
+    });
+
+    return () => {
+      unlisten.then((fn) => fn());
+    };
+  }, []);
+
+  // 发送消息
+  const handleSend = async () => {
+    if (!inputValue.trim()) {
+      antdMessage.warning("请输入消息");
+      return;
+    }
+
+    if (!currentGame) {
+      antdMessage.warning("请先选择游戏");
+      return;
+    }
+
+    const userMessage = inputValue.trim();
+    const screenshot =
+      useScreenshot && latestScreenshot ? latestScreenshot : undefined;
+
+    // 添加用户消息
+    sendMessage(userMessage, screenshot);
+    setInputValue("");
+
+    try {
+      // 调用后端 RAG 生成 AI 回复
+      const response = await invoke<{
+        content: string;
+        wiki_references?: Array<{
+          title: string;
+          content: string;
+          score: number;
+        }>;
+      }>("generate_ai_response", {
+        message: userMessage,
+        gameId: currentGame,
+        screenshot,
+      });
+
+      // 添加 AI 回复
+      receiveAIResponse(response.content, response.wiki_references);
+    } catch (error) {
+      console.error("AI 回复失败:", error);
+
+      // Fallback: 显示错误信息
+      receiveAIResponse(
+        `抱歉,AI 助手暂时无法回复。错误信息: ${error}\n\n请检查:\n1. API Key 是否配置正确\n2. 网络连接是否正常\n3. 向量数据库是否已导入`,
+        [],
+      );
+
+      antdMessage.error("AI 回复失败,请查看详细错误信息");
+    }
+  };
+
+  // 清空对话
+  const handleClear = () => {
+    clearMessages();
+    antdMessage.success("已清空对话历史");
+  };
+
+  // 渲染消息
+  const renderMessage = (msg: Message) => {
+    const isUser = msg.role === "user";
+
+    return (
+      <motion.div
+        key={msg.id}
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -20 }}
+        transition={{ duration: 0.3 }}
+        className={`message-item ${isUser ? "user-message" : "ai-message"}`}
+      >
+        <div className="message-header">
+          <span className="message-role">
+            {isUser ? "🎮 玩家" : "🤖 AI 助手"}
+          </span>
+          <span className="message-time">
+            {new Date(msg.timestamp).toLocaleTimeString()}
+          </span>
+          <Button
+            type="text"
+            size="small"
+            icon={<DeleteOutlined />}
+            onClick={() => deleteMessage(msg.id)}
+            style={{ marginLeft: "auto" }}
           />
         </div>
 
-        <Button type="primary" icon={<Send size={16} />} onClick={handleSend} block>
-          发送给 AI
-        </Button>
+        <div className="message-content">
+          {isUser ? (
+            <div>{msg.content}</div>
+          ) : (
+            <div className="markdown-content">
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                {msg.content}
+              </ReactMarkdown>
+            </div>
+          )}
+        </div>
 
-        {aiResponse && (
-          <div>
-            <Text strong>AI 响应:</Text>
-            <Paragraph 
-              style={{ 
-                background: '#e6f7ff', 
-                padding: 12, 
-                borderRadius: 6,
-                marginTop: 8,
-                whiteSpace: 'pre-wrap',
-              }}
-            >
-              {aiResponse}
-            </Paragraph>
-
-            {lastControl && (
-              <Space>
-                <Tag color={lastControl.active ? 'green' : 'blue'}>
-                  {lastControl.active ? '活跃模式' : '闲置模式'}
-                </Tag>
-                <Tag color={lastControl.now ? 'orange' : 'default'}>
-                  {lastControl.now ? '立即截图 ⚡' : '定时截图'}
-                </Tag>
-              </Space>
-            )}
+        {/* 显示截图 */}
+        {msg.screenshot && (
+          <div className="message-screenshot">
+            <img src={msg.screenshot} alt="游戏截图" />
           </div>
         )}
-      </Space>
-    </Card>
+
+        {/* 显示 Wiki 引用 */}
+        {msg.wikiReferences && msg.wikiReferences.length > 0 && (
+          <Collapse ghost className="wiki-references">
+            <Panel
+              header={
+                <span>
+                  <BookOpen size={14} style={{ marginRight: 8 }} />
+                  参考资料 ({msg.wikiReferences.length})
+                </span>
+              }
+              key="wiki"
+            >
+              {msg.wikiReferences.map((ref, index) => (
+                <div key={index} className="wiki-ref-item">
+                  <div className="wiki-ref-header">
+                    <strong>{ref.title}</strong>
+                    <Tag color="blue">{(ref.score * 100).toFixed(1)}%</Tag>
+                  </div>
+                  <div className="wiki-ref-content">
+                    {ref.content.substring(0, 200)}...
+                  </div>
+                </div>
+              ))}
+            </Panel>
+          </Collapse>
+        )}
+      </motion.div>
+    );
+  };
+
+  return (
+    <div className="ai-assistant-page">
+      {/* 主对话区 */}
+      <div className="main-conversation-area">
+        <Card
+          styles={{
+            body: {
+              display: "flex",
+              flexDirection: "row",
+              padding: 0,
+            }
+          }}
+          title={
+            <div className="conversation-header">
+              <MessageCircle size={20} />
+              <span>AI 陪玩对话</span>
+              <Select
+                value={currentGame}
+                onChange={setCurrentGame}
+                placeholder="选择游戏"
+                style={{ width: 200, marginLeft: "auto" }}
+                size="middle"
+              >
+                {availableGames.map((game) => (
+                  <Select.Option key={game!.id} value={game!.id}>
+                    {game!.name}
+                  </Select.Option>
+                ))}
+              </Select>
+              <Button
+                type="text"
+                size="small"
+                icon={<ClearOutlined />}
+                onClick={handleClear}
+                disabled={messages.length === 0}
+              >
+                清空
+              </Button>
+            </div>
+          }
+          className="conversation-card"
+        >
+          {/* 侧边栏: 最近检索 */}
+          <div className="sidebar-area">
+            <Card
+              title={
+                <span>
+                  <BookOpen size={16} style={{ marginRight: 8 }} />
+                  参考资料
+                </span>
+              }
+              size="small"
+              className="wiki-sidebar-card"
+            >
+              {lastWikiSearch.length > 0 ? (
+                <div className="wiki-sidebar-results">
+                  {lastWikiSearch.map((ref, index) => (
+                    <motion.div
+                      key={index}
+                      initial={{ opacity: 0, x: 20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: index * 0.1 }}
+                      className="wiki-sidebar-item"
+                    >
+                      <div className="wiki-sidebar-header">
+                        <strong>{ref.title}</strong>
+                        <Tag color="blue">{(ref.score * 100).toFixed(0)}%</Tag>
+                      </div>
+                      <div className="wiki-sidebar-content">
+                        {ref.content.substring(0, 150)}...
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              ) : (
+                <Empty
+                  description="开始对话后,相关的 Wiki 资料会显示在这里"
+                  image={Empty.PRESENTED_IMAGE_SIMPLE}
+                  style={{ padding: "40px 20px" }}
+                />
+              )}
+            </Card>
+          </div>
+          <div className="messages-area-container">
+            <div className="messages-container">
+            <AnimatePresence>
+              {messages.length === 0 ? (
+                <Empty
+                  description={
+                    currentGame
+                      ? "开始对话吧!问我任何关于游戏的问题~"
+                      : "请先选择游戏"
+                  }
+                  image={Empty.PRESENTED_IMAGE_SIMPLE}
+                />
+              ) : (
+                messages.map(renderMessage)
+              )}
+            </AnimatePresence>
+
+            {/* AI 思考中 */}
+            {isThinking && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="thinking-indicator"
+              >
+                <Loader2 size={16} className="spin-icon" />
+                <span>AI 思考中...</span>
+              </motion.div>
+            )}
+
+            <div ref={messagesEndRef} />
+          </div>
+
+          {/* 输入框 */}
+          <div className="input-area">
+            <div className="input-controls">
+              <Button
+                type={useScreenshot ? "primary" : "default"}
+                size="small"
+                icon={<ImageIcon size={14} />}
+                onClick={() => setUseScreenshot(!useScreenshot)}
+                disabled={!latestScreenshot}
+              >
+                {useScreenshot ? "已附加截图" : "未附加截图"}
+              </Button>
+            </div>
+            <TextArea
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              onPressEnter={(e) => {
+                if (!e.shiftKey) {
+                  e.preventDefault();
+                  handleSend();
+                }
+              }}
+              placeholder="输入消息... (Shift+Enter 换行, Enter 发送)"
+              autoSize={{ minRows: 2, maxRows: 4 }}
+              disabled={!currentGame || isThinking}
+            />
+            <Button
+              type="primary"
+              icon={<SendOutlined />}
+              onClick={handleSend}
+              loading={isThinking}
+              disabled={!currentGame || !inputValue.trim()}
+            >
+              发送
+            </Button>
+          </div>
+          </div>
+        </Card>
+      </div>
+    </div>
   );
 };
 
-/**
- * 生成模拟 AI 响应 (仅用于演示)
- */
-function generateMockAIResponse(userInput: string): string {
-  const input = userInput.toLowerCase();
-
-  // 战斗/闯关相关
-  if (input.includes('boss') || input.includes('打') || input.includes('怪') || input.includes('难')) {
-    return `这个敌人确实有一定难度,建议注意以下几点:
-1. 观察它的攻击节奏
-2. 及时躲避红色预警区域
-3. 使用合适的技能组合
-
-\`\`\`json
-{
-  "active": true,
-  "now": true,
-  "suggested_interval": 2
-}
-\`\`\``;
-  }
-
-  // 菜单/浏览相关
-  if (input.includes('装备') || input.includes('商店') || input.includes('买') || input.includes('看')) {
-    return `在商店选购装备时,建议优先考虑:
-- 攻击力提升的武器
-- 增加生存能力的护甲
-- 性价比高的消耗品
-
-\`\`\`json
-{
-  "active": false,
-  "now": false
-}
-\`\`\``;
-  }
-
-  // 一般性问题
-  return `收到你的消息,有什么需要帮助的吗?
-
-\`\`\`json
-{
-  "active": false,
-  "now": false
-}
-\`\`\``;
-}
-
-export default AIAssistantDemo;
+export default AIAssistant;

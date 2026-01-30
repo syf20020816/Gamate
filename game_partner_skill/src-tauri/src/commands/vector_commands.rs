@@ -284,7 +284,7 @@ pub async fn search_wiki(
         .map_err(|e| format!("搜索失败: {}", e))
 }
 
-async fn search_wiki_impl(
+pub async fn search_wiki_impl(
     query: String,
     game_id: String,
     top_k: Option<usize>,

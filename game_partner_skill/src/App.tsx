@@ -25,7 +25,7 @@ function App() {
       <Content className="app-content">
         <MainContent selectedMenu={selectedMenu} onMenuChange={setSelectedMenu} />
       </Content>
-      <RightPanel />
+      <RightPanel onMenuChange={setSelectedMenu} />
     </Layout>
   );
 }

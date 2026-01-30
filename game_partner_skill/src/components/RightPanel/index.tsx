@@ -1,33 +1,71 @@
-import { Layout, Card, Typography, Tag, Progress, Button, Space, Divider, Badge, Avatar } from "antd";
-import { Gamepad2, Database, Zap, TrendingUp, AlertCircle } from "lucide-react";
+import {
+  Layout,
+  Card,
+  Typography,
+  Progress,
+  Button,
+  Space,
+  Divider,
+  Select,
+} from "antd";
+import { Database, Zap, MessageCircle, PlayCircle } from "lucide-react";
 import { motion } from "framer-motion";
 import { useUserStore } from "../../stores/userStore";
 import { getGameById } from "../../data/games";
+import { useSkillLibraryStore } from "../../stores/skillLibraryStore";
+import { useAIAssistantStore } from "../../stores/aiAssistantStore";
+import { useState } from "react";
 import "./styles.scss";
 
 const { Sider } = Layout;
-const { Title, Text, Paragraph } = Typography;
+const { Title, Text } = Typography;
 
-const RightPanel: React.FC = () => {
+interface RightPanelProps {
+  onMenuChange?: (key: string) => void;
+}
+
+const RightPanel: React.FC<RightPanelProps> = ({ onMenuChange }) => {
   const { user } = useUserStore();
-  const selectedGames = user?.config.selectedGames.map(id => getGameById(id)).filter(Boolean) || [];
+  const { downloadedLibraries } = useSkillLibraryStore();
+  const { setCurrentGame } = useAIAssistantStore();
+  const selectedGames =
+    user?.config.selectedGames.map((id) => getGameById(id)).filter(Boolean) ||
+    [];
 
-  // 模拟数据
-  const gameCategories = user?.config.gameCategories || [];
+  const [aiSelectedGame, setAiSelectedGame] = useState<string>("");
 
+  // 系统统计数据
   const systemStats = {
     totalGames: selectedGames.length,
-    activeSkills: selectedGames.length * 50, // 模拟：每个游戏平均50个技能
+    activeSkills: selectedGames.length * 50,
     recognitionRate: 89,
     uptime: "0h 0m",
   };
 
-  const recentActivities = selectedGames.slice(0, 3).map((game, index) => ({
-    game: game!.name,
-    action: index === 0 ? "已添加到游戏库" : "技能库就绪",
-    time: `${index + 1}分钟前`,
-    status: "success" as "success" | "error",
-  }));
+  // 获取已下载技能库的游戏列表
+  const gamesWithSkills = [
+    ...new Set(downloadedLibraries.map((lib) => lib.gameId)),
+  ];
+  const availableGames = selectedGames.filter((game) =>
+    gamesWithSkills.includes(game!.id),
+  );
+
+  // AI 模型名称(可以从配置中读取)
+  const aiModelName = "Qwen 2.5 VL 7B";
+
+  const handleStartAI = () => {
+    if (!aiSelectedGame) {
+      return;
+    }
+
+    // 设置当前游戏到AI助手store
+    setCurrentGame(aiSelectedGame);
+
+    // 跳转到AI陪玩助手页面
+    if (onMenuChange) {
+      onMenuChange("ai-assistant");
+    }
+  };
 
   return (
     <Sider width={380} className="right-panel" theme="dark">
@@ -45,19 +83,25 @@ const RightPanel: React.FC = () => {
             </Title>
             <Space direction="vertical" size="middle" style={{ width: "100%" }}>
               <div className="stat-item">
-                <Space style={{ width: "100%", justifyContent: "space-between" }}>
+                <Space
+                  style={{ width: "100%", justifyContent: "space-between" }}
+                >
                   <Text type="secondary">已配置游戏</Text>
                   <Text strong>{systemStats.totalGames}</Text>
                 </Space>
               </div>
               <div className="stat-item">
-                <Space style={{ width: "100%", justifyContent: "space-between" }}>
+                <Space
+                  style={{ width: "100%", justifyContent: "space-between" }}
+                >
                   <Text type="secondary">活跃技能数</Text>
                   <Text strong>{systemStats.activeSkills}</Text>
                 </Space>
               </div>
               <div className="stat-item">
-                <Space style={{ width: "100%", justifyContent: "space-between" }}>
+                <Space
+                  style={{ width: "100%", justifyContent: "space-between" }}
+                >
                   <Text type="secondary">识别准确率</Text>
                   <Text strong>{systemStats.recognitionRate}%</Text>
                 </Space>
@@ -69,7 +113,9 @@ const RightPanel: React.FC = () => {
                 />
               </div>
               <div className="stat-item">
-                <Space style={{ width: "100%", justifyContent: "space-between" }}>
+                <Space
+                  style={{ width: "100%", justifyContent: "space-between" }}
+                >
                   <Text type="secondary">运行时长</Text>
                   <Text strong>{systemStats.uptime}</Text>
                 </Space>
@@ -80,106 +126,66 @@ const RightPanel: React.FC = () => {
 
         <Divider style={{ margin: "16px 0" }} />
 
-        {/* 游戏分类 */}
+        {/* AI 陪玩助手 */}
         <motion.div
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.3, delay: 0.1 }}
         >
-          <Card className="category-card" size="small">
+          <Card className="ai-assistant-card" size="small">
             <Title level={5}>
-              <Gamepad2 size={20} style={{ marginRight: 8 }} />
-              游戏分类
+              <MessageCircle size={20} style={{ marginRight: 8 }} />
+              AI 陪玩助手
             </Title>
-            <Paragraph type="secondary" style={{ fontSize: 12 }}>
-              配置你的游戏类型,系统将自动加载对应技能库
-            </Paragraph>
-            <Space direction="vertical" size="small" style={{ width: "100%" }}>
-              {gameCategories.map((category, index) => (
-                <motion.div
-                  key={category.id}
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: index * 0.05 }}
-                  className="category-item"
-                >
-                  <Space style={{ width: "100%", justifyContent: "space-between" }}>
-                    <Space>
-                      <Badge
-                        status={category.gameIds.length > 0 ? "success" : "default"}
-                        text={category.name}
-                      />
-                    </Space>
-                    <Tag color={category.gameIds.length > 0 ? category.color : "default"}>
-                      {category.gameIds.length} 个游戏
-                    </Tag>
-                  </Space>
-                </motion.div>
-              ))}
-            </Space>
-            <Button type="dashed" block style={{ marginTop: 12 }}>
-              添加新分类
-            </Button>
-          </Card>
-        </motion.div>
 
-        <Divider style={{ margin: "16px 0" }} />
-
-        {/* 最近活动 */}
-        <motion.div
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.3, delay: 0.2 }}
-        >
-          <Card className="activity-card" size="small">
-            <Title level={5}>
-              <TrendingUp size={20} style={{ marginRight: 8 }} />
-              最近活动
-            </Title>
             <Space direction="vertical" size="middle" style={{ width: "100%" }}>
-              {recentActivities.length > 0 ? (
-                recentActivities.map((activity, index) => (
-                  <motion.div
-                    key={index}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: index * 0.1 }}
-                    className="activity-item"
-                  >
-                    <Space direction="vertical" size={2} style={{ width: "100%" }}>
-                      <Space style={{ width: "100%", justifyContent: "space-between" }}>
-                        <Space>
-                          <Avatar
-                            size="small"
-                            style={{
-                              backgroundColor:
-                                activity.status === "success" ? "#52c41a" : "#f5222d",
-                            }}
-                          >
-                            {activity.game[0]}
-                          </Avatar>
-                          <Text strong style={{ fontSize: 13 }}>
-                            {activity.game}
-                          </Text>
-                        </Space>
-                        {activity.status === "error" && (
-                          <AlertCircle size={16} color="#f5222d" />
-                        )}
-                      </Space>
-                      <Text type="secondary" style={{ fontSize: 12 }}>
-                        {activity.action}
-                      </Text>
-                      <Text type="secondary" style={{ fontSize: 11 }}>
-                        {activity.time}
-                      </Text>
-                    </Space>
-                  </motion.div>
-                ))
-              ) : (
-                <Text type="secondary" style={{ textAlign: 'center', display: 'block', padding: '20px 0' }}>
-                  暂无活动记录
+              {/* AI 模型信息 */}
+              <div className="ai-model-info">
+                <Text type="secondary" style={{ fontSize: 12 }}>
+                  当前模型
                 </Text>
-              )}
+                <div
+                  style={{
+                    padding: "8px 12px",
+                    borderRadius: "6px",
+                    marginTop: "4px",
+                  }}
+                >
+                  <Text strong>{aiModelName}</Text>
+                </div>
+              </div>
+
+              {/* 游戏选择 */}
+              <div className="game-selector">
+                <Text type="secondary" style={{ fontSize: 12 }}>
+                  选择游戏
+                </Text>
+                <Select
+                  value={aiSelectedGame}
+                  onChange={setAiSelectedGame}
+                  style={{ width: "100%", marginTop: "4px" }}
+                  placeholder="请选择游戏"
+                  size="large"
+                >
+                  {availableGames.map((game) => (
+                    <Select.Option key={game!.id} value={game!.id}>
+                      {game!.name}
+                    </Select.Option>
+                  ))}
+                </Select>
+              </div>
+
+              {/* 开始对话按钮 */}
+              <Button
+                type="primary"
+                size="large"
+                block
+                icon={<PlayCircle size={18} />}
+                disabled={!aiSelectedGame}
+                onClick={handleStartAI}
+              >
+                开始对话
+              </Button>
             </Space>
           </Card>
         </motion.div>
@@ -200,11 +206,7 @@ const RightPanel: React.FC = () => {
             <Space direction="vertical" size="small" style={{ width: "100%" }}>
               <div className="skill-stat">
                 <Text type="secondary">向量数据库</Text>
-                <Progress
-                  percent={67}
-                  size="small"
-                  format={() => "3.2 GB"}
-                />
+                <Progress percent={67} size="small" format={() => "3.2 GB"} />
               </div>
               <div className="skill-stat">
                 <Text type="secondary">Wiki 条目</Text>

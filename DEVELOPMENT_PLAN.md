@@ -238,8 +238,8 @@
 ### Day 11-14: 向量数据库搭建 🗄️
 
 #### 目标
-- [ ] 集成 Qdrant 向量库 ⏳
-- [ ] 生成并存储 Embeddings ⏳
+- [x] 集成 Qdrant 向量库 ⏳
+- [x] 生成并存储 Embeddings ⏳
 
 #### 任务清单
 ```bash
@@ -308,43 +308,105 @@
 
 #### 目标
 - [ ] 实现 RAG 提示生成
-- [ ] 集成 LLM API
+- [ ] 集成多模态 LLM API
+- [ ] 构建 AI 陪玩助手页面
+
+#### 架构决策
+✅ **采用独立页面模式** (推荐)
+- 新增 Menu 项: "AI陪玩助手" (/ai-assistant)
+- 与屏幕识别页面分离,职责清晰
+- 支持后台运行+全屏游戏场景
 
 #### 任务清单
 ```bash
-# Day 15
-□ 设计 RAG 流程
-  - 输入: GameState (OCR 结果)
-  - 步骤: 向量检索 → Prompt 构建 → LLM 调用
-□ 实现查询转换
-  - 将游戏状态转为检索 query
-  - 例: "任务: 击败玛莉卡" → "玛莉卡 攻略"
-□ 构建 Prompt 模板
-  - 系统 Prompt: 定义助手角色
-  - 用户 Prompt: 嵌入检索内容
+# Day 15: 前端页面搭建 + RAG 后端基础
+□ 前端: 创建 AI 陪玩助手页面
+  - 新建 src/pages/AIAssistant/index.tsx
+  - 布局: 左侧对话区 + 右侧上下文区(截图/状态/检索结果)
+  - 底部: 消息输入框 + 发送按钮
+  - 集成到 Menu 路由: /ai-assistant
 
-# Day 16
-□ 集成 OpenAI API
-  - 使用 reqwest 发送请求
-  - 模型: gpt-4o-mini
-  - 配置: temperature=0.7, max_tokens=100
-□ 实现调用函数
-  - src-tauri/src/llm.rs
-  - 功能: generate_tip(game_state, context) -> String
-□ 错误处理
-  - API 限流、超时重试
-  - Fallback: 返回检索内容摘要
+□ 前端: 状态管理
+  - 创建 src/stores/aiAssistantStore.ts
+  - 状态: messages[], currentGame, isThinking, latestScreenshot
+  - 动作: sendMessage(), receiveAIResponse(), updateContext()
 
-# Day 17
-□ 可选: 本地 LLM 集成
-  - 使用 llama.cpp Rust 绑定
-  - 模型: Llama 3.2 3B (量化版)
-  - 推理测试 (速度 vs 质量)
-□ 前端展示 AI 提示
-  - 半透明浮窗
-  - 可拖动、可关闭
+□ 后端: RAG 流程设计
+  - 新建 src-tauri/src/rag.rs
+  - 结构体: RAGContext { screenshot, game_state, wiki_entries }
+  - 函数签名: build_rag_context(game_id, query) -> RAGContext
+
+□ 后端: 查询转换逻辑
+  - 实现 extract_query_from_user_message(text) -> String
+  - 示例: "这个Boss怎么打" → "Boss 攻略 技巧"
+  - 支持关键词提取 + 同义词扩展
+
+□ 后端: Prompt 模板系统
+  - 系统 Prompt: "你是{game_name}游戏陪玩AI助手..."
+  - 用户 Prompt: "当前游戏状态:{state}\n\nWiki参考:{wiki_context}\n\n用户问题:{query}"
+  - 支持动态变量替换
+
+# Day 16: 多模态 LLM 集成
+□ 后端: OpenAI API 集成
+  - 添加依赖: reqwest = { version = "0.11", features = ["json"] }
+  - 新建 src-tauri/src/llm/openai.rs
+  - 实现: call_gpt4_vision(prompt, image_base64) -> Result<String>
+  - 配置: model="gpt-4o-mini", temperature=0.7, max_tokens=500
+
+□ 后端: API 错误处理
+  - 超时重试: 3次, 指数退避 (1s, 2s, 4s)
+  - 限流处理: 429 错误 → 等待 60s 后重试
+  - Fallback: API失败 → 返回向量检索摘要
+
+□ 后端: 完整 RAG 流程
+  - src-tauri/src/rag.rs: generate_ai_response()
+  - 步骤:
+    1. 接收用户消息 + 最新截图
+    2. 提取查询关键词
+    3. 向量检索 Wiki (top_k=3)
+    4. 构建 Prompt (系统+用户+Wiki+截图)
+    5. 调用 GPT-4V
+    6. 返回 AI 回复
+
+□ 前端: LLM 调用集成
+  - 调用后端: invoke('generate_ai_response', { message, screenshot })
+  - 显示加载状态: "AI 思考中..."
+  - 流式显示: 逐字打印效果 (framer-motion)
+  - 错误处理: 显示 Fallback 内容
+
+□ 配置: API Key 管理
+  - 用户设置页面: 输入 OpenAI API Key
+  - 保存到: config.toml [ai_models.llm] openai_api_key
+  - 安全: 不明文显示,使用 **** 遮罩
+
+# Day 17: 智能截图联动 + UI 优化
+□ 截图事件监听
+  - 后端: 截图完成后发送事件 screenshot_captured
+  - 前端: AIAssistant 页面监听事件
+  - 自动更新: latestScreenshot 状态
+  - 显示: 右侧上下文区实时预览
+
+□ AI 主动提示 (可选)
+  - 后端: 分析截图变化 (场景切换、血量低、Boss出现)
+  - 触发: 主动调用 RAG 生成提示
+  - 前端: Toast 通知 + TTS 播报 (语音提醒)
+
+□ UI 优化
+  - 对话气泡: 用户(右对齐) vs AI(左对齐)
+  - Markdown 渲染: AI 回复支持代码块、列表
+  - 时间戳: 每条消息显示时间
+  - 快捷操作: 点击 Wiki 引用跳转到知识库
+
+□ 性能优化
+  - 截图缓存: 避免重复发送相同图片
+  - LLM 去重: 相似问题直接返回缓存答案
+  - 向量检索: 批量查询 + 结果缓存
+
 □ 测试完整流程
-  - 截屏 → OCR → 检索 → LLM → 显示
+  - 场景1: 用户提问 → RAG检索 → GPT-4V回复
+  - 场景2: 截图变化 → AI主动提示
+  - 场景3: API失败 → Fallback摘要
+  - 性能: 端到端延迟 < 5s
 ```
 
 #### 交付物
@@ -574,27 +636,40 @@
 | 检查点 | 日期 | 验收标准 | 状态 |
 |-------|------|---------|------|
 | **M1: 基础架构** | Day 4 | Tauri 运行 + 智能截图 | ✅ **已完成** |
-| **M2: 知识库** | Day 14 | Wiki 爬虫 + 向量库检索 | ⏳ **50% (爬虫完成)** |
-| **M3: AI 集成** | Day 21 | RAG + 多模态 LLM + TTS | ⏳ **未开始** |
+| **M2: 知识库** | Day 14 | Wiki 爬虫 + 向量库检索 | ✅ **已完成** |
+| **M3: AI 集成** | Day 21 | RAG + 多模态 LLM + TTS | ⏳ **进行中 (0%)** |
 | **M4: MVP 完成** | Day 28 | 完整演示可运行 | ⏳ **未开始** |
 
 ### 当前进度详情 (2026-01-30)
+
+**✅ Week 1-2 已完成:**
+- Day 1-2: Tauri 项目搭建
+- Day 3-4: 智能截图系统 (AI 驱动 + 混合定时 + 图片压缩)
+- Day 5-7: ~~OCR~~ (已跳过 - 多模态模型替代)
+- Day 8-10: Wiki 爬虫系统 (Fandom/GitHub/Web + JSONL 输出)
+- Day 11-14: 向量数据库 (三种模式 + 语义检索)
 
 **✅ 已完成:**
 - Day 1-2: Tauri 项目搭建
 - Day 3-4: 智能截图系统 (AI 驱动 + 混合定时 + 图片压缩)
 - Day 5-7: ~~OCR~~ (已跳过 - 多模态模型替代)
 - Day 8-10: Wiki 爬虫系统 (Fandom/GitHub/Web + JSONL 输出)
+- **Day 11-14: 向量数据库系统** ✅
+  - ✅ 三种模式: Local (JSON) / Qdrant / AI Direct (JSONL)
+  - ✅ 向量导入: `import_wiki_to_vector_db`
+  - ✅ 语义检索: `search_wiki` (支持三种模式)
+  - ✅ 前端 Wiki 知识库界面
+  - ✅ Markdown 渲染优化
 
 **⏳ 进行中:**
-- **Day 11-14: 向量数据库** ← **你在这里**
-  - [x] Wiki 数据准备完成 (JSONL)
-  - [ ] Qdrant 集成
-  - [ ] Fastembed 嵌入生成
-  - [ ] 向量检索实现
+- **Day 15-17: RAG + LLM 集成** ← **你在这里**
+  - [ ] AI 陪玩助手页面
+  - [ ] RAG 流程后端
+  - [ ] GPT-4 Vision API 集成
+  - [ ] 智能截图联动
 
 **📅 待开始:**
-- Day 15-21: RAG + LLM + TTS
+- Day 18-21: TTS + 语音交互
 - Day 22-28: UI 完善 + 测试
 - Day 29-30: 文档 + 演示
 

@@ -5,6 +5,7 @@ import Home from "../Home";
 import Logs from "../Logs";
 import SettingsPanel from "../Settings";
 import WikiKnowledgeBase from "../WikiKnowledgeBase";
+import AIAssistant from "../AIAssistant";
 import "./styles.scss";
 
 interface MainContentProps {
@@ -21,6 +22,8 @@ const MainContent: React.FC<MainContentProps> = ({ selectedMenu, onMenuChange })
         return <ScreenCapture />;
       case "wiki-search":
         return <WikiKnowledgeBase />;
+      case "ai-assistant":
+        return <AIAssistant />;
       case "game-library":
         return <GameLibrary />;
       case "skill-database":
