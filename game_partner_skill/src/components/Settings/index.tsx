@@ -52,6 +52,17 @@ interface AppSettings {
       localStoragePath?: string;
     };
   };
+  screenshot?: {
+    enabled: boolean;
+    captureMode: string;
+    targetWindowId?: number | null;
+    targetWindowName?: string | null;
+    activeIntervalSeconds: number;
+    idleIntervalSeconds: number;
+    quality: number;
+    targetSizeKb: number;
+    autoSendToAi: boolean;
+  };
 }
 
 interface ModelConfig {
@@ -60,6 +71,8 @@ interface ModelConfig {
   apiKey?: string | null;
   modelName: string;
   enabled: boolean;
+  temperature?: number;
+  maxTokens?: number;
 }
 
 const SettingsPanel: React.FC = () => {
@@ -104,16 +117,20 @@ const SettingsPanel: React.FC = () => {
             modelName:
               data.ai_models?.embedding?.model_name || "qwen3-embedding:4b",
             enabled: data.ai_models?.embedding?.enabled !== false,
+            temperature: data.ai_models?.embedding?.temperature || 0.0,
+            maxTokens: data.ai_models?.embedding?.max_tokens || 512,
           },
           multimodal: {
-            provider: data.ai_models?.multimodal?.provider || "local",
+            provider: data.ai_models?.multimodal?.provider || "openai",
             apiBase:
               data.ai_models?.multimodal?.api_base ||
-              "http://localhost:11434/v1",
+              "https://api.openai.com/v1",
             apiKey: data.ai_models?.multimodal?.api_key || null,
             modelName:
-              data.ai_models?.multimodal?.model_name || "qwen3-vl:latest",
+              data.ai_models?.multimodal?.model_name || "gpt-4o-mini",
             enabled: data.ai_models?.multimodal?.enabled !== false,
+            temperature: data.ai_models?.multimodal?.temperature || 0.7,
+            maxTokens: data.ai_models?.multimodal?.max_tokens || 1000,
           },
           vectorDb: {
             mode: data.ai_models?.vector_db?.mode || "local",
@@ -123,6 +140,17 @@ const SettingsPanel: React.FC = () => {
               data.ai_models?.vector_db?.local_storage_path ||
               "./data/vector_db",
           },
+        },
+        screenshot: {
+          enabled: data.screenshot?.enabled || false,
+          captureMode: data.screenshot?.capture_mode || "fullscreen",
+          targetWindowId: data.screenshot?.target_window_id || null,
+          targetWindowName: data.screenshot?.target_window_name || null,
+          activeIntervalSeconds: data.screenshot?.active_interval_seconds || 5,
+          idleIntervalSeconds: data.screenshot?.idle_interval_seconds || 15,
+          quality: data.screenshot?.quality || 85,
+          targetSizeKb: data.screenshot?.target_size_kb || 200,
+          autoSendToAi: data.screenshot?.auto_send_to_ai !== false,
         },
       };
 
@@ -175,6 +203,8 @@ const SettingsPanel: React.FC = () => {
             api_key: values.aiModels.embedding.apiKey || null,
             model_name: values.aiModels.embedding.modelName,
             enabled: values.aiModels.embedding.enabled,
+            temperature: values.aiModels.embedding.temperature || 0.0,
+            max_tokens: values.aiModels.embedding.maxTokens || 512,
           },
           multimodal: {
             provider: values.aiModels.multimodal.provider,
@@ -182,6 +212,8 @@ const SettingsPanel: React.FC = () => {
             api_key: values.aiModels.multimodal.apiKey || null,
             model_name: values.aiModels.multimodal.modelName,
             enabled: values.aiModels.multimodal.enabled,
+            temperature: values.aiModels.multimodal.temperature || 0.7,
+            max_tokens: values.aiModels.multimodal.maxTokens || 1000,
           },
           vector_db: {
             mode: values.aiModels.vectorDb.mode,
@@ -190,6 +222,17 @@ const SettingsPanel: React.FC = () => {
               values.aiModels.vectorDb.localStoragePath || null,
           },
         },
+        screenshot: values.screenshot ? {
+          enabled: values.screenshot.enabled,
+          capture_mode: values.screenshot.captureMode,
+          target_window_id: values.screenshot.targetWindowId || null,
+          target_window_name: values.screenshot.targetWindowName || null,
+          active_interval_seconds: values.screenshot.activeIntervalSeconds,
+          idle_interval_seconds: values.screenshot.idleIntervalSeconds,
+          quality: values.screenshot.quality,
+          target_size_kb: values.screenshot.targetSizeKb,
+          auto_send_to_ai: values.screenshot.autoSendToAi,
+        } : undefined,
       };
 
       console.log("📤 发送给后端:", backendData);
@@ -343,7 +386,32 @@ const SettingsPanel: React.FC = () => {
                   name={["aiModels", "embedding", "provider"]}
                   rules={[{ required: true, message: "请选择提供商" }]}
                 >
-                  <Select placeholder="选择提供商">
+                  <Select 
+                    placeholder="选择提供商"
+                    onChange={(value) => {
+                      // 根据提供商自动设置 API 地址
+                      const apiBaseMap: Record<string, string> = {
+                        openai: "https://api.openai.com/v1",
+                        local: "http://localhost:11434/v1",
+                        azure: "https://your-resource.openai.azure.com",
+                      };
+                      
+                      if (apiBaseMap[value]) {
+                        form.setFieldValue(
+                          ["aiModels", "embedding", "apiBase"],
+                          apiBaseMap[value]
+                        );
+                      }
+                      
+                      // 如果是本地模型,清空 API Key
+                      if (value === "local") {
+                        form.setFieldValue(
+                          ["aiModels", "embedding", "apiKey"],
+                          null
+                        );
+                      }
+                    }}
+                  >
                     <Select.Option value="local">
                       本地模型 (Ollama)
                     </Select.Option>
@@ -357,9 +425,9 @@ const SettingsPanel: React.FC = () => {
                   label="API 地址"
                   name={["aiModels", "embedding", "apiBase"]}
                   rules={[{ required: true, message: "请输入 API 地址" }]}
-                  tooltip="本地 Ollama 默认: http://localhost:11434/v1"
+                  tooltip="选择提供商后会自动填充,可手动修改"
                 >
-                  <Input placeholder="http://localhost:11434/v1" />
+                  <Input placeholder="会根据提供商自动设置" />
                 </Form.Item>
 
                 <Form.Item
@@ -386,10 +454,41 @@ const SettingsPanel: React.FC = () => {
                 title={
                   <Space>
                     <PictureOutlined />
-                    <span>多模态模型</span>
+                    <span>多模态模型 (AI 对话)</span>
                   </Space>
                 }
               >
+                <Alert
+                  message="多模态模型说明"
+                  description={
+                    <ul style={{ marginBottom: 0, paddingLeft: 20 }}>
+                      <li>
+                        <strong>用途</strong>: AI 陪玩助手的智能对话和截图分析
+                      </li>
+                      <li>
+                        <strong>推荐配置</strong>: OpenAI GPT-4o-mini (性价比高)
+                      </li>
+                      <li>
+                        <strong>本地模型</strong>: Ollama qwen3-vl (需要先安装)
+                      </li>
+                      <li>
+                        <strong>API Key</strong>: 在{" "}
+                        <a
+                          href="https://platform.openai.com/api-keys"
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          OpenAI 官网
+                        </a>{" "}
+                        获取
+                      </li>
+                    </ul>
+                  }
+                  type="info"
+                  showIcon
+                  style={{ marginBottom: 16 }}
+                />
+
                 <Form.Item
                   label="启用"
                   name={["aiModels", "multimodal", "enabled"]}
@@ -403,11 +502,36 @@ const SettingsPanel: React.FC = () => {
                   name={["aiModels", "multimodal", "provider"]}
                   rules={[{ required: true, message: "请选择提供商" }]}
                 >
-                  <Select placeholder="选择提供商">
+                  <Select 
+                    placeholder="选择提供商"
+                    onChange={(value) => {
+                      // 根据提供商自动设置 API 地址
+                      const apiBaseMap: Record<string, string> = {
+                        openai: "https://api.openai.com/v1",
+                        local: "http://localhost:11434",
+                        azure: "https://your-resource.openai.azure.com",
+                      };
+                      
+                      if (apiBaseMap[value]) {
+                        form.setFieldValue(
+                          ["aiModels", "multimodal", "apiBase"],
+                          apiBaseMap[value]
+                        );
+                      }
+                      
+                      // 如果是本地模型,清空 API Key
+                      if (value === "local") {
+                        form.setFieldValue(
+                          ["aiModels", "multimodal", "apiKey"],
+                          null
+                        );
+                      }
+                    }}
+                  >
+                    <Select.Option value="openai">OpenAI</Select.Option>
                     <Select.Option value="local">
                       本地模型 (Ollama)
                     </Select.Option>
-                    <Select.Option value="openai">OpenAI</Select.Option>
                     <Select.Option value="azure">Azure OpenAI</Select.Option>
                     <Select.Option value="custom">自定义</Select.Option>
                   </Select>
@@ -417,13 +541,15 @@ const SettingsPanel: React.FC = () => {
                   label="API 地址"
                   name={["aiModels", "multimodal", "apiBase"]}
                   rules={[{ required: true, message: "请输入 API 地址" }]}
+                  tooltip="选择提供商后会自动填充,可手动修改"
                 >
-                  <Input placeholder="http://localhost:11434/v1" />
+                  <Input placeholder="会根据提供商自动设置" />
                 </Form.Item>
 
                 <Form.Item
                   label="API Key"
                   name={["aiModels", "multimodal", "apiKey"]}
+                  tooltip="OpenAI 必填 (sk- 开头)，本地模型不需要"
                 >
                   <Input.Password placeholder="sk-..." />
                 </Form.Item>
@@ -432,9 +558,32 @@ const SettingsPanel: React.FC = () => {
                   label="模型名称"
                   name={["aiModels", "multimodal", "modelName"]}
                   rules={[{ required: true, message: "请输入模型名称" }]}
-                  tooltip="推荐: qwen3-vl:latest, llava:latest, gpt-4-vision-preview"
+                  tooltip="推荐: gpt-4o-mini, gpt-4-turbo, qwen3-vl:latest"
                 >
-                  <Input placeholder="qwen3-vl:latest" />
+                  <Input placeholder="gpt-4o-mini" />
+                </Form.Item>
+
+                <Divider>高级参数</Divider>
+
+                <Form.Item
+                  label="温度 (Temperature)"
+                  name={["aiModels", "multimodal", "temperature"]}
+                  tooltip="控制回复的随机性,0-2 之间,越高越随机"
+                >
+                  <InputNumber
+                    min={0}
+                    max={2}
+                    step={0.1}
+                    style={{ width: "100%" }}
+                  />
+                </Form.Item>
+
+                <Form.Item
+                  label="最大 Token 数"
+                  name={["aiModels", "multimodal", "maxTokens"]}
+                  tooltip="控制回复的长度,建议 500-2000"
+                >
+                  <InputNumber min={100} max={4000} style={{ width: "100%" }} />
                 </Form.Item>
               </Card>
 
@@ -683,6 +832,233 @@ const SettingsPanel: React.FC = () => {
                   tooltip="单个请求的最大等待时间"
                 >
                   <InputNumber min={5} style={{ width: "100%" }} />
+                </Form.Item>
+              </Card>
+            </Tabs.TabPane>
+
+            {/* 截图设置 */}
+            <Tabs.TabPane
+              tab={
+                <Space>
+                  <PictureOutlined />
+                  <span>智能截图</span>
+                </Space>
+              }
+              key="screenshot"
+            >
+              <Alert
+                message="智能截图配置"
+                description={
+                  <ul style={{ marginBottom: 0, paddingLeft: 20 }}>
+                    <li>
+                      <strong>活跃模式</strong>:
+                      AI 助手运行时的截图频率,推荐 5-10 秒
+                    </li>
+                    <li>
+                      <strong>闲置模式</strong>:
+                      用户无操作时的截图频率,推荐 15-30 秒
+                    </li>
+                    <li>
+                      <strong>自动发送给 AI</strong>:
+                      开启后截图会自动触发 AI 分析
+                    </li>
+                    <li>
+                      <strong>图片质量</strong>:
+                      建议 80-90,平衡质量与文件大小
+                    </li>
+                  </ul>
+                }
+                type="info"
+                showIcon
+                style={{ marginBottom: 24 }}
+              />
+
+              <Card type="inner" title="基本配置">
+                <Form.Item
+                  label="启用智能截图"
+                  name={["screenshot", "enabled"]}
+                  valuePropName="checked"
+                  tooltip="启用后可以自动截取游戏画面"
+                >
+                  <Switch />
+                </Form.Item>
+
+                <Form.Item
+                  label="截图模式"
+                  name={["screenshot", "captureMode"]}
+                  tooltip="选择全屏或窗口截图模式"
+                >
+                  <Select>
+                    <Select.Option value="fullscreen">🖥️ 全屏截图</Select.Option>
+                    <Select.Option value="window">🪟 窗口截图</Select.Option>
+                  </Select>
+                </Form.Item>
+
+                <Form.Item
+                  noStyle
+                  shouldUpdate={(prevValues, currentValues) =>
+                    prevValues.screenshot?.captureMode !== currentValues.screenshot?.captureMode
+                  }
+                >
+                  {({ getFieldValue }) => {
+                    const captureMode = getFieldValue(["screenshot", "captureMode"]);
+                    
+                    if (captureMode === "window") {
+                      return (
+                        <>
+                          <Form.Item
+                            label="目标窗口"
+                            tooltip="设置后将自动截取该窗口"
+                          >
+                            <Space.Compact style={{ width: "100%" }}>
+                              <Form.Item
+                                name={["screenshot", "targetWindowName"]}
+                                noStyle
+                              >
+                                <Input
+                                  placeholder="点击右侧按钮选择窗口"
+                                  readOnly
+                                  style={{ flex: 1 }}
+                                />
+                              </Form.Item>
+                              <Button
+                                onClick={async () => {
+                                  try {
+                                    const windows = await invoke<any[]>("list_windows_command");
+                                    if (windows.length === 0) {
+                                      message.warning("未找到可用窗口");
+                                      return;
+                                    }
+                                    
+                                    // 显示窗口选择对话框
+                                    const windowOptions = windows.map((w: any) => ({
+                                      label: `${w.title || w.app_name} (${w.app_name})`,
+                                      value: w.id,
+                                    }));
+                                    
+                                    // 简单实现: 选择第一个窗口 (实际应该弹出选择框)
+                                    const selectedWindow = windows[0];
+                                    form.setFieldsValue({
+                                      screenshot: {
+                                        targetWindowId: selectedWindow.id,
+                                        targetWindowName: selectedWindow.title || selectedWindow.app_name,
+                                      }
+                                    });
+                                    message.success(`已选择: ${selectedWindow.title || selectedWindow.app_name}`);
+                                  } catch (error: any) {
+                                    message.error(`获取窗口列表失败: ${error}`);
+                                  }
+                                }}
+                              >
+                                选择窗口
+                              </Button>
+                            </Space.Compact>
+                          </Form.Item>
+                          <Alert
+                            message="提示"
+                            description="窗口截图模式下，AI 对话时会自动截取您选择的窗口，无需手动操作"
+                            type="info"
+                            showIcon
+                            style={{ marginBottom: 16 }}
+                          />
+                        </>
+                      );
+                    }
+                    return null;
+                  }}
+                </Form.Item>
+
+                <Form.Item
+                  label="活跃模式截图间隔 (秒)"
+                  name={["screenshot", "activeIntervalSeconds"]}
+                  tooltip="AI 助手运行时的截图频率"
+                  rules={[
+                    {
+                      type: "number",
+                      min: 1,
+                      max: 60,
+                      message: "间隔必须在 1-60 秒之间",
+                    },
+                  ]}
+                >
+                  <InputNumber
+                    min={1}
+                    max={60}
+                    style={{ width: "100%" }}
+                    addonAfter="秒"
+                  />
+                </Form.Item>
+
+                <Form.Item
+                  label="闲置模式截图间隔 (秒)"
+                  name={["screenshot", "idleIntervalSeconds"]}
+                  tooltip="用户无操作时的截图频率"
+                  rules={[
+                    {
+                      type: "number",
+                      min: 5,
+                      max: 120,
+                      message: "间隔必须在 5-120 秒之间",
+                    },
+                  ]}
+                >
+                  <InputNumber
+                    min={5}
+                    max={120}
+                    style={{ width: "100%" }}
+                    addonAfter="秒"
+                  />
+                </Form.Item>
+
+                <Form.Item
+                  label="截图质量"
+                  name={["screenshot", "quality"]}
+                  tooltip="JPEG 压缩质量,1-100"
+                  rules={[
+                    {
+                      type: "number",
+                      min: 1,
+                      max: 100,
+                      message: "质量必须在 1-100 之间",
+                    },
+                  ]}
+                >
+                  <InputNumber
+                    min={1}
+                    max={100}
+                    style={{ width: "100%" }}
+                    addonAfter="%"
+                  />
+                </Form.Item>
+
+                <Form.Item
+                  label="目标文件大小 (KB)"
+                  name={["screenshot", "targetSizeKb"]}
+                  tooltip="压缩后的目标文件大小"
+                  rules={[
+                    {
+                      type: "number",
+                      min: 50,
+                      max: 1000,
+                      message: "文件大小必须在 50-1000 KB 之间",
+                    },
+                  ]}
+                >
+                  <InputNumber
+                    min={50}
+                    max={1000}
+                    style={{ width: "100%" }}
+                    addonAfter="KB"
+                  />
+                </Form.Item>
+
+                <Form.Item
+                  label="自动发送给 AI 分析"
+                  name={["screenshot", "autoSendToAi"]}
+                  valuePropName="checked"
+                  tooltip="开启后,每次截图都会自动触发 AI 分析"
+                >
+                  <Switch />
                 </Form.Item>
               </Card>
             </Tabs.TabPane>

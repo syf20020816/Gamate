@@ -1,4 +1,6 @@
 use crate::rag::{build_rag_context, build_prompt, AIResponse, WikiReference};
+use crate::settings::AppSettings;
+use crate::llm::{OpenAIClient, OllamaClient};
 use anyhow::Result;
 
 /// 生成 AI 回复 (Tauri 命令)
@@ -24,7 +26,7 @@ async fn generate_ai_response_impl(
     log::info!("   游戏 ID: {}", game_id);
 
     // 1. 构建 RAG 上下文
-    let context = build_rag_context(&game_id, &message, screenshot).await?;
+    let context = build_rag_context(&game_id, &message, screenshot.clone()).await?;
 
     // 2. 构建 Prompt
     let game_name = get_game_name(&game_id);
@@ -34,8 +36,8 @@ async fn generate_ai_response_impl(
     log::debug!("系统 Prompt:\n{}", system_prompt);
     log::debug!("用户 Prompt:\n{}", user_prompt);
 
-    // 3. 调用 LLM (目前是 Mock 实现,Day 16 会集成真实 API)
-    let ai_content = mock_llm_call(&system_prompt, &user_prompt, &context).await?;
+    // 3. 调用 LLM
+    let ai_content = call_llm(&system_prompt, &user_prompt, &screenshot).await?;
 
     // 4. 返回结果
     let wiki_references: Vec<WikiReference> = context
@@ -66,54 +68,116 @@ fn get_game_name(game_id: &str) -> String {
     .to_string()
 }
 
-/// Mock LLM 调用 (临时实现)
-/// Day 16 会替换为真实的 OpenAI API 调用
-async fn mock_llm_call(
-    _system_prompt: &str,
+/// 调用 LLM (根据配置选择不同的实现)
+async fn call_llm(
+    system_prompt: &str,
     user_prompt: &str,
-    context: &crate::rag::RAGContext,
+    screenshot: &Option<String>,
 ) -> Result<String> {
-    log::info!("⚠️  使用 Mock LLM (临时实现)");
+    // 加载设置
+    let settings = AppSettings::load()?;
+    let multimodal_config = settings.ai_models.multimodal;
 
-    // 模拟 AI 回复
-    let mut response = String::new();
+    // 检查是否启用
+    if !multimodal_config.enabled {
+        log::warn!("⚠️  多模态模型未启用,使用 Mock 实现");
+        return mock_llm_fallback(user_prompt);
+    }
 
-    if !context.wiki_entries.is_empty() {
-        response.push_str("## 📚 知识库检索结果\n\n");
-        response.push_str(&format!(
-            "我在知识库中找到了 {} 条相关信息:\n\n",
-            context.wiki_entries.len()
-        ));
+    // 检查 API Key (仅对非本地模型)
+    if multimodal_config.provider != "local" && multimodal_config.api_key.is_none() {
+        log::warn!("⚠️  未配置 API Key (提供商: {}),使用 Mock 实现", multimodal_config.provider);
+        return mock_llm_fallback(user_prompt);
+    }
 
-        for (i, entry) in context.wiki_entries.iter().enumerate() {
-            response.push_str(&format!(
-                "**{}. {}** (相关度: {:.1}%)\n\n{}\n\n",
-                i + 1,
-                entry.title,
-                entry.score * 100.0,
-                &entry.content[..entry.content.len().min(200)]
-            ));
+    // 根据 provider 选择合适的客户端
+    let is_local = multimodal_config.provider == "local";
+    
+    log::info!("🤖 使用 {} 客户端", if is_local { "Ollama" } else { "OpenAI" });
+
+    // 调用 API (带重试)
+    for attempt in 1..=3 {
+        log::info!("🔄 尝试调用 LLM API (第 {}/3 次)", attempt);
+
+        let result = if is_local {
+            // 使用 Ollama 原生客户端
+            let client = match OllamaClient::new(multimodal_config.clone()) {
+                Ok(c) => c,
+                Err(e) => {
+                    log::error!("❌ 创建 Ollama 客户端失败: {}", e);
+                    if attempt < 3 {
+                        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+                        continue;
+                    }
+                    log::warn!("   回退到 Mock 实现");
+                    return mock_llm_fallback(user_prompt);
+                }
+            };
+
+            if let Some(img) = screenshot {
+                client.chat_with_vision(system_prompt, user_prompt, img).await
+            } else {
+                client.chat(system_prompt, user_prompt).await
+            }
+        } else {
+            // 使用 OpenAI 客户端
+            let client = match OpenAIClient::new(multimodal_config.clone()) {
+                Ok(c) => c,
+                Err(e) => {
+                    log::error!("❌ 创建 OpenAI 客户端失败: {}", e);
+                    if attempt < 3 {
+                        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+                        continue;
+                    }
+                    log::warn!("   回退到 Mock 实现");
+                    return mock_llm_fallback(user_prompt);
+                }
+            };
+
+            if let Some(img) = screenshot {
+                client.chat_with_vision(system_prompt, user_prompt, img).await
+            } else {
+                client.chat(system_prompt, user_prompt).await
+            }
+        };
+
+        match result {
+            Ok(content) => {
+                log::info!("✅ LLM API 调用成功");
+                return Ok(content);
+            }
+            Err(e) => {
+                log::warn!("⚠️  第 {} 次调用失败: {}", attempt, e);
+                if attempt < 3 {
+                    // 指数退避
+                    let delay_ms = 1000 * (2_u64.pow(attempt - 1));
+                    log::info!("   等待 {}ms 后重试...", delay_ms);
+                    tokio::time::sleep(tokio::time::Duration::from_millis(delay_ms)).await;
+                } else {
+                    log::error!("❌ LLM API 调用失败 (已重试 3 次): {}", e);
+                    log::warn!("   回退到 Mock 实现");
+                    return mock_llm_fallback(user_prompt);
+                }
+            }
         }
-
-        response.push_str("\n---\n\n");
-        response.push_str("💡 **建议:**\n\n");
-        response.push_str("根据以上知识库内容,你可以参考这些信息来解决问题。\n\n");
-    } else {
-        response.push_str("## ⚠️  知识库未找到相关信息\n\n");
-        response.push_str("抱歉,我在知识库中没有找到相关信息。\n\n");
-        response.push_str("请尝试:\n");
-        response.push_str("1. 更换关键词重新提问\n");
-        response.push_str("2. 在 Wiki 知识库页面导入更多数据\n");
-        response.push_str("3. 提供游戏截图以获得更精准的建议\n");
     }
 
-    if context.screenshot.is_some() {
-        response.push_str("\n📸 **已分析截图** (需要真实 AI 视觉模型)\n");
-    }
+    // 理论上不会到达这里
+    mock_llm_fallback(user_prompt)
+}
 
-    response.push_str("\n---\n\n");
-    response.push_str("🔧 **提示:** 当前使用的是 Mock AI 实现\n");
-    response.push_str("请在 Day 16 集成真实的 GPT-4 Vision API 后,获得智能对话体验。\n\n");
+/// Mock LLM 回退实现
+fn mock_llm_fallback(user_prompt: &str) -> Result<String> {
+    log::info!("⚠️  使用 Mock LLM 回退实现");
+
+    let mut response = String::new();
+    response.push_str("## ⚠️  OpenAI API 未配置\n\n");
+    response.push_str("当前使用的是 Mock AI 实现,无法提供智能对话。\n\n");
+    response.push_str("**如何启用真实 AI:**\n\n");
+    response.push_str("1. 在设置页面配置 OpenAI API Key\n");
+    response.push_str("2. 选择合适的模型 (推荐: gpt-4o-mini)\n");
+    response.push_str("3. 保存设置后重新发送消息\n\n");
+    response.push_str("---\n\n");
     response.push_str(&format!("**您的问题:** {}\n", user_prompt));
 
     Ok(response)
@@ -124,15 +188,10 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn test_mock_llm() {
-        let context = crate::rag::RAGContext {
-            screenshot: None,
-            game_state: serde_json::json!({}),
-            wiki_entries: vec![],
-        };
-
-        let result = mock_llm_call("system", "user question", &context).await;
+    async fn test_mock_fallback() {
+        let result = mock_llm_fallback("测试问题");
         assert!(result.is_ok());
-        assert!(result.unwrap().contains("Mock"));
+        let content = result.unwrap();
+        assert!(content.contains("Mock AI"));
     }
 }

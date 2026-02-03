@@ -61,3 +61,5 @@ image = "0.24"
 xcap = "0.8.1"
 # 系统目录
 dirs = "5.0"
+# OpenAI API 客户端
+async-openai = "0.23"

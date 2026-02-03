@@ -50,6 +50,7 @@ const AIAssistant: React.FC = () => {
 
   const [inputValue, setInputValue] = useState("");
   const [useScreenshot, setUseScreenshot] = useState(true);
+  const [isAIRunning, setIsAIRunning] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // 可用的游戏列表
@@ -98,14 +99,42 @@ const AIAssistant: React.FC = () => {
     }
 
     const userMessage = inputValue.trim();
-    const screenshot =
-      useScreenshot && latestScreenshot ? latestScreenshot : undefined;
+    let screenshot: string | undefined = undefined;
+
+    console.log("🚀 开始发送消息:", userMessage);
+    console.log("📷 截图启用状态:", useScreenshot);
+    console.log("🎮 当前游戏:", currentGame);
+
+    // 如果启用截图,先执行截图
+    if (useScreenshot) {
+      try {
+        console.log("📸 开始截图...");
+        antdMessage.loading({ content: "正在截图...", key: "screenshot" });
+        
+        // 调用截图命令
+        const capturedScreenshot = await invoke<string>("capture_screenshot");
+        screenshot = capturedScreenshot;
+        
+        antdMessage.success({ content: "截图完成", key: "screenshot", duration: 1 });
+        console.log("✅ 截图成功,长度:", screenshot?.length);
+      } catch (error) {
+        console.error("❌ 截图失败:", error);
+        antdMessage.warning({ 
+          content: "截图失败,将以纯文本模式发送", 
+          key: "screenshot",
+          duration: 2 
+        });
+      }
+    }
 
     // 添加用户消息
     sendMessage(userMessage, screenshot);
     setInputValue("");
 
     try {
+      console.log("🤖 准备调用 generate_ai_response");
+      console.log("   参数:", { message: userMessage, gameId: currentGame, hasScreenshot: !!screenshot });
+      
       // 调用后端 RAG 生成 AI 回复
       const response = await invoke<{
         content: string;
@@ -120,14 +149,16 @@ const AIAssistant: React.FC = () => {
         screenshot,
       });
 
+      console.log("✅ AI 回复成功:", response);
+      
       // 添加 AI 回复
       receiveAIResponse(response.content, response.wiki_references);
     } catch (error) {
-      console.error("AI 回复失败:", error);
+      console.error("❌ AI 回复失败:", error);
 
       // Fallback: 显示错误信息
       receiveAIResponse(
-        `抱歉,AI 助手暂时无法回复。错误信息: ${error}\n\n请检查:\n1. API Key 是否配置正确\n2. 网络连接是否正常\n3. 向量数据库是否已导入`,
+        `抱歉,AI 助手暂时无法回复。错误信息: ${error}\n\n请检查:\n1. 多模态模型是否已启用\n2. API Key 是否配置正确 (本地 Ollama 不需要)\n3. 网络连接是否正常\n4. 向量数据库是否已导入`,
         [],
       );
 
@@ -139,6 +170,35 @@ const AIAssistant: React.FC = () => {
   const handleClear = () => {
     clearMessages();
     antdMessage.success("已清空对话历史");
+  };
+
+  // 启动 AI 助手
+  const handleStartAI = async () => {
+    if (!currentGame) {
+      antdMessage.warning("请先选择游戏");
+      return;
+    }
+
+    try {
+      await invoke("start_ai_assistant", { gameId: currentGame });
+      setIsAIRunning(true);
+      antdMessage.success("AI 助手已启动,开始智能截图和分析");
+    } catch (error) {
+      console.error("启动 AI 助手失败:", error);
+      antdMessage.error(`启动失败: ${error}`);
+    }
+  };
+
+  // 停止 AI 助手
+  const handleStopAI = async () => {
+    try {
+      await invoke("stop_ai_assistant");
+      setIsAIRunning(false);
+      antdMessage.success("AI 助手已停止");
+    } catch (error) {
+      console.error("停止 AI 助手失败:", error);
+      antdMessage.error(`停止失败: ${error}`);
+    }
   };
 
   // 渲染消息
@@ -153,10 +213,11 @@ const AIAssistant: React.FC = () => {
         exit={{ opacity: 0, y: -20 }}
         transition={{ duration: 0.3 }}
         className={`message-item ${isUser ? "user-message" : "ai-message"}`}
+        style={{backgroundColor: "#1e1e1e"}}
       >
         <div className="message-header">
           <span className="message-role">
-            {isUser ? "🎮 玩家" : "🤖 AI 助手"}
+            {isUser ? "玩家" : "AI 助手"}
           </span>
           <span className="message-time">
             {new Date(msg.timestamp).toLocaleTimeString()}
@@ -175,9 +236,56 @@ const AIAssistant: React.FC = () => {
             <div>{msg.content}</div>
           ) : (
             <div className="markdown-content">
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                {msg.content}
-              </ReactMarkdown>
+              {/* 检查是否包含 thinking 内容 */}
+              {msg.content.includes("Thinking...") && msg.content.includes("...done thinking.") ? (
+                <>
+                  {/* 提取 thinking 部分 */}
+                  {(() => {
+                    const thinkingStart = msg.content.indexOf("Thinking...");
+                    const thinkingEnd = msg.content.indexOf("...done thinking.") + "...done thinking.".length;
+                    const thinkingContent = msg.content.substring(thinkingStart, thinkingEnd);
+                    const actualResponse = msg.content.substring(thinkingEnd).trim();
+                    
+                    return (
+                      <>
+                        {/* Thinking 过程（可折叠） */}
+                        <Collapse ghost style={{ marginBottom: 12 }}>
+                          <Panel
+                            header={
+                              <span style={{ color: '#888', fontSize: '13px' }}>
+                                <span style={{ marginRight: 8 }}>🧠</span>
+                                AI 思考过程
+                              </span>
+                            }
+                            key="thinking"
+                          >
+                            <div style={{ 
+                              background: '#f5f5f5', 
+                              padding: '12px', 
+                              borderRadius: '4px',
+                              fontSize: '13px',
+                              color: '#666',
+                              whiteSpace: 'pre-wrap',
+                              fontFamily: 'monospace'
+                            }}>
+                              {thinkingContent}
+                            </div>
+                          </Panel>
+                        </Collapse>
+                        
+                        {/* 实际回复 */}
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                          {actualResponse || msg.content}
+                        </ReactMarkdown>
+                      </>
+                    );
+                  })()}
+                </>
+              ) : (
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                  {msg.content}
+                </ReactMarkdown>
+              )}
             </div>
           )}
         </div>
@@ -241,6 +349,7 @@ const AIAssistant: React.FC = () => {
                 placeholder="选择游戏"
                 style={{ width: 200, marginLeft: "auto" }}
                 size="middle"
+                disabled={isAIRunning}
               >
                 {availableGames.map((game) => (
                   <Select.Option key={game!.id} value={game!.id}>
@@ -248,6 +357,25 @@ const AIAssistant: React.FC = () => {
                   </Select.Option>
                 ))}
               </Select>
+              {!isAIRunning ? (
+                <Button
+                  type="primary"
+                  size="small"
+                  onClick={handleStartAI}
+                  disabled={!currentGame}
+                >
+                  开始对话
+                </Button>
+              ) : (
+                <Button
+                  type="default"
+                  size="small"
+                  danger
+                  onClick={handleStopAI}
+                >
+                  停止对话
+                </Button>
+              )}
               <Button
                 type="text"
                 size="small"

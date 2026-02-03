@@ -59,19 +59,23 @@
   padding: 8px;
 }
 
+strong {
+  color: #fff !important;
+}
+
 /* 消息样式 */
 .message-item {
   margin-bottom: 20px;
   padding: 12px 16px;
   border-radius: 8px;
-
+  color: #fff;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 }
 
 .user-message {
   margin-left: auto;
   max-width: 80%;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: #1e1e1e;
   color: white;
 }
 
@@ -108,11 +112,13 @@
 .message-content {
   line-height: 1.6;
   word-break: break-word;
+  color: #fff;
 }
 
 /* Markdown 内容样式 */
 .markdown-content {
   font-size: 14px;
+  color: #fff;
 }
 
 .markdown-content h1,
@@ -174,7 +180,7 @@
   border-left: 4px solid #667eea;
   padding-left: 12px;
   margin: 12px 0;
-  color: #666;
+  color: #eee;
 }
 
 .markdown-content table {
@@ -229,7 +235,7 @@
 
 .wiki-ref-content {
   font-size: 12px;
-  color: #666;
+  color: #eee;
   line-height: 1.5;
 }
 
@@ -241,7 +247,7 @@
   padding: 12px;
 
   border-radius: 8px;
-  color: #666;
+  color: #eee;
   font-size: 14px;
 }
 
@@ -323,7 +329,7 @@
 
 .wiki-search-content {
   font-size: 12px;
-  color: #666;
+  color: #eee;
   line-height: 1.4;
 }
 
@@ -343,3 +349,4 @@
     width: 100%;
   }
 }
+

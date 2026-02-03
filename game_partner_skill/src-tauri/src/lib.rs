@@ -5,6 +5,7 @@ mod screenshot;
 mod embeddings;
 mod settings;
 mod rag;
+mod llm;
 pub mod vector_db;
 
 use commands::*;
@@ -67,6 +68,7 @@ pub fn run() {
             // 窗口捕获命令
             list_windows_command,
             capture_window_command,
+            capture_screenshot,
             // 向量数据库命令
             import_wiki_to_vector_db,
             search_wiki,
@@ -83,6 +85,10 @@ pub fn run() {
             test_vector_db_connection,
             // AI 命令
             generate_ai_response,
+            // AI 助手命令
+            start_ai_assistant,
+            stop_ai_assistant,
+            get_ai_assistant_state,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

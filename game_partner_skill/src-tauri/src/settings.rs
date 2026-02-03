@@ -13,6 +13,9 @@ pub struct AppSettings {
     pub skill_library: SkillLibrarySettings,
     /// AI 模型设置
     pub ai_models: AIModelSettings,
+    /// 截图设置
+    #[serde(default)]
+    pub screenshot: ScreenshotSettings,
 }
 
 /// 通用设置
@@ -51,6 +54,48 @@ pub struct CrawlerSettings {
     pub max_concurrent_requests: usize,
     /// 超时时间 (秒)
     pub timeout_seconds: u64,
+}
+
+/// 截图设置
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub struct ScreenshotSettings {
+    /// 是否启用智能截图
+    pub enabled: bool,
+    /// 截图模式 (fullscreen, window, area)
+    pub capture_mode: String,
+    /// 目标窗口 ID (仅当 capture_mode = window 时使用)
+    #[serde(default)]
+    pub target_window_id: Option<u32>,
+    /// 目标窗口名称 (用于显示)
+    #[serde(default)]
+    pub target_window_name: Option<String>,
+    /// 活跃模式截图间隔 (秒)
+    pub active_interval_seconds: u64,
+    /// 闲置模式截图间隔 (秒)
+    pub idle_interval_seconds: u64,
+    /// 截图质量 (0-100)
+    pub quality: u8,
+    /// 目标文件大小 (KB)
+    pub target_size_kb: u32,
+    /// 是否自动发送给 AI 分析
+    pub auto_send_to_ai: bool,
+}
+
+impl Default for ScreenshotSettings {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            capture_mode: "fullscreen".to_string(),
+            target_window_id: None,
+            target_window_name: None,
+            active_interval_seconds: 5,
+            idle_interval_seconds: 15,
+            quality: 85,
+            target_size_kb: 200,
+            auto_send_to_ai: true,
+        }
+    }
 }
 
 /// AI 模型设置
@@ -105,6 +150,20 @@ pub struct ModelConfig {
     pub model_name: String,
     /// 是否启用
     pub enabled: bool,
+    /// 温度参数 (0.0-2.0) - 用于 LLM 生成
+    #[serde(default = "default_temperature")]
+    pub temperature: f32,
+    /// 最大 Token 数 - 用于 LLM 生成
+    #[serde(default = "default_max_tokens")]
+    pub max_tokens: u32,
+}
+
+fn default_temperature() -> f32 {
+    0.7
+}
+
+fn default_max_tokens() -> u32 {
+    1000
 }
 
 impl Default for AppSettings {
@@ -132,13 +191,17 @@ impl Default for AppSettings {
                     api_key: None,
                     model_name: "qwen3-embedding:4b".to_string(),
                     enabled: true,
+                    temperature: 0.0,
+                    max_tokens: 512,
                 },
                 multimodal: ModelConfig {
-                    provider: "local".to_string(),
-                    api_base: "http://localhost:11434/v1".to_string(),
+                    provider: "openai".to_string(),
+                    api_base: "https://api.openai.com/v1".to_string(),
                     api_key: None,
-                    model_name: "qwen3-vl:latest".to_string(),
+                    model_name: "gpt-4o-mini".to_string(),
                     enabled: true,
+                    temperature: 0.7,
+                    max_tokens: 1000,
                 },
                 vector_db: VectorDBSettings {
                     mode: "local".to_string(),
@@ -146,6 +209,7 @@ impl Default for AppSettings {
                     local_storage_path: Some("./data/vector_db".to_string()),
                 },
             },
+            screenshot: ScreenshotSettings::default(),
         }
     }
 }
