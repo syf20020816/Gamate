@@ -16,6 +16,9 @@ pub struct AppSettings {
     /// 截图设置
     #[serde(default)]
     pub screenshot: ScreenshotSettings,
+    /// TTS 语音播报设置
+    #[serde(default)]
+    pub tts: TtsSettings,
 }
 
 /// 通用设置
@@ -98,6 +101,34 @@ impl Default for ScreenshotSettings {
     }
 }
 
+/// TTS 语音播报设置
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub struct TtsSettings {
+    /// 是否启用 TTS
+    pub enabled: bool,
+    /// 音色名称
+    #[serde(default)]
+    pub voice: Option<String>,
+    /// 语速 (0.5 - 2.0, 默认 1.0)
+    pub rate: f32,
+    /// 音量 (0.0 - 1.0, 默认 0.8)
+    pub volume: f32,
+    /// AI 回复时自动播报
+    pub auto_speak: bool,
+}
+
+impl Default for TtsSettings {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            voice: None,
+            rate: 1.0,
+            volume: 0.8,
+            auto_speak: true,
+        }
+    }
+}
 /// AI 模型设置
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -218,6 +249,7 @@ impl Default for AppSettings {
                 },
             },
             screenshot: ScreenshotSettings::default(),
+            tts: TtsSettings::default(),
         }
     }
 }

@@ -7,6 +7,8 @@ mod settings;
 mod rag;
 mod llm;
 mod personality;
+mod tts;
+mod audio;
 pub mod vector_db;
 
 use commands::*;
@@ -47,11 +49,15 @@ pub fn run() {
     // 初始化截图状态
     let screenshot_state = ScreenshotState::default();
 
+    // 初始化音频状态
+    let audio_state = audio_commands::AudioState::new();
+
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .manage(game_config) // 将配置注入到应用状态
         .manage(screenshot_state) // 注入截图状态
+        .manage(audio_state) // 注入音频状态
         .invoke_handler(tauri::generate_handler![
             greet,
             download_wiki,
@@ -90,6 +96,21 @@ pub fn run() {
             start_ai_assistant,
             stop_ai_assistant,
             get_ai_assistant_state,
+            // TTS 命令
+            speak_text,
+            stop_speaking,
+            set_tts_rate,
+            set_tts_volume,
+            get_tts_voices,
+            set_tts_voice,
+            apply_personality_voice,
+            // 音频命令
+            start_continuous_listening,
+            stop_continuous_listening,
+            get_listener_state,
+            test_microphone,
+            start_microphone_test,
+            stop_microphone_test,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -24,6 +24,12 @@ pub struct CharacterInfo {
     pub gender: String,
     #[serde(rename = "type")]
     pub personality_type: String,
+    /// 推荐的 TTS 语音名称
+    #[serde(default)]
+    pub preferred_voice: Option<String>,
+    /// 备用 TTS 语音名称
+    #[serde(default)]
+    pub fallback_voice: Option<String>,
 }
 
 /// 系统提示词

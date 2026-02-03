@@ -6,6 +6,8 @@ pub mod settings_commands;
 pub mod vdb_test_commands;
 pub mod ai_commands;
 pub mod ai_assistant_commands;
+pub mod tts_commands;
+pub mod audio_commands;
 
 pub use wiki_commands::*;
 pub use config_commands::*;
@@ -15,3 +17,5 @@ pub use settings_commands::*;
 pub use vdb_test_commands::*;
 pub use ai_commands::*;
 pub use ai_assistant_commands::*;
+pub use tts_commands::*;
+pub use audio_commands::*;

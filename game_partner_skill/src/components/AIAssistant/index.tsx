@@ -25,6 +25,7 @@ import { useAIAssistantStore, Message } from "../../stores/aiAssistantStore";
 import { useUserStore } from "../../stores/userStore";
 import { useSkillLibraryStore } from "../../stores/skillLibraryStore";
 import { getGameById } from "../../data/games";
+import { VoiceChatPanel } from "../VoiceChatPanel";
 import "./index.css";
 
 const { TextArea } = Input;
@@ -85,6 +86,25 @@ const AIAssistant: React.FC = () => {
       unlisten.then((fn) => fn());
     };
   }, []);
+
+  // 组件加载时应用当前角色语音
+  useEffect(() => {
+    const applyCurrentPersonalityVoice = async () => {
+      try {
+        const settings = await invoke("get_app_settings");
+        const personalityType =
+          (settings as any)?.ai_models?.ai_personality || "sunnyou_male";
+        await invoke("apply_personality_voice", {
+          personalityType,
+        });
+        console.log("🎤 已应用角色语音:", personalityType);
+      } catch (error) {
+        console.error("应用角色语音失败:", error);
+      }
+    };
+
+    applyCurrentPersonalityVoice();
+  }, []); // 仅在组件挂载时执行一次
 
   // 发送消息
   const handleSend = async () => {
@@ -153,6 +173,39 @@ const AIAssistant: React.FC = () => {
       
       // 添加 AI 回复
       receiveAIResponse(response.content, response.wiki_references);
+
+      // TTS 播报 AI 回复
+      try {
+        // 获取 TTS 配置
+        const ttsSettings = await invoke<{
+          enabled: boolean;
+          auto_speak: boolean;
+          rate: number;
+          volume: number;
+        }>("get_app_settings").then((settings: any) => settings.tts);
+
+        console.log("🔊 TTS 配置:", ttsSettings);
+
+        // 如果启用了 TTS 且自动播报
+        if (ttsSettings?.enabled && ttsSettings?.auto_speak) {
+          console.log("🎤 开始播报 AI 回复...");
+          
+          // 设置语速和音量
+          await invoke("set_tts_rate", { rate: ttsSettings.rate || 1.0 });
+          await invoke("set_tts_volume", { volume: ttsSettings.volume || 0.8 });
+          
+          // 播报 AI 回复内容
+          await invoke("speak_text", {
+            text: response.content,
+            interrupt: true, // 打断之前的播报
+          });
+          
+          console.log("✅ TTS 播报已开始");
+        }
+      } catch (ttsError) {
+        console.warn("⚠️  TTS 播报失败:", ttsError);
+        // TTS 失败不影响主流程
+      }
     } catch (error) {
       console.error("❌ AI 回复失败:", error);
 
@@ -222,6 +275,37 @@ const AIAssistant: React.FC = () => {
           <span className="message-time">
             {new Date(msg.timestamp).toLocaleTimeString()}
           </span>
+          {/* AI 消息显示播报按钮 */}
+          {!isUser && (
+            <Button
+              type="text"
+              size="small"
+              icon={<span>🔊</span>}
+              onClick={async () => {
+                try {
+                  const ttsSettings = await invoke<any>("get_app_settings").then(
+                    (settings: any) => settings.tts
+                  );
+
+                  if (!ttsSettings?.enabled) {
+                    antdMessage.warning("请先在设置中启用 TTS");
+                    return;
+                  }
+
+                  await invoke("set_tts_rate", { rate: ttsSettings.rate || 1.0 });
+                  await invoke("set_tts_volume", { volume: ttsSettings.volume || 0.8 });
+                  await invoke("speak_text", {
+                    text: msg.content,
+                    interrupt: true,
+                  });
+                  antdMessage.success("开始播报");
+                } catch (error) {
+                  antdMessage.error(`播报失败: ${error}`);
+                }
+              }}
+              title="播报此消息"
+            />
+          )}
           <Button
             type="text"
             size="small"
@@ -389,11 +473,25 @@ const AIAssistant: React.FC = () => {
           }
           className="conversation-card"
         >
-          {/* 侧边栏: 最近检索 */}
+          {/* 侧边栏: 参考资料和语音聊天 */}
           <div className="sidebar-area">
+            {/* 语音聊天面板 */}
             <Card
+             
+              size="small"
+              className="voice-chat-card"
+              style={{ marginBottom: 16, height: '400px', margin: 0, borderRadius: 0 }}
+            >
+              <div style={{ height: 'calc(100% - 40px)' }}>
+                <VoiceChatPanel />
+              </div>
+            </Card>
+            
+            {/* 参考资料 */}
+            <Card
+              style={{ height: "calc(100% - 400px)" }}
               title={
-                <span>
+                <span style={{ display: "flex", alignItems: "center" }}>
                   <BookOpen size={16} style={{ marginRight: 8 }} />
                   参考资料
                 </span>

@@ -13,6 +13,7 @@ import {
   InputNumber,
   Tabs,
   Alert,
+  Slider,
 } from "antd";
 import {
   SettingOutlined,
@@ -22,6 +23,7 @@ import {
   SearchOutlined,
   PictureOutlined,
   UserOutlined,
+  SoundOutlined,
 } from "@ant-design/icons";
 import { invoke } from "@tauri-apps/api/core";
 import "./styles.scss";
@@ -64,6 +66,13 @@ interface AppSettings {
     quality: number;
     targetSizeKb: number;
     autoSendToAi: boolean;
+  };
+  tts?: {
+    enabled: boolean;
+    voice?: string;
+    rate: number;
+    volume: number;
+    autoSpeak: boolean; // AI 回复时自动播报
   };
 }
 
@@ -154,6 +163,13 @@ const SettingsPanel: React.FC = () => {
           targetSizeKb: data.screenshot?.target_size_kb || 200,
           autoSendToAi: data.screenshot?.auto_send_to_ai !== false,
         },
+        tts: {
+          enabled: data.tts?.enabled || false,
+          voice: data.tts?.voice || undefined,
+          rate: data.tts?.rate || 1.0,
+          volume: data.tts?.volume || 0.8,
+          autoSpeak: data.tts?.auto_speak !== false,
+        },
       };
 
       setSettings(transformedData);
@@ -236,6 +252,15 @@ const SettingsPanel: React.FC = () => {
               quality: values.screenshot.quality,
               target_size_kb: values.screenshot.targetSizeKb,
               auto_send_to_ai: values.screenshot.autoSendToAi,
+            }
+          : undefined,
+        tts: values.tts
+          ? {
+              enabled: values.tts.enabled,
+              voice: values.tts.voice || null,
+              rate: values.tts.rate || 1.0,
+              volume: values.tts.volume || 0.8,
+              auto_speak: values.tts.autoSpeak !== false,
             }
           : undefined,
       };
@@ -392,7 +417,23 @@ const SettingsPanel: React.FC = () => {
                   tooltip="选择 AI 陪玩的性格类型"
                   initialValue="sunnyou_male"
                 >
-                  <Select size="large" placeholder="选择角色">
+                  <Select
+                    size="large"
+                    placeholder="选择角色"
+                    onChange={async (value: string) => {
+                      // 切换角色时自动应用推荐语音
+                      try {
+                        const { invoke } = await import("@tauri-apps/api/core");
+                        await invoke("apply_personality_voice", {
+                          personalityType: value,
+                        });
+                        message.success("已切换到角色语音");
+                      } catch (error) {
+                        console.error("应用角色语音失败:", error);
+                        // 不显示错误提示,保持用户体验流畅
+                      }
+                    }}
+                  >
                     <Select.Option value="sunnyou_male">
                       <Space>
                         <span>🎮</span>
@@ -1247,6 +1288,159 @@ const SettingsPanel: React.FC = () => {
                   tooltip="开启后,每次截图都会自动触发 AI 分析"
                 >
                   <Switch />
+                </Form.Item>
+              </Card>
+            </Tabs.TabPane>
+
+            {/* TTS 语音设置 */}
+            <Tabs.TabPane
+              tab={
+                <Space>
+                  <SoundOutlined />
+                  <span>语音播报</span>
+                </Space>
+              }
+              key="tts"
+            >
+              <Alert
+                message="TTS 语音播报配置"
+                description={
+                  <ul style={{ marginBottom: 0, paddingLeft: 20 }}>
+                    <li>
+                      <strong>Windows</strong>: 使用 SAPI 5 语音引擎
+                    </li>
+                    <li>
+                      <strong>自动播报</strong>: AI 回复时自动朗读内容
+                    </li>
+                    <li>
+                      <strong>语速/音量</strong>: 可根据个人喜好调整
+                    </li>
+                    <li>
+                      <strong>音色</strong>: 支持系统安装的所有TTS音色
+                    </li>
+                  </ul>
+                }
+                type="info"
+                showIcon
+                style={{ marginBottom: 24 }}
+              />
+
+              <Card type="inner" title="基础设置">
+                <Form.Item
+                  label="启用 TTS"
+                  name={["tts", "enabled"]}
+                  valuePropName="checked"
+                  tooltip="开启后可以使用语音播报功能"
+                >
+                  <Switch />
+                </Form.Item>
+
+                <Form.Item
+                  label="AI 回复自动播报"
+                  name={["tts", "autoSpeak"]}
+                  valuePropName="checked"
+                  tooltip="AI 回复时自动朗读内容,无需手动点击"
+                >
+                  <Switch />
+                </Form.Item>
+
+                <Form.Item
+                  label="语速"
+                  name={["tts", "rate"]}
+                  tooltip="调整播报语速,1.0 为正常速度"
+                >
+                  <Slider
+                    min={0.5}
+                    max={2.0}
+                    step={0.1}
+                    marks={{
+                      0.5: "慢速",
+                      1.0: "正常",
+                      1.5: "快速",
+                      2.0: "极快",
+                    }}
+                    tooltip={{ formatter: (value) => `${value}x` }}
+                  />
+                </Form.Item>
+
+                <Form.Item
+                  label="音量"
+                  name={["tts", "volume"]}
+                  tooltip="调整播报音量"
+                >
+                  <Slider
+                    min={0.0}
+                    max={1.0}
+                    step={0.1}
+                    marks={{
+                      0.0: "静音",
+                      0.5: "中等",
+                      1.0: "最大",
+                    }}
+                    tooltip={{ formatter: (value) => `${((value || 0) * 100).toFixed(0)}%` }}
+                  />
+                </Form.Item>
+
+                <Form.Item
+                  noStyle
+                  shouldUpdate={(prevValues, currentValues) =>
+                    prevValues.tts?.enabled !== currentValues.tts?.enabled
+                  }
+                >
+                  {({ getFieldValue }) => {
+                    const ttsEnabled = getFieldValue(["tts", "enabled"]);
+                    
+                    return ttsEnabled ? (
+                      <>
+                        <Form.Item label="测试播报">
+                          <Space>
+                            <Button
+                              onClick={async () => {
+                                try {
+                                  const { invoke } = await import("@tauri-apps/api/core");
+                                  const rate = getFieldValue(["tts", "rate"]) || 1.0;
+                                  const volume = getFieldValue(["tts", "volume"]) || 0.8;
+                                  
+                                  await invoke("set_tts_rate", { rate });
+                                  await invoke("set_tts_volume", { volume });
+                                  await invoke("speak_text", {
+                                    text: "你好,这是语音播报测试。AI 陪玩助手已准备就绪!",
+                                    interrupt: true,
+                                  });
+                                  message.success("播报测试已开始");
+                                } catch (error: any) {
+                                  message.error(`测试失败: ${error}`);
+                                }
+                              }}
+                            >
+                              🔊 测试播报
+                            </Button>
+                            <Button
+                              onClick={async () => {
+                                try {
+                                  const { invoke } = await import("@tauri-apps/api/core");
+                                  await invoke("stop_speaking");
+                                  message.info("已停止播报");
+                                } catch (error: any) {
+                                  message.error(`停止失败: ${error}`);
+                                }
+                              }}
+                            >
+                              ⏹ 停止
+                            </Button>
+                          </Space>
+                        </Form.Item>
+
+                        <Alert
+                          message="💡 提示"
+                          description='保存设置后,语速和音量将在下次播报时生效。你也可以点击"测试播报"立即体验。'
+                          type="success"
+                          showIcon
+                          style={{ marginTop: 16 }}
+                        />
+                      </>
+                    ) : null;
+                  }}
                 </Form.Item>
               </Card>
             </Tabs.TabPane>

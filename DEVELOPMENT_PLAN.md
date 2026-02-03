@@ -307,9 +307,9 @@
 ### Day 15-17: RAG 流程与 LLM 集成 🤖
 
 #### 目标
-- [ ] 实现 RAG 提示生成
-- [ ] 集成多模态 LLM API
-- [ ] 构建 AI 陪玩助手页面
+- [x] 实现 RAG 提示生成
+- [x] 集成多模态 LLM API
+- [x] 构建 AI 陪玩助手页面
 
 #### 架构决策
 ✅ **采用独立页面模式** (推荐)
@@ -424,44 +424,117 @@
 
 #### 任务清单
 ```bash
-# Day 18
-□ 添加 TTS 依赖
+# Day 18 ✅ (已完成)
+✅ 添加 TTS 依赖
   - tts = "0.26"
-□ 实现基础 TTS
+✅ 实现基础 TTS
   - src-tauri/src/tts.rs
   - 功能: speak(text) -> Result<()>
-  - Windows: 使用 SAPI 5
-□ 测试语音播报
+  - Windows: 使用 SAPI
+  - 异步播报队列系统
+✅ Tauri 命令接口
+  - speak_text, stop_speaking
+  - set_tts_rate, set_tts_volume
+  - get_tts_voices, set_tts_voice, apply_personality_voice
+✅ 测试语音播报
   - 朗读 AI 生成的提示
   - 调整语速、音量
 
-# Day 19
-□ TTS 配置界面
+# Day 19 ✅ (已完成)
+✅ TTS 配置界面
   - 前端: 选择音色 (男/女)
-  - 前端: 调整语速滑块
+  - 前端: 调整语速/音量滑块
   - 保存到本地配置
-□ 异步播报
+✅ 异步播报
   - 不阻塞主线程
   - 队列管理 (防止重叠)
-□ 测试播报延迟
-  - 目标: < 300ms
+✅ AI 角色语音系统
+  - 5个角色专属语音配置
+  - 自动语音切换
+  - Windows 默认语音包集成
 
-# Day 20
-□ (可选) 语音唤醒
-  - 添加 Vosk 依赖
-  - 实现麦克风监听
-  - 唤醒词检测: "小助手"
-  - 触发主动提示
-□ 或替代: 快捷键唤醒
-  - 全局热键: Ctrl+Shift+G
+# Day 20 ✅ (已完成) - 持续监听模式语音输入
+✅ 添加音频依赖
+  - cpal = "0.15" (跨平台音频 I/O)
+  - hound = "3.5" (WAV 文件读写)
+  - rubato = "0.15" (音频重采样)
+  - Windows Speech Recognition API
+✅ VAD (Voice Activity Detection)
+  - src-tauri/src/audio/vad.rs
+  - VadConfig: 音量阈值 0.02, 静音 1.5s, 最短 0.3s, 最长 30s
+  - VoiceActivityDetector: RMS 计算 + 状态机
+  - 状态: Idle → Speaking → Processing → Idle
+✅ 音频录制器
+  - src-tauri/src/audio/recorder.rs
+  - AudioRecorder: 基于 cpal, 16kHz 单声道
+  - start_recording(), stop_recording(), take_audio_data()
+✅ Windows STT 引擎
+  - src-tauri/src/audio/stt_windows.rs
+  - WindowsSttEngine: 中文识别 (zh-CN)
+  - recognize_from_audio(): f32 样本 → 文字
+  - 自动保存临时 WAV 文件
+✅ 持续监听器
+  - src-tauri/src/audio/continuous_listener.rs
+  - ContinuousListener: VAD + 录音 + STT 集成
+  - ListenerEvent: SpeechStarted, SpeechEnded, VoiceTranscribed, Error
+  - 监听循环: 100ms 间隔处理音频
+✅ Tauri 命令接口
+  - src-tauri/src/commands/audio_commands.rs
+  - start_continuous_listening(vad_config)
+  - stop_continuous_listening()
+  - get_listener_state()
+  - test_microphone()
+✅ 前端语音聊天面板
+  - src/components/VoiceChatPanel/index.tsx
+  - 开始/停止对话按钮
+  - 实时状态显示 (待机/说话中/处理中)
+  - 音量指示器 + 录音时长
+  - 识别记录列表
+  - 事件监听: voice_transcribed, speech_started, speech_ended
+✅ 集成到 AI 助手页面
+  - 右侧边栏添加语音聊天卡片
+  - 固定高度 400px
+✅ 编译验证
+  - cargo build --release 通过 (仅警告)
+  - 前端 TypeScript 编译通过
 
-# Day 21
-□ 集成测试
-  - 完整流程: 游戏触发 → AI 提示 → 语音播报
+# Day 21 ⏳ (进行中) - 语音交互完整流程
+□ 添加语音识别依赖
+  - Windows Speech Recognition API
+  - 或 whisper.cpp Rust 绑定
+□ 实现麦克风录音
+  - src-tauri/src/audio/recorder.rs
+  - 功能: start_recording() -> RecordingHandle
+  - 音频格式: WAV/PCM, 16kHz, 单声道
+□ 语音转文字 (STT)
+  - Windows API: ISpRecognizer
+  - 或 Whisper 本地模型 (离线)
+  - 功能: transcribe_audio(audio_data) -> Result<String>
+□ 快捷键触发
+  - 全局热键: Ctrl+Shift+V (按住说话)
+  - 松开键盘停止录音
+  - 自动触发截图+STT+AI处理
+
+# Day 21 - 语音交互完整流程
+□ 集成语音交互流程
+  - 监听热键按下 → 开始录音
+  - 录音中显示波形动画
+  - 松开热键 → 停止录音 → STT → 触发截图
+  - AI 处理 (RAG + 多模态分析)
+  - TTS 播报 AI 回复
+□ 前端 UI 优化
+  - 麦克风状态指示器
+  - 实时音频波形可视化
+  - 语音输入文字实时显示
+  - 快捷键提示浮窗
 □ 性能优化
-  - TTS 预加载
-  - 音频缓存
-□ Week 3 总结
+  - 音频流式处理 (避免内存峰值)
+  - STT 缓存 (相同音频不重复识别)
+  - 并发控制 (STT + 截图同时进行)
+□ Week 3 总结与演示
+  - 完整语音交互演示
+  - 性能测试 (端到端延迟 < 3s)
+  - 文档更新
 ```
 
 #### 交付物
@@ -654,22 +727,21 @@
 - Day 3-4: 智能截图系统 (AI 驱动 + 混合定时 + 图片压缩)
 - Day 5-7: ~~OCR~~ (已跳过 - 多模态模型替代)
 - Day 8-10: Wiki 爬虫系统 (Fandom/GitHub/Web + JSONL 输出)
-- **Day 11-14: 向量数据库系统** ✅
-  - ✅ 三种模式: Local (JSON) / Qdrant / AI Direct (JSONL)
-  - ✅ 向量导入: `import_wiki_to_vector_db`
-  - ✅ 语义检索: `search_wiki` (支持三种模式)
-  - ✅ 前端 Wiki 知识库界面
-  - ✅ Markdown 渲染优化
+- Day 11-14: 向量数据库系统 (Local/Qdrant/AI Direct + 语义检索)
+- **Day 15-17: RAG + LLM 集成** ✅
+  - ✅ AI 陪玩助手页面
+  - ✅ RAG 流程后端
+  - ✅ GPT-4 Vision API 集成 (Ollama qwen3-vl)
+  - ✅ 智能截图联动
+  - ✅ 5种 AI 陪玩角色系统 (损友男/搞笑女/Kobe/甜妹/特朗普)
 
 **⏳ 进行中:**
-- **Day 15-17: RAG + LLM 集成** ← **你在这里**
-  - [ ] AI 陪玩助手页面
-  - [ ] RAG 流程后端
-  - [ ] GPT-4 Vision API 集成
-  - [ ] 智能截图联动
+- **Day 18-21: TTS + 语音交互** ← **你在这里**
+  - ✅ Day 18-19: 基础 TTS 实现 + 配置界面 + AI 角色语音
+  - ✅ Day 20: 持续监听模式 (VAD + 录音 + STT + 前端面板)
+  - [ ] Day 21: 集成语音交互流程 (STT → 截图 → RAG → TTS)
 
 **📅 待开始:**
-- Day 18-21: TTS + 语音交互
 - Day 22-28: UI 完善 + 测试
 - Day 29-30: 文档 + 演示
 
