@@ -106,9 +106,16 @@ pub struct AIModelSettings {
     pub embedding: ModelConfig,
     /// 多模态模型配置 (用于语音、图片识别)
     pub multimodal: ModelConfig,
+    /// AI 陪玩角色类型 (sunnyou_male, funny_female, kobe, sweet_girl, trump)
+    #[serde(default = "default_ai_personality")]
+    pub ai_personality: String,
     /// 向量数据库配置
     #[serde(default)]
     pub vector_db: VectorDBSettings,
+}
+
+fn default_ai_personality() -> String {
+    "sunnyou_male".to_string()
 }
 
 /// 向量数据库设置
@@ -203,6 +210,7 @@ impl Default for AppSettings {
                     temperature: 0.7,
                     max_tokens: 1000,
                 },
+                ai_personality: default_ai_personality(),
                 vector_db: VectorDBSettings {
                     mode: "local".to_string(),
                     qdrant_url: None,

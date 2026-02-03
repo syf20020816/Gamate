@@ -7,9 +7,12 @@ import {
   Space,
   Divider,
   Select,
+  Switch,
+  message,
 } from "antd";
-import { Database, Zap, MessageCircle, PlayCircle } from "lucide-react";
+import { Database, Zap, MessageCircle, PlayCircle, Camera } from "lucide-react";
 import { motion } from "framer-motion";
+import { invoke } from "@tauri-apps/api/core";
 import { useUserStore } from "../../stores/userStore";
 import { getGameById } from "../../data/games";
 import { useSkillLibraryStore } from "../../stores/skillLibraryStore";
@@ -27,12 +30,13 @@ interface RightPanelProps {
 const RightPanel: React.FC<RightPanelProps> = ({ onMenuChange }) => {
   const { user } = useUserStore();
   const { downloadedLibraries } = useSkillLibraryStore();
-  const { setCurrentGame } = useAIAssistantStore();
+  const { setCurrentGame, sendMessage } = useAIAssistantStore();
   const selectedGames =
     user?.config.selectedGames.map((id) => getGameById(id)).filter(Boolean) ||
     [];
 
   const [aiSelectedGame, setAiSelectedGame] = useState<string>("");
+  const [useScreenshot, setUseScreenshot] = useState(true); // 截图开关
 
   // 系统统计数据
   const systemStats = {
@@ -53,8 +57,9 @@ const RightPanel: React.FC<RightPanelProps> = ({ onMenuChange }) => {
   // AI 模型名称(可以从配置中读取)
   const aiModelName = "Qwen 2.5 VL 7B";
 
-  const handleStartAI = () => {
+  const handleStartAI = async () => {
     if (!aiSelectedGame) {
+      message.warning("请先选择游戏");
       return;
     }
 
@@ -65,6 +70,82 @@ const RightPanel: React.FC<RightPanelProps> = ({ onMenuChange }) => {
     if (onMenuChange) {
       onMenuChange("ai-assistant");
     }
+
+    // 延迟一点让页面完成跳转
+    setTimeout(async () => {
+      try {
+        let screenshot: string | undefined = undefined;
+        const welcomeMessage = "嘿！来一起玩吧！现在游戏里什么情况？";
+
+        console.log("🚀 [RightPanel] 启动 AI 对话");
+        console.log("📷 [RightPanel] 截图启用状态:", useScreenshot);
+        console.log("🎮 [RightPanel] 当前游戏:", aiSelectedGame);
+
+        // 如果启用截图,先执行截图
+        if (useScreenshot) {
+          try {
+            console.log("📸 [RightPanel] 开始截图...");
+            message.loading({ content: "正在截图...", key: "screenshot" });
+            
+            // 调用截图命令
+            const capturedScreenshot = await invoke<string>("capture_screenshot");
+            screenshot = capturedScreenshot;
+            
+            message.success({ content: "截图完成", key: "screenshot", duration: 1 });
+            console.log("✅ [RightPanel] 截图成功,长度:", screenshot?.length);
+          } catch (error) {
+            console.error("❌ [RightPanel] 截图失败:", error);
+            message.warning({ 
+              content: "截图失败,将以纯文本模式发送", 
+              key: "screenshot",
+              duration: 2 
+            });
+          }
+        }
+
+        // 添加用户消息
+        sendMessage(welcomeMessage, screenshot);
+
+        // 调用后端 RAG 生成 AI 回复
+        console.log("🤖 [RightPanel] 准备调用 generate_ai_response");
+        message.loading({ content: "AI 正在思考...", key: "ai-thinking" });
+
+        const response = await invoke<{
+          content: string;
+          wiki_references?: Array<{
+            title: string;
+            content: string;
+            score: number;
+          }>;
+        }>("generate_ai_response", {
+          message: welcomeMessage,
+          gameId: aiSelectedGame,
+          screenshot,
+        });
+
+        console.log("✅ [RightPanel] AI 回复成功");
+        message.success({ content: "AI 已回复", key: "ai-thinking", duration: 1 });
+        
+        // 添加 AI 回复
+        const { receiveAIResponse } = useAIAssistantStore.getState();
+        receiveAIResponse(response.content, response.wiki_references);
+
+      } catch (error) {
+        console.error("❌ [RightPanel] AI 回复失败:", error);
+        message.error({ 
+          content: `AI 回复失败: ${error}`, 
+          key: "ai-thinking",
+          duration: 3 
+        });
+
+        // Fallback: 显示错误信息
+        const { receiveAIResponse } = useAIAssistantStore.getState();
+        receiveAIResponse(
+          `抱歉,AI 助手暂时无法回复。错误信息: ${error}\n\n请检查:\n1. 多模态模型是否已启用\n2. API Key 是否配置正确 (本地 Ollama 不需要)\n3. 网络连接是否正常\n4. 向量数据库是否已导入`,
+          [],
+        );
+      }
+    }, 300); // 延迟 300ms 让页面跳转完成
   };
 
   return (
@@ -173,6 +254,29 @@ const RightPanel: React.FC<RightPanelProps> = ({ onMenuChange }) => {
                     </Select.Option>
                   ))}
                 </Select>
+              </div>
+
+              {/* 截图开关 */}
+              <div className="screenshot-toggle">
+                <Space style={{ width: "100%", justifyContent: "space-between" }}>
+                  <Space>
+                    <Camera size={16} />
+                    <Text type="secondary" style={{ fontSize: 12 }}>
+                      附加截图
+                    </Text>
+                  </Space>
+                  <Switch
+                    checked={useScreenshot}
+                    onChange={setUseScreenshot}
+                    checkedChildren="开"
+                    unCheckedChildren="关"
+                  />
+                </Space>
+                {useScreenshot && (
+                  <Text type="secondary" style={{ fontSize: 11, display: "block", marginTop: 4 }}>
+                    将在进入对话前自动截图
+                  </Text>
+                )}
               </div>
 
               {/* 开始对话按钮 */}

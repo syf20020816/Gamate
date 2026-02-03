@@ -21,6 +21,7 @@ import {
   DatabaseOutlined,
   SearchOutlined,
   PictureOutlined,
+  UserOutlined,
 } from "@ant-design/icons";
 import { invoke } from "@tauri-apps/api/core";
 import "./styles.scss";
@@ -46,6 +47,7 @@ interface AppSettings {
   aiModels: {
     embedding: ModelConfig;
     multimodal: ModelConfig;
+    aiPersonality?: string; // AI 陪玩角色类型
     vectorDb: {
       mode: string;
       qdrantUrl?: string;
@@ -126,12 +128,12 @@ const SettingsPanel: React.FC = () => {
               data.ai_models?.multimodal?.api_base ||
               "https://api.openai.com/v1",
             apiKey: data.ai_models?.multimodal?.api_key || null,
-            modelName:
-              data.ai_models?.multimodal?.model_name || "gpt-4o-mini",
+            modelName: data.ai_models?.multimodal?.model_name || "gpt-4o-mini",
             enabled: data.ai_models?.multimodal?.enabled !== false,
             temperature: data.ai_models?.multimodal?.temperature || 0.7,
             maxTokens: data.ai_models?.multimodal?.max_tokens || 1000,
           },
+          aiPersonality: data.ai_models?.ai_personality || "sunnyou_male",
           vectorDb: {
             mode: data.ai_models?.vector_db?.mode || "local",
             qdrantUrl:
@@ -215,6 +217,7 @@ const SettingsPanel: React.FC = () => {
             temperature: values.aiModels.multimodal.temperature || 0.7,
             max_tokens: values.aiModels.multimodal.maxTokens || 1000,
           },
+          ai_personality: values.aiModels.aiPersonality || "sunnyou_male",
           vector_db: {
             mode: values.aiModels.vectorDb.mode,
             qdrant_url: values.aiModels.vectorDb.qdrantUrl || null,
@@ -222,17 +225,19 @@ const SettingsPanel: React.FC = () => {
               values.aiModels.vectorDb.localStoragePath || null,
           },
         },
-        screenshot: values.screenshot ? {
-          enabled: values.screenshot.enabled,
-          capture_mode: values.screenshot.captureMode,
-          target_window_id: values.screenshot.targetWindowId || null,
-          target_window_name: values.screenshot.targetWindowName || null,
-          active_interval_seconds: values.screenshot.activeIntervalSeconds,
-          idle_interval_seconds: values.screenshot.idleIntervalSeconds,
-          quality: values.screenshot.quality,
-          target_size_kb: values.screenshot.targetSizeKb,
-          auto_send_to_ai: values.screenshot.autoSendToAi,
-        } : undefined,
+        screenshot: values.screenshot
+          ? {
+              enabled: values.screenshot.enabled,
+              capture_mode: values.screenshot.captureMode,
+              target_window_id: values.screenshot.targetWindowId || null,
+              target_window_name: values.screenshot.targetWindowName || null,
+              active_interval_seconds: values.screenshot.activeIntervalSeconds,
+              idle_interval_seconds: values.screenshot.idleIntervalSeconds,
+              quality: values.screenshot.quality,
+              target_size_kb: values.screenshot.targetSizeKb,
+              auto_send_to_ai: values.screenshot.autoSendToAi,
+            }
+          : undefined,
       };
 
       console.log("📤 发送给后端:", backendData);
@@ -362,6 +367,176 @@ const SettingsPanel: React.FC = () => {
                 style={{ marginBottom: 24 }}
               />
 
+              {/* AI 陪玩角色配置 */}
+              <Card
+                type="inner"
+                title={
+                  <Space>
+                    <UserOutlined />
+                    <span>AI 陪玩角色</span>
+                  </Space>
+                }
+                style={{ marginBottom: 16 }}
+              >
+                <Alert
+                  message="选择你喜欢的 AI 陪玩风格"
+                  description="不同角色有不同的说话风格和性格,但都会给出准确的游戏建议"
+                  type="success"
+                  showIcon
+                  style={{ marginBottom: 16 }}
+                />
+
+                <Form.Item
+                  label="角色类型"
+                  name={["aiModels", "aiPersonality"]}
+                  tooltip="选择 AI 陪玩的性格类型"
+                  initialValue="sunnyou_male"
+                >
+                  <Select size="large" placeholder="选择角色">
+                    <Select.Option value="sunnyou_male">
+                      <Space>
+                        <span>🎮</span>
+                        <span>
+                          <strong>损友-男</strong> (老陈)
+                        </span>
+                        <span style={{ fontSize: 12, color: "#999" }}>
+                          - 幽默损友,嘴贱心善
+                        </span>
+                      </Space>
+                    </Select.Option>
+                    <Select.Option value="funny_female">
+                      <Space>
+                        <span>😂</span>
+                        <span>
+                          <strong>搞笑-女</strong> (小雨)
+                        </span>
+                        <span style={{ fontSize: 12, color: "#999" }}>
+                          - 活泼搞笑,主播风格
+                        </span>
+                      </Space>
+                    </Select.Option>
+                    <Select.Option value="kobe">
+                      <Space>
+                        <span>🐍</span>
+                        <span>
+                          <strong>牢大</strong> (Kobe)
+                        </span>
+                        <span style={{ fontSize: 12, color: "#999" }}>
+                          - 曼巴精神,励志霸气
+                        </span>
+                      </Space>
+                    </Select.Option>
+                    <Select.Option value="sweet_girl">
+                      <Space>
+                        <span>🍬</span>
+                        <span>
+                          <strong>甜妹</strong> (糖糖)
+                        </span>
+                        <span style={{ fontSize: 12, color: "#999" }}>
+                          - 温柔可爱,治愈系
+                        </span>
+                      </Space>
+                    </Select.Option>
+                    <Select.Option value="trump">
+                      <Space>
+                        <span>🦅</span>
+                        <span>
+                          <strong>特朗普</strong> (建国)
+                        </span>
+                        <span style={{ fontSize: 12, color: "#999" }}>
+                          - 自信霸气,商业思维
+                        </span>
+                      </Space>
+                    </Select.Option>
+                  </Select>
+                </Form.Item>
+
+                <Form.Item
+                  noStyle
+                  shouldUpdate={(prevValues, currentValues) =>
+                    prevValues.aiModels?.aiPersonality !==
+                    currentValues.aiModels?.aiPersonality
+                  }
+                >
+                  {({ getFieldValue }) => {
+                    const personality = getFieldValue([
+                      "aiModels",
+                      "aiPersonality",
+                    ]);
+                    const personalityInfo: Record<
+                      string,
+                      { name: string; desc: string; example: string }
+                    > = {
+                      sunnyou_male: {
+                        name: "老陈 (Chen)",
+                        desc: "游戏老手损友,说话带梗,适度嘲讽,但关键时刻靠谱",
+                        example:
+                          "笑死,又是这个BOSS,多少萌新死在这儿了😂 来,笔记记好了...",
+                      },
+                      funny_female: {
+                        name: "小雨 (Rain)",
+                        desc: "活泼搞笑的女性主播,自黑达人,充满表演欲",
+                        example:
+                          "哇塞!太厉害了吧!我都惊呆了!你是不是偷偷练过!🎉",
+                      },
+                      kobe: {
+                        name: "牢大 (Kobe)",
+                        desc: "传奇球星风格,曼巴精神,专注细节,励志霸气",
+                        example:
+                          "Mamba Mentality! 细节决定成败。Let's make it happen! 💪",
+                      },
+                      sweet_girl: {
+                        name: "糖糖 (Candy)",
+                        desc: "温柔可爱的甜妹,超级温柔体贴,正能量满满",
+                        example:
+                          "呀~这里确实有点难呢...不过没关系哦,糖糖来帮你~ ♡",
+                      },
+                      trump: {
+                        name: "建国 (Donald)",
+                        desc: "自信霸气的商业大亨风格,夸张表达,简单直接",
+                        example:
+                          "Believe me, this is the best strategy! We're gonna win so much! 🦅",
+                      },
+                    };
+
+                    const info =
+                      personalityInfo[personality] ||
+                      personalityInfo.sunnyou_male;
+
+                    return (
+                      <div
+                        style={{
+                          padding: 16,
+                          borderRadius: 8,
+                          marginTop: 16,
+                        }}
+                      >
+                        <div style={{ marginBottom: 8 }}>
+                          <Text strong>角色名:</Text> <Text>{info.name}</Text>
+                        </div>
+                        <div style={{ marginBottom: 8 }}>
+                          <Text strong>性格:</Text>{" "}
+                          <Text type="secondary">{info.desc}</Text>
+                        </div>
+                        <div>
+                          <Text strong>示例:</Text>
+                          <div
+                            style={{
+                              marginTop: 8,
+                              padding: 12,
+                              borderRadius: 4,
+                              borderLeft: "3px solid #1890ff",
+                            }}
+                          >
+                            <Text italic>"{info.example}"</Text>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  }}
+                </Form.Item>
+              </Card>
+
               {/* Embedding 模型 */}
               <Card
                 type="inner"
@@ -386,7 +561,7 @@ const SettingsPanel: React.FC = () => {
                   name={["aiModels", "embedding", "provider"]}
                   rules={[{ required: true, message: "请选择提供商" }]}
                 >
-                  <Select 
+                  <Select
                     placeholder="选择提供商"
                     onChange={(value) => {
                       // 根据提供商自动设置 API 地址
@@ -395,19 +570,19 @@ const SettingsPanel: React.FC = () => {
                         local: "http://localhost:11434/v1",
                         azure: "https://your-resource.openai.azure.com",
                       };
-                      
+
                       if (apiBaseMap[value]) {
                         form.setFieldValue(
                           ["aiModels", "embedding", "apiBase"],
-                          apiBaseMap[value]
+                          apiBaseMap[value],
                         );
                       }
-                      
+
                       // 如果是本地模型,清空 API Key
                       if (value === "local") {
                         form.setFieldValue(
                           ["aiModels", "embedding", "apiKey"],
-                          null
+                          null,
                         );
                       }
                     }}
@@ -502,7 +677,7 @@ const SettingsPanel: React.FC = () => {
                   name={["aiModels", "multimodal", "provider"]}
                   rules={[{ required: true, message: "请选择提供商" }]}
                 >
-                  <Select 
+                  <Select
                     placeholder="选择提供商"
                     onChange={(value) => {
                       // 根据提供商自动设置 API 地址
@@ -511,19 +686,19 @@ const SettingsPanel: React.FC = () => {
                         local: "http://localhost:11434",
                         azure: "https://your-resource.openai.azure.com",
                       };
-                      
+
                       if (apiBaseMap[value]) {
                         form.setFieldValue(
                           ["aiModels", "multimodal", "apiBase"],
-                          apiBaseMap[value]
+                          apiBaseMap[value],
                         );
                       }
-                      
+
                       // 如果是本地模型,清空 API Key
                       if (value === "local") {
                         form.setFieldValue(
                           ["aiModels", "multimodal", "apiKey"],
-                          null
+                          null,
                         );
                       }
                     }}
@@ -851,20 +1026,19 @@ const SettingsPanel: React.FC = () => {
                 description={
                   <ul style={{ marginBottom: 0, paddingLeft: 20 }}>
                     <li>
-                      <strong>活跃模式</strong>:
-                      AI 助手运行时的截图频率,推荐 5-10 秒
+                      <strong>活跃模式</strong>: AI 助手运行时的截图频率,推荐
+                      5-10 秒
                     </li>
                     <li>
-                      <strong>闲置模式</strong>:
-                      用户无操作时的截图频率,推荐 15-30 秒
+                      <strong>闲置模式</strong>: 用户无操作时的截图频率,推荐
+                      15-30 秒
                     </li>
                     <li>
-                      <strong>自动发送给 AI</strong>:
-                      开启后截图会自动触发 AI 分析
+                      <strong>自动发送给 AI</strong>: 开启后截图会自动触发 AI
+                      分析
                     </li>
                     <li>
-                      <strong>图片质量</strong>:
-                      建议 80-90,平衡质量与文件大小
+                      <strong>图片质量</strong>: 建议 80-90,平衡质量与文件大小
                     </li>
                   </ul>
                 }
@@ -889,7 +1063,9 @@ const SettingsPanel: React.FC = () => {
                   tooltip="选择全屏或窗口截图模式"
                 >
                   <Select>
-                    <Select.Option value="fullscreen">🖥️ 全屏截图</Select.Option>
+                    <Select.Option value="fullscreen">
+                      🖥️ 全屏截图
+                    </Select.Option>
                     <Select.Option value="window">🪟 窗口截图</Select.Option>
                   </Select>
                 </Form.Item>
@@ -897,12 +1073,16 @@ const SettingsPanel: React.FC = () => {
                 <Form.Item
                   noStyle
                   shouldUpdate={(prevValues, currentValues) =>
-                    prevValues.screenshot?.captureMode !== currentValues.screenshot?.captureMode
+                    prevValues.screenshot?.captureMode !==
+                    currentValues.screenshot?.captureMode
                   }
                 >
                   {({ getFieldValue }) => {
-                    const captureMode = getFieldValue(["screenshot", "captureMode"]);
-                    
+                    const captureMode = getFieldValue([
+                      "screenshot",
+                      "captureMode",
+                    ]);
+
                     if (captureMode === "window") {
                       return (
                         <>
@@ -924,27 +1104,35 @@ const SettingsPanel: React.FC = () => {
                               <Button
                                 onClick={async () => {
                                   try {
-                                    const windows = await invoke<any[]>("list_windows_command");
+                                    const windows = await invoke<any[]>(
+                                      "list_windows_command",
+                                    );
                                     if (windows.length === 0) {
                                       message.warning("未找到可用窗口");
                                       return;
                                     }
-                                    
+
                                     // 显示窗口选择对话框
-                                    const windowOptions = windows.map((w: any) => ({
-                                      label: `${w.title || w.app_name} (${w.app_name})`,
-                                      value: w.id,
-                                    }));
-                                    
+                                    const windowOptions = windows.map(
+                                      (w: any) => ({
+                                        label: `${w.title || w.app_name} (${w.app_name})`,
+                                        value: w.id,
+                                      }),
+                                    );
+
                                     // 简单实现: 选择第一个窗口 (实际应该弹出选择框)
                                     const selectedWindow = windows[0];
                                     form.setFieldsValue({
                                       screenshot: {
                                         targetWindowId: selectedWindow.id,
-                                        targetWindowName: selectedWindow.title || selectedWindow.app_name,
-                                      }
+                                        targetWindowName:
+                                          selectedWindow.title ||
+                                          selectedWindow.app_name,
+                                      },
                                     });
-                                    message.success(`已选择: ${selectedWindow.title || selectedWindow.app_name}`);
+                                    message.success(
+                                      `已选择: ${selectedWindow.title || selectedWindow.app_name}`,
+                                    );
                                   } catch (error: any) {
                                     message.error(`获取窗口列表失败: ${error}`);
                                   }

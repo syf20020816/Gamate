@@ -115,9 +115,26 @@ pub fn build_prompt(
     user_message: &str,
     context: &RAGContext,
 ) -> (String, String) {
-    // 系统 Prompt
-    let system_prompt = format!(
-        r#"你是一个专业的《{}》游戏陪玩 AI 助手。你的任务是:
+    // 加载角色配置
+    let settings = crate::settings::AppSettings::load()
+        .unwrap_or_else(|e| {
+            log::warn!("⚠️  加载设置失败: {}, 使用默认配置", e);
+            crate::settings::AppSettings::default()
+        });
+    
+    let personality_type = &settings.ai_models.ai_personality;
+    
+    // 加载 personality 配置并构建系统提示词
+    let system_prompt = match crate::personality::load_personality(personality_type) {
+        Ok(config) => {
+            log::info!("✅ 使用角色: {} ({})", config.character.name_cn, config.character.name_en);
+            crate::personality::build_system_prompt(&config, game_name)
+        }
+        Err(e) => {
+            log::warn!("⚠️  加载角色配置失败: {}, 使用默认提示词", e);
+            // 回退到默认提示词
+            format!(
+                r#"你是一个专业的《{}》游戏陪玩 AI 助手。你的任务是:
 
 1. 根据用户的问题,结合提供的游戏 Wiki 知识库,给出准确、有帮助的建议
 2. 如果用户提供了游戏截图,分析截图中的游戏状态
@@ -130,8 +147,10 @@ pub fn build_prompt(
 - 如果截图提供了额外信息,结合截图给出更精准的建议
 - 回复控制在 200 字以内,除非需要详细解释
 "#,
-        game_name
-    );
+                game_name
+            )
+        }
+    };
 
     // 用户 Prompt
     let mut user_prompt = String::new();

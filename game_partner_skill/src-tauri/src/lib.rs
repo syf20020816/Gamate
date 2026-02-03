@@ -6,6 +6,7 @@ mod embeddings;
 mod settings;
 mod rag;
 mod llm;
+mod personality;
 pub mod vector_db;
 
 use commands::*;
