@@ -1,5 +1,16 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Card, Button, Space, Typography, Divider, Select, message, Slider, Switch, Tag } from "antd";
+import {
+  Card,
+  Button,
+  Space,
+  Typography,
+  Divider,
+  Select,
+  message,
+  Slider,
+  Switch,
+  Tag,
+} from "antd";
 import { Monitor, Play, Square, Download, RefreshCw, Zap } from "lucide-react";
 import { motion } from "framer-motion";
 import { invoke } from "@tauri-apps/api/core";
@@ -45,22 +56,28 @@ interface Screenshot {
 
 const ScreenCapture: React.FC = () => {
   const [isCapturing, setIsCapturing] = useState(false);
-  const [captureMode, setCaptureMode] = useState<"fullscreen" | "window" | "area">("fullscreen");
+  const [captureMode, setCaptureMode] = useState<
+    "fullscreen" | "window" | "area"
+  >("fullscreen");
   const [captureArea, setCaptureArea] = useState<CaptureArea | null>(null);
   const [isDragging, setIsDragging] = useState(false);
-  
+
   // 截图策略配置
   const [captureInterval, setCaptureInterval] = useState(3); // 活跃期间隔 (1-15s)
   const [aiControlled, setAiControlled] = useState(true); // 是否启用 AI 控制
   const [isActiveMode, setIsActiveMode] = useState(false); // 当前是否活跃模式 (由 AI 判断)
   const [currentInterval, setCurrentInterval] = useState(15); // 当前实际使用的间隔
-  
+
   const [displays, setDisplays] = useState<DisplayInfo[]>([]);
   const [selectedDisplay, setSelectedDisplay] = useState<number>(0);
   const [windows, setWindows] = useState<WindowInfo[]>([]);
   const [selectedWindow, setSelectedWindow] = useState<number | null>(null);
-  const [currentScreenshot, setCurrentScreenshot] = useState<string | null>(null);
-  const [captureTimer, setCaptureTimer] = useState<ReturnType<typeof setInterval> | null>(null);
+  const [currentScreenshot, setCurrentScreenshot] = useState<string | null>(
+    null,
+  );
+  const [captureTimer, setCaptureTimer] = useState<ReturnType<
+    typeof setInterval
+  > | null>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
 
   // 加载显示器列表
@@ -158,33 +175,36 @@ const ScreenCapture: React.FC = () => {
    * @param now 是否立即截图
    * @param suggestedInterval 建议的间隔
    */
-  const updateCaptureStrategy = useCallback((active: boolean, now: boolean, suggestedInterval?: number) => {
-    // 更新活跃状态
-    setIsActiveMode(active);
+  const updateCaptureStrategy = useCallback(
+    (active: boolean, now: boolean, suggestedInterval?: number) => {
+      // 更新活跃状态
+      setIsActiveMode(active);
 
-    // 计算新的间隔
-    const newInterval = active 
-      ? (suggestedInterval || captureInterval) // 活跃期: AI 建议 或 用户设置
-      : 15; // 非活跃期: 固定 15s
+      // 计算新的间隔
+      const newInterval = active
+        ? suggestedInterval || captureInterval // 活跃期: AI 建议 或 用户设置
+        : 15; // 非活跃期: 固定 15s
 
-    if (newInterval !== currentInterval) {
-      setCurrentInterval(newInterval);
-      
-      // 重启定时器
-      if (captureTimer) {
-        clearInterval(captureTimer);
-        const timer = setInterval(() => {
-          captureScreenshot();
-        }, newInterval * 1000);
-        setCaptureTimer(timer);
+      if (newInterval !== currentInterval) {
+        setCurrentInterval(newInterval);
+
+        // 重启定时器
+        if (captureTimer) {
+          clearInterval(captureTimer);
+          const timer = setInterval(() => {
+            captureScreenshot();
+          }, newInterval * 1000);
+          setCaptureTimer(timer);
+        }
       }
-    }
 
-    // 立即截图
-    if (now) {
-      captureScreenshot();
-    }
-  }, [captureInterval, currentInterval, captureTimer]);
+      // 立即截图
+      if (now) {
+        captureScreenshot();
+      }
+    },
+    [captureInterval, currentInterval, captureTimer],
+  );
 
   // 暴露给父组件的控制函数 (通过 ref 或全局事件)
   useEffect(() => {
@@ -194,8 +214,9 @@ const ScreenCapture: React.FC = () => {
       updateCaptureStrategy(active, now, suggested_interval);
     };
 
-    window.addEventListener('ai-control' as any, handleAIControl);
-    return () => window.removeEventListener('ai-control' as any, handleAIControl);
+    window.addEventListener("ai-control" as any, handleAIControl);
+    return () =>
+      window.removeEventListener("ai-control" as any, handleAIControl);
   }, [updateCaptureStrategy]);
 
   const handleStopCapture = () => {
@@ -256,7 +277,9 @@ const ScreenCapture: React.FC = () => {
   const handleMouseUp = () => {
     setIsDragging(false);
     if (captureArea && (captureArea.width !== 0 || captureArea.height !== 0)) {
-      message.success(`已选择区域: ${Math.abs(captureArea.width)}x${Math.abs(captureArea.height)}`);
+      message.success(
+        `已选择区域: ${Math.abs(captureArea.width)}x${Math.abs(captureArea.height)}`,
+      );
     }
   };
 
@@ -268,15 +291,12 @@ const ScreenCapture: React.FC = () => {
         transition={{ duration: 0.3 }}
       >
         <Card className="control-panel">
-          <Space direction="vertical" size="large" style={{ width: "100%" }}>
+          <Space direction="vertical" style={{ width: "100%" }} >
             <div>
-              <Title level={4}>
-                <Monitor size={24} style={{ marginRight: 8 }} />
-                屏幕识别设置
-              </Title>
-              <Paragraph type="secondary">
+              <h3 style={{fontSize: 22}}>屏幕识别设置</h3>
+              <div style={{color: "#8f8f8f", marginTop: 8}}>
                 配置截屏模式和识别参数,实时捕获游戏画面
-              </Paragraph>
+              </div>
             </div>
 
             {/* 捕获模式选择 */}
@@ -315,10 +335,12 @@ const ScreenCapture: React.FC = () => {
             {/* 窗口选择 */}
             {captureMode === "window" && (
               <div className="control-item">
-                <Space style={{ width: "100%", justifyContent: "space-between" }}>
+                <Space
+                  style={{ width: "100%", justifyContent: "space-between" }}
+                >
                   <Text strong>选择窗口</Text>
-                  <Button 
-                    size="small" 
+                  <Button
+                    size="small"
                     icon={<RefreshCw size={14} />}
                     onClick={loadWindows}
                     disabled={isCapturing}
@@ -344,10 +366,16 @@ const ScreenCapture: React.FC = () => {
 
             {/* AI 智能截图策略 */}
             <div className="control-item">
-              <Space style={{ width: "100%", justifyContent: "space-between", marginBottom: 8 }}>
+              <Space
+                style={{
+                  width: "100%",
+                  justifyContent: "space-between",
+                  marginBottom: 8,
+                }}
+              >
                 <Text strong>AI 智能控制</Text>
-                <Switch 
-                  checked={aiControlled} 
+                <Switch
+                  checked={aiControlled}
                   onChange={setAiControlled}
                   disabled={isCapturing}
                   checkedChildren="启用"
@@ -355,24 +383,39 @@ const ScreenCapture: React.FC = () => {
                 />
               </Space>
               {aiControlled && (
-                <div style={{ padding: '8px 12px', borderRadius: 6, marginTop: 8 }}>
+                <div
+                  style={{ padding: "8px 12px", borderRadius: 6, marginTop: 8 }}
+                >
                   <Space direction="vertical" size={4}>
                     <Text type="secondary" style={{ fontSize: 14 }}>
                       <Zap size={12} style={{ marginRight: 4 }} />
                       AI 将根据对话内容自动调整截图频率:
                     </Text>
-                    <Text type="secondary" style={{ fontSize: 14, marginLeft: 16 }}>
+                    <Text
+                      type="secondary"
+                      style={{ fontSize: 14, marginLeft: 16 }}
+                    >
                       • 活跃期 (战斗/闯关): 使用下方设置的间隔
                     </Text>
-                    <Text type="secondary" style={{ fontSize: 14, marginLeft: 16 }}>
+                    <Text
+                      type="secondary"
+                      style={{ fontSize: 14, marginLeft: 16 }}
+                    >
                       • 闲置期 (菜单/浏览): 固定 15 秒间隔
                     </Text>
-                    <Text type="secondary" style={{ fontSize: 14, marginLeft: 16 }}>
+                    <Text
+                      type="secondary"
+                      style={{ fontSize: 14, marginLeft: 16 }}
+                    >
                       • 询问游戏问题时: 立即截图
                     </Text>
                     {isCapturing && (
-                      <Tag color={isActiveMode ? 'green' : 'blue'} style={{ marginTop: 4 }}>
-                        当前模式: {isActiveMode ? '活跃' : '闲置'} | 间隔: {currentInterval}s
+                      <Tag
+                        color={isActiveMode ? "green" : "blue"}
+                        style={{ marginTop: 4 }}
+                      >
+                        当前模式: {isActiveMode ? "活跃" : "闲置"} | 间隔:{" "}
+                        {currentInterval}s
                       </Tag>
                     )}
                   </Space>
@@ -395,10 +438,14 @@ const ScreenCapture: React.FC = () => {
                 style={{ marginTop: 8 }}
                 disabled={isCapturing}
               />
-              <Text type="secondary" style={{ fontSize: 12, marginTop: 4, display: "block" }}>
-                <InfoCircleOutlined></InfoCircleOutlined> {aiControlled 
-                  ? '此间隔仅用于活跃期 (战斗/闯关),闲置期固定 15s' 
-                  : '固定间隔,不受 AI 控制。推荐 3-5 秒'}
+              <Text
+                type="secondary"
+                style={{ fontSize: 12, marginTop: 4, display: "block" }}
+              >
+                <InfoCircleOutlined></InfoCircleOutlined>{" "}
+                {aiControlled
+                  ? "此间隔仅用于活跃期 (战斗/闯关),闲置期固定 15s"
+                  : "固定间隔,不受 AI 控制。推荐 3-5 秒"}
               </Text>
             </div>
 
@@ -436,16 +483,16 @@ const ScreenCapture: React.FC = () => {
           <div className="canvas-header">
             <Title level={5}>实时预览</Title>
             <Space>
-              <Button 
-                icon={<RefreshCw size={18} />} 
+              <Button
+                icon={<RefreshCw size={18} />}
                 size="small"
                 onClick={handleRefresh}
                 disabled={!isCapturing}
               >
                 刷新
               </Button>
-              <Button 
-                icon={<Download size={18} />} 
+              <Button
+                icon={<Download size={18} />}
                 size="small"
                 onClick={handleSaveScreenshot}
                 disabled={!currentScreenshot}
@@ -469,21 +516,21 @@ const ScreenCapture: React.FC = () => {
               </div>
             ) : (
               <>
-                <img 
-                  src={currentScreenshot} 
-                  alt="Screen capture" 
-                  style={{ 
-                    width: "100%", 
-                    height: "100%", 
-                    objectFit: "contain" 
-                  }} 
+                <img
+                  src={currentScreenshot}
+                  alt="Screen capture"
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "contain",
+                  }}
                 />
                 {isCapturing && (
                   <div className="capturing-indicator">
                     <div className="pulse" />
                     <Text>
-                      {aiControlled 
-                        ? `正在捕获 (${isActiveMode ? '活跃' : '闲置'} ${currentInterval}s)` 
+                      {aiControlled
+                        ? `正在捕获 (${isActiveMode ? "活跃" : "闲置"} ${currentInterval}s)`
                         : `正在捕获画面 (每 ${captureInterval} 秒)`}
                     </Text>
                   </div>

@@ -9,11 +9,9 @@ import {
   Collapse,
   Select,
   Tabs,
-  TabsProps,
 } from "antd";
 import { SendOutlined, DeleteOutlined, ClearOutlined } from "@ant-design/icons";
 import {
-  MessageCircle,
   Image as ImageIcon,
   BookOpen,
   Loader2,
@@ -32,6 +30,32 @@ import "./index.css";
 
 const { TextArea } = Input;
 const { Panel } = Collapse;
+
+// 清理 Markdown 标记，用于 TTS 播报 (与 ConversationArea 中的函数一致)
+const cleanMarkdownForTTS = (text: string): string => {
+  // 检查是否包含简化播报标记
+  const ttsSimpleMatch = text.match(/\[TTS_SIMPLE\](.*?)\[\/TTS_SIMPLE\]/s);
+  if (ttsSimpleMatch) {
+    // 如果有简化标记,只播报标记内的内容
+    return ttsSimpleMatch[1].trim();
+  }
+
+  // 否则进行常规 Markdown 清理
+  return text
+    .replace(/\*\*(.+?)\*\*/g, '$1')      // 移除加粗 **text**
+    .replace(/\*(.+?)\*/g, '$1')          // 移除斜体 *text*
+    .replace(/`(.+?)`/g, '$1')            // 移除代码标记 `code`
+    .replace(/~~(.+?)~~/g, '$1')          // 移除删除线 ~~text~~
+    .replace(/#{1,6}\s+/g, '')            // 移除标题标记 # ## ###
+    .replace(/\[(.+?)\]\(.+?\)/g, '$1')   // 移除链接 [text](url) -> text
+    .replace(/!\[.+?\]\(.+?\)/g, '')      // 移除图片
+    .replace(/^\s*[-*+]\s+/gm, '')        // 移除列表标记
+    .replace(/^\s*\d+\.\s+/gm, '')        // 移除数字列表
+    .replace(/\n{3,}/g, '\n\n')           // 多个换行合并
+    .replace(/```[\s\S]*?```/g, '')       // 移除代码块
+    .replace(/`/g, '')                    // 移除单个反引号
+    .trim();
+};
 
 const AIAssistant: React.FC = () => {
   const {
@@ -53,8 +77,8 @@ const AIAssistant: React.FC = () => {
 
   const [inputValue, setInputValue] = useState("");
   const [useScreenshot, setUseScreenshot] = useState(true);
-  const [isAIRunning, setIsAIRunning] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const voiceListenerRegistered = useRef(false); // 防止重复注册语音识别监听器
 
   // 可用的游戏列表
   const gamesWithSkills = [
@@ -88,6 +112,149 @@ const AIAssistant: React.FC = () => {
       unlisten.then((fn) => fn());
     };
   }, []);
+
+  // 监听语音识别完成事件 (从 VoiceChatPanel 触发)
+  useEffect(() => {
+    // 防止重复注册（React Strict Mode 会执行两次）
+    if (voiceListenerRegistered.current) {
+      console.log("⚠️ [跳过] 语音监听器已注册，避免重复");
+      return;
+    }
+    
+    console.log("🔧 [初始化] 注册语音识别完成监听器...");
+    voiceListenerRegistered.current = true;
+
+    // 防止同一次识别被处理多次
+    const processedRecognitions = new Set<string>();
+
+    const handleVoiceRecognitionCompleted = async (event: any) => {
+      const recognizedText = event.detail?.text;
+      if (!recognizedText || !recognizedText.trim()) {
+        console.warn("⚠️ 语音识别文字为空，跳过处理");
+        return;
+      }
+
+      // 生成唯一标识防止重复处理
+      const textKey = recognizedText.trim();
+      
+      if (processedRecognitions.has(textKey)) {
+        console.log("⚠️ [跳过重复] 该识别结果已处理:", textKey);
+        return;
+      }
+      processedRecognitions.add(textKey);
+      
+      // 5秒后清除标记(允许重复提问)
+      setTimeout(() => processedRecognitions.delete(textKey), 5000);
+
+      console.log("🎤 [语音识别完成]", recognizedText);
+
+      // 检查是否选择了游戏
+      if (!currentGame) {
+        antdMessage.warning("请先选择游戏");
+        return;
+      }
+
+      let screenshot: string | undefined = undefined;
+
+      try {
+        // 1. 自动截图
+        console.log("📸 [语音对话] 开始自动截图...");
+        antdMessage.loading({ content: "正在截图...", key: "voice_screenshot" });
+
+        screenshot = await invoke<string>("capture_screenshot");
+
+        antdMessage.success({
+          content: "截图完成",
+          key: "voice_screenshot",
+          duration: 1,
+        });
+        console.log("✅ [语音对话] 截图成功");
+      } catch (error) {
+        console.error("❌ [语音对话] 截图失败:", error);
+        antdMessage.warning({
+          content: "截图失败,将以纯文本模式发送",
+          key: "voice_screenshot",
+          duration: 2,
+        });
+      }
+
+      // 2. 添加用户消息 (语音识别的文字)
+      sendMessage(recognizedText, screenshot);
+
+      try {
+        console.log("🤖 [语音对话] 准备调用 generate_ai_response");
+
+        // 3. 调用 AI 生成回复
+        const response = await invoke<{
+          content: string;
+          wiki_references?: Array<{
+            title: string;
+            content: string;
+            score: number;
+          }>;
+        }>("generate_ai_response", {
+          message: recognizedText,
+          gameId: currentGame,
+          screenshot,
+        });
+
+        console.log("✅ [语音对话] AI 回复成功:", response);
+
+        // 4. 添加 AI 回复到对话历史
+        receiveAIResponse(response.content, response.wiki_references);
+
+        // 5. TTS 播报 AI 回复 (清理 Markdown 标记)
+        try {
+          const ttsSettings = await invoke<{
+            enabled: boolean;
+            auto_speak: boolean;
+            rate: number;
+            volume: number;
+          }>("get_app_settings").then((settings: any) => settings.tts);
+
+          console.log("🔊 [语音对话] TTS 配置:", ttsSettings);
+
+          if (ttsSettings?.enabled && ttsSettings?.auto_speak) {
+            console.log("🎤 [语音对话] 开始播报 AI 回复...");
+
+            // 清理 Markdown 标记 (支持 [TTS_SIMPLE] 简化标记)
+            const cleanText = cleanMarkdownForTTS(response.content);
+
+            console.log("🧹 [清理后的文本]", cleanText);
+
+            await invoke("set_tts_rate", { rate: ttsSettings.rate || 1.0 });
+            await invoke("set_tts_volume", { volume: ttsSettings.volume || 0.8 });
+            await invoke("speak_text", {
+              text: cleanText,  // 使用清理后的文本
+              interrupt: true,
+            });
+
+            console.log("✅ [语音对话] TTS 播报已开始");
+          }
+        } catch (ttsError) {
+          console.warn("⚠️ [语音对话] TTS 播报失败:", ttsError);
+        }
+      } catch (error) {
+        console.error("❌ [语音对话] AI 回复失败:", error);
+
+        receiveAIResponse(
+          `抱歉,AI 助手暂时无法回复。错误信息: ${error}\n\n请检查:\n1. 多模态模型是否已启用\n2. API Key 是否配置正确 (本地 Ollama 不需要)\n3. 网络连接是否正常\n4. 向量数据库是否已导入`,
+          [],
+        );
+
+        antdMessage.error("AI 回复失败,请查看详细错误信息");
+      }
+    };
+
+    // 监听自定义事件
+    window.addEventListener("voice_recognition_completed", handleVoiceRecognitionCompleted);
+
+    return () => {
+      console.log("🧹 [清理] 取消语音识别监听器");
+      window.removeEventListener("voice_recognition_completed", handleVoiceRecognitionCompleted);
+      voiceListenerRegistered.current = false; // 重置标志
+    };
+  }, [currentGame, sendMessage, receiveAIResponse]); // 添加依赖
 
   // 组件加载时应用当前角色语音
   useEffect(() => {
@@ -200,13 +367,17 @@ const AIAssistant: React.FC = () => {
         if (ttsSettings?.enabled && ttsSettings?.auto_speak) {
           console.log("🎤 开始播报 AI 回复...");
 
+          // 清理 Markdown 标记 (支持 [TTS_SIMPLE] 简化标记)
+          const cleanText = cleanMarkdownForTTS(response.content);
+          console.log("🧹 [清理后的文本]", cleanText);
+
           // 设置语速和音量
           await invoke("set_tts_rate", { rate: ttsSettings.rate || 1.0 });
           await invoke("set_tts_volume", { volume: ttsSettings.volume || 0.8 });
 
           // 播报 AI 回复内容
           await invoke("speak_text", {
-            text: response.content,
+            text: cleanText,  // 使用清理后的文本
             interrupt: true, // 打断之前的播报
           });
 
@@ -233,35 +404,6 @@ const AIAssistant: React.FC = () => {
   const handleClear = () => {
     clearMessages();
     antdMessage.success("已清空对话历史");
-  };
-
-  // 启动 AI 助手
-  const handleStartAI = async () => {
-    if (!currentGame) {
-      antdMessage.warning("请先选择游戏");
-      return;
-    }
-
-    try {
-      await invoke("start_ai_assistant", { gameId: currentGame });
-      setIsAIRunning(true);
-      antdMessage.success("AI 助手已启动,开始智能截图和分析");
-    } catch (error) {
-      console.error("启动 AI 助手失败:", error);
-      antdMessage.error(`启动失败: ${error}`);
-    }
-  };
-
-  // 停止 AI 助手
-  const handleStopAI = async () => {
-    try {
-      await invoke("stop_ai_assistant");
-      setIsAIRunning(false);
-      antdMessage.success("AI 助手已停止");
-    } catch (error) {
-      console.error("停止 AI 助手失败:", error);
-      antdMessage.error(`停止失败: ${error}`);
-    }
   };
 
   // 渲染消息
@@ -437,6 +579,37 @@ const AIAssistant: React.FC = () => {
 
   return (
     <div className="ai-assistant-page">
+      <div className="conversation-header">
+        
+        <h3 style={{fontSize: 22}}>AI 陪玩对话</h3>
+        <Select
+          value={currentGame}
+          onChange={setCurrentGame}
+          placeholder="选择游戏"
+          style={{ width: 200, marginLeft: "auto" }}
+          size="middle"
+        >
+          {availableGames.map((game) => (
+            <Select.Option key={game!.id} value={game!.id}>
+              {game!.name}
+            </Select.Option>
+          ))}
+        </Select>
+        {/* {!isAIRunning ? (
+          <Button
+            type="primary"
+            size="small"
+            onClick={handleStartAI}
+            disabled={!currentGame}
+          >
+            开始对话
+          </Button>
+        ) : (
+          <Button type="default" size="small" danger onClick={handleStopAI}>
+            停止对话
+          </Button>
+        )} */}
+      </div>
       <Tabs
         activeKey={tabKey}
         onChange={setTabKey}
@@ -453,7 +626,10 @@ const AIAssistant: React.FC = () => {
         </Tabs.TabPane>
         <Tabs.TabPane tab="文本对话" key="word">
           {/* 主对话区 */}
-          <div className="main-conversation-area" style={{ height: "calc(100vh - 108px)" }}>
+          <div
+            className="main-conversation-area"
+            style={{ height: "calc(100vh - 132px)" }}
+          >
             <Card
               styles={{
                 body: {
@@ -463,54 +639,6 @@ const AIAssistant: React.FC = () => {
                   height: "100%",
                 },
               }}
-              title={
-                <div className="conversation-header">
-                  <MessageCircle size={20} />
-                  <span>AI 陪玩对话</span>
-                  <Select
-                    value={currentGame}
-                    onChange={setCurrentGame}
-                    placeholder="选择游戏"
-                    style={{ width: 200, marginLeft: "auto" }}
-                    size="middle"
-                    disabled={isAIRunning}
-                  >
-                    {availableGames.map((game) => (
-                      <Select.Option key={game!.id} value={game!.id}>
-                        {game!.name}
-                      </Select.Option>
-                    ))}
-                  </Select>
-                  {!isAIRunning ? (
-                    <Button
-                      type="primary"
-                      size="small"
-                      onClick={handleStartAI}
-                      disabled={!currentGame}
-                    >
-                      开始对话
-                    </Button>
-                  ) : (
-                    <Button
-                      type="default"
-                      size="small"
-                      danger
-                      onClick={handleStopAI}
-                    >
-                      停止对话
-                    </Button>
-                  )}
-                  <Button
-                    type="text"
-                    size="small"
-                    icon={<ClearOutlined />}
-                    onClick={handleClear}
-                    disabled={messages.length === 0}
-                  >
-                    清空
-                  </Button>
-                </div>
-              }
               className="conversation-card"
             >
               {/* 侧边栏: 参考资料和语音聊天 */}
@@ -601,6 +729,15 @@ const AIAssistant: React.FC = () => {
                       disabled={!latestScreenshot}
                     >
                       {useScreenshot ? "已附加截图" : "未附加截图"}
+                    </Button>
+                    <Button
+                      type="text"
+                      size="small"
+                      icon={<ClearOutlined />}
+                      onClick={handleClear}
+                      disabled={messages.length === 0}
+                    >
+                      清空
                     </Button>
                   </div>
                   <TextArea

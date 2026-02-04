@@ -1,8 +1,8 @@
 .ai-assistant-page {
   display: flex;
-  gap: 16px;
   width: 100%;
   height: 100%;
+  flex-direction: column;
 }
 
 .sidebar-area {
@@ -10,9 +10,8 @@
   display: flex;
   flex-direction: column;
   gap: 0px;
+  width: 200px;
 }
-
-
 
 .conversation-card {
   height: 100%;

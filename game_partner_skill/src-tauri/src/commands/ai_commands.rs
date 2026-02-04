@@ -171,11 +171,16 @@ fn mock_llm_fallback(user_prompt: &str) -> Result<String> {
     log::info!("⚠️  使用 Mock LLM 回退实现");
 
     let mut response = String::new();
-    response.push_str("## ⚠️  OpenAI API 未配置\n\n");
+    
+    // 添加语音播报专用标记 (前端会识别并简化播报内容)
+    response.push_str("[TTS_SIMPLE]对话失败，请检查 API 配置。[/TTS_SIMPLE]\n\n");
+    
+    // 详细信息用于屏幕显示
+    response.push_str("## ⚠️  AI API 未配置或调用失败\n\n");
     response.push_str("当前使用的是 Mock AI 实现,无法提供智能对话。\n\n");
     response.push_str("**如何启用真实 AI:**\n\n");
-    response.push_str("1. 在设置页面配置 OpenAI API Key\n");
-    response.push_str("2. 选择合适的模型 (推荐: gpt-4o-mini)\n");
+    response.push_str("1. 在设置页面配置 OpenAI API Key 或 Ollama 模型\n");
+    response.push_str("2. 选择合适的模型 (推荐: gpt-4o-mini 或 llava)\n");
     response.push_str("3. 保存设置后重新发送消息\n\n");
     response.push_str("---\n\n");
     response.push_str(&format!("**您的问题:** {}\n", user_prompt));

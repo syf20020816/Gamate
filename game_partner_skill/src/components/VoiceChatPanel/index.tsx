@@ -6,6 +6,8 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { Mic, MicOff, Volume2 } from "lucide-react";
 import { Button, Modal, Progress } from "antd";
+import { useAIAssistantStore } from "../../stores/aiAssistantStore";
+import { ConversationArea } from "../ConversationArea";
 import "./index.scss";
 
 interface VadConfig {
@@ -28,13 +30,23 @@ export const VoiceChatPanel: React.FC = () => {
   const [listenerState, setListenerState] = useState<ListenerState | null>(
     null,
   );
-  const [transcriptions, setTranscriptions] = useState<string[]>([]);
+
+  // 使用共享的对话Store
+  const {
+    messages,
+    isThinking,
+    currentGame,
+    deleteMessage,
+  } = useAIAssistantStore();
 
   // 麦克风测试状态
   const [isTesting, setIsTesting] = useState(false);
   const [testVolume, setTestVolume] = useState(0);
   const [testDuration, setTestDuration] = useState(0);
   const [testSamples, setTestSamples] = useState(0);
+  
+  // 使用 ref 防止重复注册监听器
+  const listenersRegistered = React.useRef(false);
 
   // 加载监听器状态
   const loadState = async () => {
@@ -71,9 +83,9 @@ export const VoiceChatPanel: React.FC = () => {
     try {
       console.log("⏹️⏹️⏹️ [前端] 用户点击停止对话按钮 !!!");
       console.log("⏹️ [前端] 调用 stop_continuous_listening 命令...");
-      
+
       const result = await invoke("stop_continuous_listening");
-      
+
       console.log("✅ [前端] stop_continuous_listening 命令返回:", result);
       setIsListening(false);
       console.log("⏹️ 已停止监听");
@@ -164,13 +176,21 @@ export const VoiceChatPanel: React.FC = () => {
 
   // 监听事件
   useEffect(() => {
+    // 防止重复注册（React Strict Mode 会执行两次 useEffect）
+    if (listenersRegistered.current) {
+      console.log("⚠️ [跳过] 监听器已注册，避免重复");
+      return;
+    }
+    
     console.log("🔧 [初始化] 注册事件监听器...");
+    listenersRegistered.current = true;
+    
     const unlistenList: (() => void)[] = [];
 
-    // 语音转文字事件
+    // 语音转文字事件 - 不再需要,因为会触发自定义事件
     listen<string>("voice_transcribed", (event) => {
       console.log("📝 [语音转文字]", event.payload);
-      setTranscriptions((prev) => [...prev, event.payload]);
+      // 已移除 setTranscriptions,由 AIAssistant 统一处理
     }).then((unlisten) => {
       console.log("✅ [已注册] voice_transcribed 监听器");
       unlistenList.push(unlisten);
@@ -217,16 +237,27 @@ export const VoiceChatPanel: React.FC = () => {
       unlistenList.push(unlisten);
     });
 
-    // 阿里云识别请求事件 (后端触发)
+    // 阿里云识别请求事件 (后端触发) - 使用 once 防止重复处理
+    const recognizeRequestHandled = new Set<string>();
+    
     listen<{
       pcm_data: number[];
       sample_rate: number;
       duration_secs: number;
     }>("aliyun_recognize_request", async (event) => {
+      // 生成唯一ID防止重复处理
+      const eventId = `${event.payload.pcm_data.length}_${event.payload.sample_rate}_${event.payload.duration_secs}`;
+      
+      if (recognizeRequestHandled.has(eventId)) {
+        console.log("⚠️ [跳过重复] 识别请求已处理:", eventId);
+        return;
+      }
+      recognizeRequestHandled.add(eventId);
+      
       console.log("🎯🎯🎯 [收到阿里云识别请求!!!]");
       console.log(
         "🎯 [收到阿里云识别请求]",
-        `${event.payload.pcm_data.length} 字节, ${event.payload.sample_rate}Hz, ${event.payload.duration_secs.toFixed(1)}s`
+        `${event.payload.pcm_data.length} 字节, ${event.payload.sample_rate}Hz, ${event.payload.duration_secs.toFixed(1)}s`,
       );
 
       try {
@@ -239,6 +270,7 @@ export const VoiceChatPanel: React.FC = () => {
         if (!aliyunAccessKey || !aliyunAccessSecret || !aliyunAppKey) {
           console.error("❌ 阿里云配置不完整");
           alert("请先在设置中配置阿里云 Access Key 和 AppKey");
+          recognizeRequestHandled.delete(eventId); // 失败时清除标记
           return;
         }
 
@@ -256,13 +288,21 @@ export const VoiceChatPanel: React.FC = () => {
 
         console.log("✅ [识别结果]", result);
 
-        // 添加到识别记录
+        // 不再添加到本地列表,由自定义事件触发 AIAssistant 统一处理
         if (result && result.trim()) {
-          setTranscriptions((prev) => [...prev, result]);
+          // 🎯 触发自定义事件: 语音识别完成 (传递识别文字)
+          console.log("📢 [触发事件] voice_recognition_completed:", result);
+          window.dispatchEvent(new CustomEvent("voice_recognition_completed", {
+            detail: { text: result }
+          }));
         }
+        
+        // 成功后清除标记(允许下次相同长度的音频)
+        setTimeout(() => recognizeRequestHandled.delete(eventId), 5000);
       } catch (error) {
         console.error("❌ [阿里云识别失败]", error);
         alert(`语音识别失败: ${error}`);
+        recognizeRequestHandled.delete(eventId); // 失败时清除标记
       }
     }).then((unlisten) => {
       console.log("✅✅✅ [已注册] aliyun_recognize_request 监听器 !!!");
@@ -271,12 +311,14 @@ export const VoiceChatPanel: React.FC = () => {
 
     // 阿里云 ASR 文本事件
     listen<string>("aliyun_asr_event", (event) => {
-      console.log("🌐 [阿里云 ASR]", event.payload);
+      console.log("🌐 [阿里云 ASR 原始事件]", event.payload);
       try {
         const data = JSON.parse(event.payload);
         // 处理不同类型的 ASR 事件
         if (data.header) {
           const msgName = data.header.name;
+          console.log("📡 [ASR 事件类型]", msgName);
+
           if (msgName === "TranscriptionStarted") {
             // 会话开始
             console.log("🚀 [会话开始]", data.payload);
@@ -286,12 +328,29 @@ export const VoiceChatPanel: React.FC = () => {
             if (text) {
               console.log("📝 [中间结果]", text);
             }
-          } else if (msgName === "SentenceEnd") {
-            // 句子结束(最终识别结果)
+          } else if (msgName === "RecognitionResultChanged") {
+            // 一句话识别的中间结果
             const text = data.payload?.result;
             if (text) {
-              console.log("✅ [最终结果]", text);
-              setTranscriptions((prev) => [...prev, text]);
+              console.log("📝 [一句话识别中间结果]", text);
+            }
+          } else if (msgName === "RecognitionCompleted") {
+            // 一句话识别完成 - 不要在这里添加结果，因为已经在 aliyun_recognize_request 中添加了
+            const text = data.payload?.result;
+            if (text) {
+              console.log(
+                "✅ [一句话识别完成]",
+                text,
+                "（不添加到列表，避免重复）",
+              );
+            }
+          } else if (msgName === "SentenceEnd") {
+            // 句子结束(最终识别结果) - 仅用于流式识别
+            const text = data.payload?.result;
+            if (text) {
+              console.log("✅ [流式识别最终结果]", text);
+              // 注意: 一句话识别不会触发这个事件，只在流式识别时才会添加
+              // setTranscriptions((prev) => [...prev, text]);
             }
           } else if (msgName === "SentenceBegin") {
             console.log("🎤 [句子开始]", data.payload);
@@ -309,15 +368,20 @@ export const VoiceChatPanel: React.FC = () => {
 
     // 阿里云 ASR 二进制事件 (base64)
     listen<string>("aliyun_asr_event_bin", (event) => {
-      console.log("📦 [阿里云 ASR 二进制数据]", event.payload.substring(0, 50) + "...");
+      console.log(
+        "📦 [阿里云 ASR 二进制数据]",
+        event.payload.substring(0, 50) + "...",
+      );
     }).then((unlisten) => unlistenList.push(unlisten));
 
     // 定时更新状态
     const interval = setInterval(loadState, 500);
 
     return () => {
+      console.log("🧹 [清理] 取消注册事件监听器");
       unlistenList.forEach((unlisten) => unlisten());
       clearInterval(interval);
+      listenersRegistered.current = false; // 重置标志，允许下次重新注册
     };
   }, []);
 
@@ -360,47 +424,50 @@ export const VoiceChatPanel: React.FC = () => {
             </Button>
           )}
         </div>
-
         {/* 麦克风测试进度 */}
-        <div className="microphone-test-panel">
-          <div className="volume-label">
-            <span>实时音量</span>
-            <span className="test-duration">
-              {testDuration.toFixed(1)}s / 10.0s
-            </span>
-          </div>
-
-          <Progress
-            percent={testVolume * 100}
-            format={(percent) => `${(percent || 0).toFixed(1)}`}
-          />
-          <div className="test-stats">
-            <div className="stat-item">
-              <span className="stat-label">采集样本:</span>
-              <span className="stat-value">{testSamples.toLocaleString()}</span>
-            </div>
-            <div className="stat-item">
-              <span className="stat-label">状态:</span>
-              <span
-                className="stat-value"
-                style={{
-                  color:
-                    testVolume > 0.01
-                      ? "green"
-                      : testVolume > 0.001
-                        ? "orange"
-                        : "red",
-                }}
-              >
-                {testVolume > 0.01
-                  ? "检测到声音"
-                  : testVolume > 0.001
-                    ? "声音较弱"
-                    : "无声音"}
+        {isTesting && (
+          <div className="microphone-test-panel">
+            <div className="volume-label">
+              <span>实时音量</span>
+              <span className="test-duration">
+                {testDuration.toFixed(1)}s / 10.0s
               </span>
             </div>
+
+            <Progress
+              percent={testVolume * 100}
+              format={(percent) => `${(percent || 0).toFixed(1)}`}
+            />
+            <div className="test-stats">
+              <div className="stat-item">
+                <span className="stat-label">采集样本:</span>
+                <span className="stat-value">
+                  {testSamples.toLocaleString()}
+                </span>
+              </div>
+              <div className="stat-item">
+                <span className="stat-label">状态:</span>
+                <span
+                  className="stat-value"
+                  style={{
+                    color:
+                      testVolume > 0.01
+                        ? "green"
+                        : testVolume > 0.001
+                          ? "orange"
+                          : "red",
+                  }}
+                >
+                  {testVolume > 0.01
+                    ? "检测到声音"
+                    : testVolume > 0.001
+                      ? "声音较弱"
+                      : "无声音"}
+                </span>
+              </div>
+            </div>
           </div>
-        </div>
+        )}
 
         {/* 主控制按钮 */}
         <div className="control-buttons">
@@ -461,43 +528,14 @@ export const VoiceChatPanel: React.FC = () => {
         </div>
       </div>
 
-      {/* 识别结果显示区 */}
-      <div className="results-section">
-        <h4 className="results-title">识别记录</h4>
-
-        {transcriptions.length === 0 ? (
-          <div className="empty-state">
-            <Mic className="empty-icon" />
-            <p>点击"开始对话"开始语音输入</p>
-            <p className="hint">说话后会自动识别并转换为文字</p>
-          </div>
-        ) : (
-          <div className="results-list">
-            {transcriptions.map((text, index) => (
-              <div key={index} className="result-item">
-                <div className="result-content">
-                  <div className="result-number">{index + 1}</div>
-                  <div className="result-text-container">
-                    <p className="result-text">{text}</p>
-                    <p className="result-time">
-                      {new Date().toLocaleTimeString()}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* 最近一次识别 */}
-        {listenerState?.last_transcription && (
-          <div className="last-transcription">
-            <p className="last-transcription-label">最近识别:</p>
-            <p className="last-transcription-text">
-              {listenerState.last_transcription}
-            </p>
-          </div>
-        )}
+      {/* 对话显示区 - 使用共享组件 */}
+      <div className="conversation-section">
+        <ConversationArea
+          messages={messages}
+          isThinking={isThinking}
+          currentGame={currentGame}
+          onDeleteMessage={deleteMessage}
+        />
       </div>
 
       {/* 底部提示 */}
