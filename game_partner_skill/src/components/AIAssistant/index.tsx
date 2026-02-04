@@ -8,6 +8,8 @@ import {
   Tag,
   Collapse,
   Select,
+  Tabs,
+  TabsProps,
 } from "antd";
 import { SendOutlined, DeleteOutlined, ClearOutlined } from "@ant-design/icons";
 import {
@@ -130,19 +132,23 @@ const AIAssistant: React.FC = () => {
       try {
         console.log("📸 开始截图...");
         antdMessage.loading({ content: "正在截图...", key: "screenshot" });
-        
+
         // 调用截图命令
         const capturedScreenshot = await invoke<string>("capture_screenshot");
         screenshot = capturedScreenshot;
-        
-        antdMessage.success({ content: "截图完成", key: "screenshot", duration: 1 });
+
+        antdMessage.success({
+          content: "截图完成",
+          key: "screenshot",
+          duration: 1,
+        });
         console.log("✅ 截图成功,长度:", screenshot?.length);
       } catch (error) {
         console.error("❌ 截图失败:", error);
-        antdMessage.warning({ 
-          content: "截图失败,将以纯文本模式发送", 
+        antdMessage.warning({
+          content: "截图失败,将以纯文本模式发送",
           key: "screenshot",
-          duration: 2 
+          duration: 2,
         });
       }
     }
@@ -153,8 +159,12 @@ const AIAssistant: React.FC = () => {
 
     try {
       console.log("🤖 准备调用 generate_ai_response");
-      console.log("   参数:", { message: userMessage, gameId: currentGame, hasScreenshot: !!screenshot });
-      
+      console.log("   参数:", {
+        message: userMessage,
+        gameId: currentGame,
+        hasScreenshot: !!screenshot,
+      });
+
       // 调用后端 RAG 生成 AI 回复
       const response = await invoke<{
         content: string;
@@ -170,7 +180,7 @@ const AIAssistant: React.FC = () => {
       });
 
       console.log("✅ AI 回复成功:", response);
-      
+
       // 添加 AI 回复
       receiveAIResponse(response.content, response.wiki_references);
 
@@ -189,17 +199,17 @@ const AIAssistant: React.FC = () => {
         // 如果启用了 TTS 且自动播报
         if (ttsSettings?.enabled && ttsSettings?.auto_speak) {
           console.log("🎤 开始播报 AI 回复...");
-          
+
           // 设置语速和音量
           await invoke("set_tts_rate", { rate: ttsSettings.rate || 1.0 });
           await invoke("set_tts_volume", { volume: ttsSettings.volume || 0.8 });
-          
+
           // 播报 AI 回复内容
           await invoke("speak_text", {
             text: response.content,
             interrupt: true, // 打断之前的播报
           });
-          
+
           console.log("✅ TTS 播报已开始");
         }
       } catch (ttsError) {
@@ -266,12 +276,10 @@ const AIAssistant: React.FC = () => {
         exit={{ opacity: 0, y: -20 }}
         transition={{ duration: 0.3 }}
         className={`message-item ${isUser ? "user-message" : "ai-message"}`}
-        style={{backgroundColor: "#1e1e1e"}}
+        style={{ backgroundColor: "#1e1e1e" }}
       >
         <div className="message-header">
-          <span className="message-role">
-            {isUser ? "玩家" : "AI 助手"}
-          </span>
+          <span className="message-role">{isUser ? "玩家" : "AI 助手"}</span>
           <span className="message-time">
             {new Date(msg.timestamp).toLocaleTimeString()}
           </span>
@@ -283,17 +291,21 @@ const AIAssistant: React.FC = () => {
               icon={<span>🔊</span>}
               onClick={async () => {
                 try {
-                  const ttsSettings = await invoke<any>("get_app_settings").then(
-                    (settings: any) => settings.tts
-                  );
+                  const ttsSettings = await invoke<any>(
+                    "get_app_settings",
+                  ).then((settings: any) => settings.tts);
 
                   if (!ttsSettings?.enabled) {
                     antdMessage.warning("请先在设置中启用 TTS");
                     return;
                   }
 
-                  await invoke("set_tts_rate", { rate: ttsSettings.rate || 1.0 });
-                  await invoke("set_tts_volume", { volume: ttsSettings.volume || 0.8 });
+                  await invoke("set_tts_rate", {
+                    rate: ttsSettings.rate || 1.0,
+                  });
+                  await invoke("set_tts_volume", {
+                    volume: ttsSettings.volume || 0.8,
+                  });
                   await invoke("speak_text", {
                     text: msg.content,
                     interrupt: true,
@@ -321,42 +333,52 @@ const AIAssistant: React.FC = () => {
           ) : (
             <div className="markdown-content">
               {/* 检查是否包含 thinking 内容 */}
-              {msg.content.includes("Thinking...") && msg.content.includes("...done thinking.") ? (
+              {msg.content.includes("Thinking...") &&
+              msg.content.includes("...done thinking.") ? (
                 <>
                   {/* 提取 thinking 部分 */}
                   {(() => {
                     const thinkingStart = msg.content.indexOf("Thinking...");
-                    const thinkingEnd = msg.content.indexOf("...done thinking.") + "...done thinking.".length;
-                    const thinkingContent = msg.content.substring(thinkingStart, thinkingEnd);
-                    const actualResponse = msg.content.substring(thinkingEnd).trim();
-                    
+                    const thinkingEnd =
+                      msg.content.indexOf("...done thinking.") +
+                      "...done thinking.".length;
+                    const thinkingContent = msg.content.substring(
+                      thinkingStart,
+                      thinkingEnd,
+                    );
+                    const actualResponse = msg.content
+                      .substring(thinkingEnd)
+                      .trim();
+
                     return (
                       <>
                         {/* Thinking 过程（可折叠） */}
                         <Collapse ghost style={{ marginBottom: 12 }}>
                           <Panel
                             header={
-                              <span style={{ color: '#888', fontSize: '13px' }}>
+                              <span style={{ color: "#888", fontSize: "13px" }}>
                                 <span style={{ marginRight: 8 }}>🧠</span>
                                 AI 思考过程
                               </span>
                             }
                             key="thinking"
                           >
-                            <div style={{ 
-                              background: '#f5f5f5', 
-                              padding: '12px', 
-                              borderRadius: '4px',
-                              fontSize: '13px',
-                              color: '#666',
-                              whiteSpace: 'pre-wrap',
-                              fontFamily: 'monospace'
-                            }}>
+                            <div
+                              style={{
+                                background: "#f5f5f5",
+                                padding: "12px",
+                                borderRadius: "4px",
+                                fontSize: "13px",
+                                color: "#666",
+                                whiteSpace: "pre-wrap",
+                                fontFamily: "monospace",
+                              }}
+                            >
                               {thinkingContent}
                             </div>
                           </Panel>
                         </Collapse>
-                        
+
                         {/* 实际回复 */}
                         <ReactMarkdown remarkPlugins={[remarkGfm]}>
                           {actualResponse || msg.content}
@@ -411,194 +433,204 @@ const AIAssistant: React.FC = () => {
     );
   };
 
+  const [tabKey, setTabKey] = useState("audio");
+
   return (
     <div className="ai-assistant-page">
-      {/* 主对话区 */}
-      <div className="main-conversation-area">
-        <Card
-          styles={{
-            body: {
-              display: "flex",
-              flexDirection: "row",
-              padding: 0,
-            }
-          }}
-          title={
-            <div className="conversation-header">
-              <MessageCircle size={20} />
-              <span>AI 陪玩对话</span>
-              <Select
-                value={currentGame}
-                onChange={setCurrentGame}
-                placeholder="选择游戏"
-                style={{ width: 200, marginLeft: "auto" }}
-                size="middle"
-                disabled={isAIRunning}
-              >
-                {availableGames.map((game) => (
-                  <Select.Option key={game!.id} value={game!.id}>
-                    {game!.name}
-                  </Select.Option>
-                ))}
-              </Select>
-              {!isAIRunning ? (
-                <Button
-                  type="primary"
-                  size="small"
-                  onClick={handleStartAI}
-                  disabled={!currentGame}
-                >
-                  开始对话
-                </Button>
-              ) : (
-                <Button
-                  type="default"
-                  size="small"
-                  danger
-                  onClick={handleStopAI}
-                >
-                  停止对话
-                </Button>
-              )}
-              <Button
-                type="text"
-                size="small"
-                icon={<ClearOutlined />}
-                onClick={handleClear}
-                disabled={messages.length === 0}
-              >
-                清空
-              </Button>
-            </div>
-          }
-          className="conversation-card"
-        >
-          {/* 侧边栏: 参考资料和语音聊天 */}
-          <div className="sidebar-area">
-            {/* 语音聊天面板 */}
+      <Tabs
+        activeKey={tabKey}
+        onChange={setTabKey}
+        styles={{
+          root: { height: "100%", width: "100%" },
+          content: { height: "100%" },
+        }}
+      >
+        <Tabs.TabPane tab="语音对话" key="audio">
+          {/* 语音聊天面板 */}
+          <div style={{ height: "calc(100% - 40px)" }}>
+            <VoiceChatPanel />
+          </div>
+        </Tabs.TabPane>
+        <Tabs.TabPane tab="文本对话" key="word">
+          {/* 主对话区 */}
+          <div className="main-conversation-area" style={{ height: "calc(100vh - 108px)" }}>
             <Card
-             
-              size="small"
-              className="voice-chat-card"
-              style={{ marginBottom: 16, height: '400px', margin: 0, borderRadius: 0 }}
+              styles={{
+                body: {
+                  display: "flex",
+                  flexDirection: "row",
+                  padding: 0,
+                  height: "100%",
+                },
+              }}
+              title={
+                <div className="conversation-header">
+                  <MessageCircle size={20} />
+                  <span>AI 陪玩对话</span>
+                  <Select
+                    value={currentGame}
+                    onChange={setCurrentGame}
+                    placeholder="选择游戏"
+                    style={{ width: 200, marginLeft: "auto" }}
+                    size="middle"
+                    disabled={isAIRunning}
+                  >
+                    {availableGames.map((game) => (
+                      <Select.Option key={game!.id} value={game!.id}>
+                        {game!.name}
+                      </Select.Option>
+                    ))}
+                  </Select>
+                  {!isAIRunning ? (
+                    <Button
+                      type="primary"
+                      size="small"
+                      onClick={handleStartAI}
+                      disabled={!currentGame}
+                    >
+                      开始对话
+                    </Button>
+                  ) : (
+                    <Button
+                      type="default"
+                      size="small"
+                      danger
+                      onClick={handleStopAI}
+                    >
+                      停止对话
+                    </Button>
+                  )}
+                  <Button
+                    type="text"
+                    size="small"
+                    icon={<ClearOutlined />}
+                    onClick={handleClear}
+                    disabled={messages.length === 0}
+                  >
+                    清空
+                  </Button>
+                </div>
+              }
+              className="conversation-card"
             >
-              <div style={{ height: 'calc(100% - 40px)' }}>
-                <VoiceChatPanel />
+              {/* 侧边栏: 参考资料和语音聊天 */}
+              <div className="sidebar-area">
+                {/* 参考资料 */}
+                <Card
+                  title={
+                    <span style={{ display: "flex", alignItems: "center" }}>
+                      <BookOpen size={16} style={{ marginRight: 8 }} />
+                      参考资料
+                    </span>
+                  }
+                  size="small"
+                  className="wiki-sidebar-card"
+                >
+                  {lastWikiSearch.length > 0 ? (
+                    <div className="wiki-sidebar-results">
+                      {lastWikiSearch.map((ref, index) => (
+                        <motion.div
+                          key={index}
+                          initial={{ opacity: 0, x: 20 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: index * 0.1 }}
+                          className="wiki-sidebar-item"
+                        >
+                          <div className="wiki-sidebar-header">
+                            <strong>{ref.title}</strong>
+                            <Tag color="blue">
+                              {(ref.score * 100).toFixed(0)}%
+                            </Tag>
+                          </div>
+                          <div className="wiki-sidebar-content">
+                            {ref.content.substring(0, 150)}...
+                          </div>
+                        </motion.div>
+                      ))}
+                    </div>
+                  ) : (
+                    <Empty
+                      description="开始对话后,相关的 Wiki 资料会显示在这里"
+                      image={Empty.PRESENTED_IMAGE_SIMPLE}
+                      style={{ padding: "40px 20px" }}
+                    />
+                  )}
+                </Card>
+              </div>
+
+              <div className="messages-area-container">
+                <div className="messages-container">
+                  <AnimatePresence>
+                    {messages.length === 0 ? (
+                      <Empty
+                        description={
+                          currentGame
+                            ? "开始对话吧!问我任何关于游戏的问题~"
+                            : "请先选择游戏"
+                        }
+                        image={Empty.PRESENTED_IMAGE_SIMPLE}
+                      />
+                    ) : (
+                      messages.map(renderMessage)
+                    )}
+                  </AnimatePresence>
+
+                  {/* AI 思考中 */}
+                  {isThinking && (
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      className="thinking-indicator"
+                    >
+                      <Loader2 size={16} className="spin-icon" />
+                      <span>AI 思考中...</span>
+                    </motion.div>
+                  )}
+
+                  <div ref={messagesEndRef} />
+                </div>
+
+                {/* 输入框 */}
+                <div className="input-area">
+                  <div className="input-controls">
+                    <Button
+                      type={useScreenshot ? "primary" : "default"}
+                      size="small"
+                      icon={<ImageIcon size={14} />}
+                      onClick={() => setUseScreenshot(!useScreenshot)}
+                      disabled={!latestScreenshot}
+                    >
+                      {useScreenshot ? "已附加截图" : "未附加截图"}
+                    </Button>
+                  </div>
+                  <TextArea
+                    value={inputValue}
+                    onChange={(e) => setInputValue(e.target.value)}
+                    onPressEnter={(e) => {
+                      if (!e.shiftKey) {
+                        e.preventDefault();
+                        handleSend();
+                      }
+                    }}
+                    placeholder="输入消息... (Shift+Enter 换行, Enter 发送)"
+                    autoSize={{ minRows: 2, maxRows: 4 }}
+                    disabled={!currentGame || isThinking}
+                  />
+                  <Button
+                    type="primary"
+                    icon={<SendOutlined />}
+                    onClick={handleSend}
+                    loading={isThinking}
+                    disabled={!currentGame || !inputValue.trim()}
+                  >
+                    发送
+                  </Button>
+                </div>
               </div>
             </Card>
-            
-            {/* 参考资料 */}
-            <Card
-              style={{ height: "calc(100% - 400px)" }}
-              title={
-                <span style={{ display: "flex", alignItems: "center" }}>
-                  <BookOpen size={16} style={{ marginRight: 8 }} />
-                  参考资料
-                </span>
-              }
-              size="small"
-              className="wiki-sidebar-card"
-            >
-              {lastWikiSearch.length > 0 ? (
-                <div className="wiki-sidebar-results">
-                  {lastWikiSearch.map((ref, index) => (
-                    <motion.div
-                      key={index}
-                      initial={{ opacity: 0, x: 20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: index * 0.1 }}
-                      className="wiki-sidebar-item"
-                    >
-                      <div className="wiki-sidebar-header">
-                        <strong>{ref.title}</strong>
-                        <Tag color="blue">{(ref.score * 100).toFixed(0)}%</Tag>
-                      </div>
-                      <div className="wiki-sidebar-content">
-                        {ref.content.substring(0, 150)}...
-                      </div>
-                    </motion.div>
-                  ))}
-                </div>
-              ) : (
-                <Empty
-                  description="开始对话后,相关的 Wiki 资料会显示在这里"
-                  image={Empty.PRESENTED_IMAGE_SIMPLE}
-                  style={{ padding: "40px 20px" }}
-                />
-              )}
-            </Card>
           </div>
-          <div className="messages-area-container">
-            <div className="messages-container">
-            <AnimatePresence>
-              {messages.length === 0 ? (
-                <Empty
-                  description={
-                    currentGame
-                      ? "开始对话吧!问我任何关于游戏的问题~"
-                      : "请先选择游戏"
-                  }
-                  image={Empty.PRESENTED_IMAGE_SIMPLE}
-                />
-              ) : (
-                messages.map(renderMessage)
-              )}
-            </AnimatePresence>
-
-            {/* AI 思考中 */}
-            {isThinking && (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="thinking-indicator"
-              >
-                <Loader2 size={16} className="spin-icon" />
-                <span>AI 思考中...</span>
-              </motion.div>
-            )}
-
-            <div ref={messagesEndRef} />
-          </div>
-
-          {/* 输入框 */}
-          <div className="input-area">
-            <div className="input-controls">
-              <Button
-                type={useScreenshot ? "primary" : "default"}
-                size="small"
-                icon={<ImageIcon size={14} />}
-                onClick={() => setUseScreenshot(!useScreenshot)}
-                disabled={!latestScreenshot}
-              >
-                {useScreenshot ? "已附加截图" : "未附加截图"}
-              </Button>
-            </div>
-            <TextArea
-              value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
-              onPressEnter={(e) => {
-                if (!e.shiftKey) {
-                  e.preventDefault();
-                  handleSend();
-                }
-              }}
-              placeholder="输入消息... (Shift+Enter 换行, Enter 发送)"
-              autoSize={{ minRows: 2, maxRows: 4 }}
-              disabled={!currentGame || isThinking}
-            />
-            <Button
-              type="primary"
-              icon={<SendOutlined />}
-              onClick={handleSend}
-              loading={isThinking}
-              disabled={!currentGame || !inputValue.trim()}
-            >
-              发送
-            </Button>
-          </div>
-          </div>
-        </Card>
-      </div>
+        </Tabs.TabPane>
+      </Tabs>
     </div>
   );
 };

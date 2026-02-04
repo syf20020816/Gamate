@@ -69,6 +69,10 @@ interface AppSettings {
   };
   tts?: {
     enabled: boolean;
+    provider?: string; // 'windows' or 'aliyun'
+    aliyunAccessKey?: string | null;
+    aliyunAccessSecret?: string | null;
+    aliyunAppKey?: string | null;
     voice?: string;
     rate: number;
     volume: number;
@@ -165,6 +169,10 @@ const SettingsPanel: React.FC = () => {
         },
         tts: {
           enabled: data.tts?.enabled || false,
+          provider: data.tts?.provider || 'windows',
+          aliyunAccessKey: data.tts?.aliyun_access_key || null,
+          aliyunAccessSecret: data.tts?.aliyun_access_secret || null,
+          aliyunAppKey: data.tts?.aliyun_appkey || null,
           voice: data.tts?.voice || undefined,
           rate: data.tts?.rate || 1.0,
           volume: data.tts?.volume || 0.8,
@@ -257,6 +265,10 @@ const SettingsPanel: React.FC = () => {
         tts: values.tts
           ? {
               enabled: values.tts.enabled,
+              provider: values.tts.provider || 'windows',
+              aliyun_access_key: values.tts.aliyunAccessKey || null,
+              aliyun_access_secret: values.tts.aliyunAccessSecret || null,
+              aliyun_appkey: values.tts.aliyunAppKey || null,
               voice: values.tts.voice || null,
               rate: values.tts.rate || 1.0,
               volume: values.tts.volume || 0.8,
@@ -1154,12 +1166,12 @@ const SettingsPanel: React.FC = () => {
                                     }
 
                                     // 显示窗口选择对话框
-                                    const windowOptions = windows.map(
-                                      (w: any) => ({
-                                        label: `${w.title || w.app_name} (${w.app_name})`,
-                                        value: w.id,
-                                      }),
-                                    );
+                                    // const windowOptions = windows.map(
+                                    //   (w: any) => ({
+                                    //     label: `${w.title || w.app_name} (${w.app_name})`,
+                                    //     value: w.id,
+                                    //   }),
+                                    // );
 
                                     // 简单实现: 选择第一个窗口 (实际应该弹出选择框)
                                     const selectedWindow = windows[0];
@@ -1379,6 +1391,68 @@ const SettingsPanel: React.FC = () => {
                     }}
                     tooltip={{ formatter: (value) => `${((value || 0) * 100).toFixed(0)}%` }}
                   />
+                </Form.Item>
+
+                <Form.Item
+                  label="提供商"
+                  name={["tts", "provider"]}
+                  tooltip="选择 TTS 提供商"
+                >
+                  <Select
+                    onChange={(value: string) => {
+                      // 如果选择本地或系统，可以清空阿里云 Access Key
+                      if (value !== 'aliyun') {
+                        form.setFieldValue(['tts', 'aliyunAccessKey'], null);
+                        form.setFieldValue(['tts', 'aliyunAccessSecret'], null);
+                        form.setFieldValue(['tts', 'aliyunAppKey'], null);
+                      }
+                    }}
+                  >
+                    <Select.Option value="windows">系统 TTS (Windows)</Select.Option>
+                    <Select.Option value="aliyun">阿里云-智能语音交互</Select.Option>
+                  </Select>
+                </Form.Item>
+
+                <Form.Item
+                  noStyle
+                  shouldUpdate={(prevValues, currentValues) =>
+                    prevValues.tts?.provider !== currentValues.tts?.provider
+                  }
+                >
+                  {({ getFieldValue }) => {
+                    const provider = getFieldValue(['tts', 'provider']);
+                    if (provider === 'aliyun') {
+                      return (
+                        <>
+                          <Form.Item
+                            label="阿里云 Access Key"
+                            name={["tts", "aliyunAccessKey"]}
+                            rules={[{ required: true, message: '请输入阿里云 Access Key' }]}
+                            tooltip="用于阿里云语音服务的 Access Key (仅示例，生产环境请使用安全存储)"
+                          >
+                            <Input.Password placeholder="AccessKeyId:AccessKeySecret" />
+                          </Form.Item>
+                          <Form.Item
+                            label="阿里云 Access Secret"
+                            name={["tts", "aliyunAccessSecret"]}
+                            rules={[{ required: true, message: '请输入阿里云 Access Secret' }]}
+                            tooltip="用于阿里云语音服务的 Access Secret (仅示例，生产环境请使用安全存储)"
+                          >
+                            <Input.Password placeholder="AccessKeyId:AccessKeySecret" />
+                          </Form.Item>
+                          <Form.Item
+                            label="阿里云 AppKey"
+                            name={["tts", "aliyunAppKey"]}
+                            rules={[{ required: true, message: '请输入阿里云 AppKey' }]}
+                            tooltip="智能语音交互中创建的项目 AppKey，用于实时 ASR"
+                          >
+                            <Input placeholder="项目 AppKey" />
+                          </Form.Item>
+                        </>
+                      );
+                    }
+                    return null;
+                  }}
                 </Form.Item>
 
                 <Form.Item

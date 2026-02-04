@@ -9,6 +9,7 @@ mod llm;
 mod personality;
 mod tts;
 mod audio;
+mod aliyun_voice_service;
 pub mod vector_db;
 
 use commands::*;
@@ -111,6 +112,12 @@ pub fn run() {
             test_microphone,
             start_microphone_test,
             stop_microphone_test,
+            // 阿里云语音服务命令
+            aliyun_voice_service::aliyun_get_token,
+            aliyun_voice_service::aliyun_get_cached_token,
+            aliyun_voice_service::aliyun_test_connection,
+            aliyun_voice_service::aliyun_one_sentence_recognize,
+            aliyun_voice_service::aliyun_tts_synthesize,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

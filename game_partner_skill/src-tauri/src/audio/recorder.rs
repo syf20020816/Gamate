@@ -33,6 +33,9 @@ pub struct AudioRecorder {
     
     /// 共享的音频缓冲区
     audio_buffer: Arc<Mutex<Vec<f32>>>,
+    
+    /// 实际的设备配置（包含实际采样率）
+    actual_config: RecorderConfig,
 }
 
 impl AudioRecorder {
@@ -55,7 +58,7 @@ impl AudioRecorder {
         
         log::info!("📋 设备默认配置: {:?}", default_config);
         
-        // 使用设备默认配置,但尝试调整采样率
+        // 使用设备默认配置(稍后会重采样到16kHz)
         let config = StreamConfig {
             channels: default_config.channels(),
             sample_rate: default_config.sample_rate(),
@@ -63,6 +66,16 @@ impl AudioRecorder {
         };
         
         log::info!("✅ 使用配置: {:?}", config);
+        if config.sample_rate.0 != 16000 {
+            log::warn!("⚠️ 设备采样率({} Hz)与目标(16000 Hz)不同,需要重采样", 
+                      config.sample_rate.0);
+        }
+        
+        // 更新 RecorderConfig 为实际的设备采样率
+        let actual_config = RecorderConfig {
+            sample_rate: config.sample_rate.0,  // 使用实际设备采样率
+            channels: config.channels,
+        };
         
         Ok(Self {
             host,
@@ -70,6 +83,7 @@ impl AudioRecorder {
             config,
             stream: None,
             audio_buffer: Arc::new(Mutex::new(Vec::new())),
+            actual_config,  // 保存实际配置
         })
     }
 
@@ -182,6 +196,11 @@ impl AudioRecorder {
     /// 检查是否正在录音
     pub fn is_recording(&self) -> bool {
         self.stream.is_some()
+    }
+    
+    /// 获取实际的设备采样率
+    pub fn actual_sample_rate(&self) -> u32 {
+        self.actual_config.sample_rate
     }
 }
 

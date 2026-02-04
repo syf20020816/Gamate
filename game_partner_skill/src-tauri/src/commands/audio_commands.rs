@@ -10,11 +10,22 @@ use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Emitter, State};
 
+/// 麦克风测试数据
+#[derive(Default, Clone)]
+pub struct MicTestData {
+    pub duration_secs: f32,
+    pub total_samples: usize,
+    pub average_volume: f32,
+    pub max_volume: f32,
+}
+
 /// 全局持续监听器状态
 pub struct AudioState {
     listener: Arc<Mutex<Option<ContinuousListener>>>,
     // 麦克风测试状态 (不存储AudioRecorder,避免Send问题)
     test_running: Arc<Mutex<bool>>,
+    // 测试数据
+    test_data: Arc<Mutex<MicTestData>>,
 }
 
 impl AudioState {
@@ -22,6 +33,7 @@ impl AudioState {
         Self {
             listener: Arc::new(Mutex::new(None)),
             test_running: Arc::new(Mutex::new(false)),
+            test_data: Arc::new(Mutex::new(MicTestData::default())),
         }
     }
 }
@@ -112,6 +124,17 @@ pub async fn start_continuous_listening(
                 ListenerEvent::AiResponseReady { response } => {
                     let _ = app_clone.emit("ai_response_ready", response.clone());
                 }
+                ListenerEvent::AliyunRecognizeRequest { pcm_data, sample_rate, duration_secs } => {
+                    log::info!("🎯 收到阿里云识别请求: {} 字节 PCM, {}Hz, {:.1}s",
+                              pcm_data.len(), sample_rate, duration_secs);
+                    // 发送事件到前端,前端会调用 aliyun_one_sentence_recognize 命令
+                    let payload = serde_json::json!({
+                        "pcm_data": pcm_data,
+                        "sample_rate": sample_rate,
+                        "duration_secs": duration_secs,
+                    });
+                    let _ = app_clone.emit("aliyun_recognize_request", payload);
+                }
                 ListenerEvent::Error { message } => {
                     let _ = app_clone.emit("voice_error", message.clone());
                 }
@@ -133,14 +156,19 @@ pub async fn start_continuous_listening(
 pub async fn stop_continuous_listening(
     audio_state: State<'_, AudioState>,
 ) -> Result<String, String> {
+    // 使用 println! 确保在控制台能看到
+    println!("⏹️⏹️⏹️ 收到停止监听命令 !!!");
     log::info!("⏹️ 收到停止监听命令");
 
     let mut state = audio_state.listener.lock().unwrap();
     if let Some(listener) = state.as_mut() {
+        println!("📤 正在调用 listener.stop_listening()...");
         listener.stop_listening().map_err(|e| e.to_string())?;
         *state = None;
+        println!("✅ 监听已停止");
         Ok("持续监听已停止".to_string())
     } else {
+        println!("❌ 监听器未运行");
         Err("监听器未运行".to_string())
     }
 }
@@ -220,7 +248,14 @@ pub async fn start_microphone_test(
         *is_running = true;
     }
     
+    // 重置测试数据
+    {
+        let mut test_data = audio_state.test_data.lock().unwrap();
+        *test_data = MicTestData::default();
+    }
+    
     let test_running = Arc::clone(&audio_state.test_running);
+    let test_data = Arc::clone(&audio_state.test_data);
     
     // 在spawn_blocking中创建recorder并运行测试
     tokio::task::spawn_blocking(move || {
@@ -247,6 +282,11 @@ pub async fn start_microphone_test(
         let start_time = std::time::Instant::now();
         let max_duration = std::time::Duration::from_secs(10);
         
+        let mut total_samples = 0usize;
+        let mut sum_volume = 0.0f32;
+        let mut max_volume = 0.0f32;
+        let mut volume_count = 0usize;
+        
         // 测试循环
         loop {
             // 检查是否应该停止
@@ -271,6 +311,7 @@ pub async fn start_microphone_test(
             // 获取音频数据并计算音量
             let audio_data = recorder.take_audio_data();
             let samples = audio_data.len();
+            total_samples += samples;
             
             let rms: f32 = if !audio_data.is_empty() {
                 let sum_squares: f32 = audio_data.iter().map(|&s| s * s).sum();
@@ -278,6 +319,14 @@ pub async fn start_microphone_test(
             } else {
                 0.0
             };
+            
+            if rms > 0.0 {
+                sum_volume += rms;
+                volume_count += 1;
+                if rms > max_volume {
+                    max_volume = rms;
+                }
+            }
             
             // 发送更新事件
             let _ = app.emit("microphone_test_update", serde_json::json!({
@@ -292,6 +341,22 @@ pub async fn start_microphone_test(
         
         // 停止录音
         let _ = recorder.stop_recording();
+        
+        // 保存测试数据
+        let final_duration = start_time.elapsed().as_secs_f32();
+        let average_volume = if volume_count > 0 {
+            sum_volume / volume_count as f32
+        } else {
+            0.0
+        };
+        
+        {
+            let mut data = test_data.lock().unwrap();
+            data.duration_secs = final_duration;
+            data.total_samples = total_samples;
+            data.average_volume = average_volume;
+            data.max_volume = max_volume;
+        }
     });
     
     Ok("麦克风测试已启动".to_string())
@@ -307,18 +372,64 @@ pub struct MicrophoneTestResult {
 }
 
 /// 停止麦克风测试
+#[derive(serde::Serialize)]
+pub struct MicTestResult {
+    pub duration_secs: f32,
+    pub total_samples: usize,
+    pub average_volume: f32,
+    pub max_volume: f32,
+}
+
 #[tauri::command]
 pub async fn stop_microphone_test(
     audio_state: State<'_, AudioState>,
-) -> Result<String, String> {
+) -> Result<MicTestResult, String> {
     log::info!("⏹️ 停止麦克风测试");
     
-    let mut is_running = audio_state.test_running.lock().unwrap();
-    
-    if *is_running {
+    // 检查并停止测试
+    {
+        let mut is_running = audio_state.test_running.lock().unwrap();
+        
+        if !*is_running {
+            return Err("没有正在进行的麦克风测试".to_string());
+        }
+        
         *is_running = false;
-        Ok("麦克风测试已停止".to_string())
-    } else {
-        Err("没有正在进行的麦克风测试".to_string())
+    } // 锁释放
+    
+    // 等待后台线程保存数据 (最多等待500ms)
+    let mut data_ready = false;
+    for _ in 0..5 {
+        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+        
+        let has_data = {
+            let test_data = audio_state.test_data.lock().unwrap();
+            test_data.duration_secs > 0.0 || test_data.total_samples > 0
+        }; // 锁释放
+        
+        if has_data {
+            data_ready = true;
+            break;
+        }
     }
+    
+    if !data_ready {
+        log::warn!("⚠️ 等待测试数据超时");
+    }
+    
+    // 获取测试数据
+    let result = {
+        let test_data = audio_state.test_data.lock().unwrap();
+        MicTestResult {
+            duration_secs: test_data.duration_secs,
+            total_samples: test_data.total_samples,
+            average_volume: test_data.average_volume,
+            max_volume: test_data.max_volume,
+        }
+    }; // 锁释放
+    
+    log::info!("📊 测试结果: 时长={:.1}s, 样本={}, 平均音量={:.4}, 最大音量={:.4}",
+              result.duration_secs, result.total_samples, result.average_volume, result.max_volume);
+    
+    Ok(result)
 }

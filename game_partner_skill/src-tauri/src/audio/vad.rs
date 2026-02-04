@@ -161,7 +161,27 @@ impl VoiceActivityDetector {
             }
             
             VadState::Processing => {
-                // 处理状态:忽略新的音频输入
+                // 处理状态:检测新的语音输入以重新开始
+                if rms > self.config.volume_threshold {
+                    // 检测到新语音,清空旧缓冲区并重新开始
+                    log::info!("🎤 VAD: 检测到新语音,清空旧缓冲区并重新开始");
+                    self.state = VadState::Speaking;
+                    self.speech_start_time = Some(now);
+                    self.last_voice_time = Some(now);
+                    self.audio_buffer.clear(); // 清空旧音频
+                    self.audio_buffer.extend_from_slice(audio_chunk);
+                    log::info!("🎤 VAD: 检测到语音开始 (RMS: {:.4})", rms);
+                } else {
+                    // 继续等待新的语音输入,超时后回到 Idle
+                    if let Some(speech_end) = self.speech_start_time {
+                        let elapsed = now.duration_since(speech_end);
+                        if elapsed.as_secs() > 2 {
+                            // 2秒无新语音,回到 Idle
+                            log::info!("💤 VAD: 回到 Idle 状态");
+                            self.reset();
+                        }
+                    }
+                }
                 false
             }
         }

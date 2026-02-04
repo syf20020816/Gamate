@@ -12,12 +12,7 @@
   gap: 0px;
 }
 
-/* 左侧对话区 */
-.main-conversation-area {
-  flex: 1;
-  min-width: 300px;
-  width: 100%;
-}
+
 
 .conversation-card {
   height: 100%;

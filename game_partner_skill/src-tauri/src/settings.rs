@@ -107,6 +107,18 @@ impl Default for ScreenshotSettings {
 pub struct TtsSettings {
     /// 是否启用 TTS
     pub enabled: bool,
+    /// TTS 提供商 (windows, aliyun)
+    #[serde(default = "default_tts_provider")]
+    pub provider: String,
+    /// 阿里云 Access Key
+    #[serde(default)]
+    pub aliyun_access_key: Option<String>,
+    /// 阿里云 Access Secret
+    #[serde(default)]
+    pub aliyun_access_secret: Option<String>,
+    /// 阿里云 AppKey
+    #[serde(default)]
+    pub aliyun_appkey: Option<String>,
     /// 音色名称
     #[serde(default)]
     pub voice: Option<String>,
@@ -118,10 +130,18 @@ pub struct TtsSettings {
     pub auto_speak: bool,
 }
 
+fn default_tts_provider() -> String {
+    "windows".to_string()
+}
+
 impl Default for TtsSettings {
     fn default() -> Self {
         Self {
             enabled: false,
+            provider: default_tts_provider(),
+            aliyun_access_key: None,
+            aliyun_access_secret: None,
+            aliyun_appkey: None,
             voice: None,
             rate: 1.0,
             volume: 0.8,

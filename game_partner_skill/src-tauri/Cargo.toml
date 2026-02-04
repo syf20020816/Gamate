@@ -66,6 +66,15 @@ async-openai = "0.23"
 # TTS 语音合成
 tts = "0.26"
 
+# 阿里云语音服务依赖
+percent-encoding = "2.3"
+uuid = { version = "1.0", features = ["v4"] }
+hmac = "0.12"
+sha1 = "0.10"
+tokio-tungstenite = { version = "0.23", features = ["native-tls"] }
+futures = "0.3"
+once_cell = "1.19"
+
 # 音频录制与处理
 cpal = "0.15"           # 跨平台音频 I/O
 hound = "3.5"           # WAV 文件读写

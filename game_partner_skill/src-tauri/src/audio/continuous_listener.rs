@@ -10,6 +10,7 @@ use tokio::task::JoinHandle;
 
 use super::recorder::{AudioRecorder, RecorderConfig};
 use super::vad::{VadConfig, VadState, VoiceActivityDetector};
+use rubato::{Resampler, SincFixedIn, SincInterpolationType, SincInterpolationParameters, WindowFunction};
 
 #[cfg(windows)]
 use super::stt_windows::WindowsSttEngine;
@@ -41,6 +42,12 @@ pub enum ListenerEvent {
     VoiceTranscribed { text: String },
     /// AI 响应就绪
     AiResponseReady { response: String },
+    /// 请求阿里云识别 (包含PCM数据)
+    AliyunRecognizeRequest {
+        pcm_data: Vec<u8>,
+        sample_rate: u32,
+        duration_secs: f32,
+    },
     /// 错误
     Error { message: String },
 }
@@ -60,6 +67,9 @@ pub struct ContinuousListener {
     
     /// 事件发送器
     event_tx: Option<mpsc::UnboundedSender<ListenerEvent>>,
+    
+    /// 实际的设备采样率（在 start_listening 时设置）
+    actual_sample_rate: Option<u32>,
 }
 
 /// 内部状态 (需要线程安全)
@@ -86,6 +96,7 @@ impl ContinuousListener {
             state,
             listen_task: None,
             event_tx: None,
+            actual_sample_rate: None,
         }
     }
 
@@ -136,6 +147,103 @@ impl ContinuousListener {
 
     /// 停止持续监听
     pub fn stop_listening(&mut self) -> Result<()> {
+        println!("⏹️⏹️⏹️ stop_listening() 被调用 !!!");
+        log::info!("⏹️ 收到停止监听请求");
+        
+        // 先检查 event_tx 是否存在
+        if self.event_tx.is_none() {
+            println!("⚠️⚠️⚠️ event_tx 为 None，监听器可能未启动或已停止");
+            log::warn!("⚠️ event_tx 为 None，监听器可能未启动或已停止");
+            return Ok(());
+        }
+        
+        println!("✅ event_tx 存在，继续处理...");
+        
+        // 在停止前,检查是否有未处理的音频数据
+        let event_tx = self.event_tx.clone();
+        let should_trigger_recognition = {
+            let mut state = self.state.lock().unwrap();
+            let buffer_size = state.vad.buffer_size();
+            let recording_duration = state.vad.recording_duration();
+            
+            println!("📊 音频缓冲区: {} 样本, 时长: {:.2}s", buffer_size, recording_duration);
+            
+            // 如果有音频数据且持续时间足够
+            if buffer_size > 0 && recording_duration >= 0.3 {
+                println!("🎯 手动停止时触发识别: buffer={} 样本, duration={:.1}s", buffer_size, recording_duration);
+                log::info!("🎯 手动停止时触发识别: buffer={} 样本, duration={:.1}s",
+                          buffer_size, recording_duration);
+                
+                // 获取音频buffer
+                let audio_samples = state.vad.take_audio_buffer();
+                let duration = recording_duration;
+                
+                // 计算实际采样率: 样本数 / 时长
+                let actual_sample_rate = (audio_samples.len() as f32 / duration) as u32;
+                
+                println!("🔄 开始重采样: {} 样本 从 {}Hz 到 16000Hz", audio_samples.len(), actual_sample_rate);
+                log::info!("🔄 计算的实际采样率: {} Hz (样本数: {}, 时长: {:.2}s)", 
+                          actual_sample_rate, audio_samples.len(), duration);
+                
+                // 重采样到16kHz
+                match Self::resample_to_16khz(&audio_samples, actual_sample_rate) {
+                    Ok(pcm_data) => {
+                        println!("✅ 重采样成功: {} 字节 PCM 数据", pcm_data.len());
+                        Some((pcm_data, actual_sample_rate, duration))
+                    },
+                    Err(e) => {
+                        println!("❌ 重采样失败: {}", e);
+                        log::error!("❌ 重采样失败: {}", e);
+                        None
+                    }
+                }
+            } else {
+                if buffer_size > 0 {
+                    println!("⚠️ 音频数据过短,不触发识别: duration={:.1}s", recording_duration);
+                    log::warn!("⚠️ 音频数据过短,不触发识别: duration={:.1}s", recording_duration);
+                } else {
+                    println!("⚠️ 没有音频数据");
+                }
+                None
+            }
+        };
+        
+        // 在释放锁后发送事件
+        if let Some((pcm_data, sample_rate, duration)) = should_trigger_recognition {
+            if let Some(tx) = event_tx {
+                println!("🚀🚀🚀 准备发送阿里云识别请求 !!!");
+                println!("   - PCM 数据大小: {} 字节", pcm_data.len());
+                println!("   - 采样率: {} Hz", sample_rate);
+                println!("   - 音频时长: {:.2} 秒", duration);
+                
+                log::info!("🚀 准备发送阿里云识别请求:");
+                log::info!("   - PCM 数据大小: {} 字节", pcm_data.len());
+                log::info!("   - 采样率: {} Hz", sample_rate);
+                log::info!("   - 音频时长: {:.2} 秒", duration);
+                log::info!("   - 计算的音频时长: {:.2} 秒", pcm_data.len() as f32 / (16000.0 * 2.0));
+                
+                if let Err(e) = tx.send(ListenerEvent::AliyunRecognizeRequest {
+                    pcm_data,
+                    sample_rate,
+                    duration_secs: duration,
+                }) {
+                    println!("❌ 发送阿里云识别请求事件失败: {}", e);
+                    log::error!("❌ 发送阿里云识别请求事件失败: {}", e);
+                } else {
+                    println!("📤📤📤 已发送阿里云识别请求事件 !!!");
+                    log::info!("📤 已发送阿里云识别请求事件");
+                    // 等待一小段时间让事件循环处理事件
+                    std::thread::sleep(std::time::Duration::from_millis(100));
+                }
+            } else {
+                println!("❌❌❌ event_tx 为 None，无法发送识别请求 !!!");
+                log::error!("❌ event_tx 为 None，无法发送识别请求");
+            }
+        } else {
+            println!("⚠️ 没有触发识别（音频可能过短或重采样失败）");
+            log::warn!("⚠️ 没有触发识别（音频可能过短或重采样失败）");
+        }
+        
         // 标记为停止监听
         {
             let mut state = self.state.lock().unwrap();
@@ -190,6 +298,11 @@ impl ContinuousListener {
         // 创建录音器
         let mut recorder = AudioRecorder::new(recorder_config.clone())
             .context("无法创建录音器")?;
+        
+        // 获取实际的设备采样率（可能与配置不同）
+        let actual_sample_rate = recorder.actual_sample_rate();
+        log::info!("🎤 实际设备采样率: {} Hz (配置: {} Hz)", 
+                  actual_sample_rate, recorder_config.sample_rate);
 
         // 开始录音
         recorder.start_recording()?;
@@ -241,53 +354,24 @@ impl ContinuousListener {
                 should_trigger
             };
 
-            // 如果检测到语音结束,触发 STT
+            // 如果检测到语音结束,不再自动触发STT
+            // 原因: Windows STT有采样率问题,改用手动停止触发阿里云ASR
             if should_trigger_stt {
-                let audio_buffer = {
-                    let mut state = state.lock().unwrap();
-                    state.vad.take_audio_buffer()
+                // 不要取出音频数据,让它保留在VAD缓冲区中
+                // 等待用户手动停止时再处理
+                let buffer_size = {
+                    let state = state.lock().unwrap();
+                    state.vad.buffer_size()
                 };
 
-                // 执行 STT (在后台线程中,避免阻塞)
-                let event_tx_clone = event_tx.clone();
-                let state_clone = Arc::clone(&state);
-                let sample_rate = recorder_config.sample_rate;
+                log::info!("🎯 检测到语音结束, 音频: {} samples @ {} Hz (已缓存,等待手动停止)", 
+                          buffer_size, actual_sample_rate);
                 
-                std::thread::spawn(move || {
-                    // 使用 tokio runtime 执行异步 STT
-                    let rt = tokio::runtime::Runtime::new().unwrap();
-                    match rt.block_on(Self::process_voice_segment(&audio_buffer, sample_rate)) {
-                        Ok(text) => {
-                            log::info!("📝 STT 识别结果: {}", text);
-                            
-                            // 保存识别结果
-                            {
-                                let mut s = state_clone.lock().unwrap();
-                                s.last_transcription = Some(text.clone());
-                                s.vad.reset(); // 重置 VAD 状态
-                            }
-                            
-                            // 发送事件
-                            let _ = event_tx_clone.send(ListenerEvent::VoiceTranscribed {
-                                text: text.clone(),
-                            });
-
-                            // TODO: 这里应该触发截图 + RAG + AI 处理
-                            // 暂时只是示例
-                        }
-                        Err(e) => {
-                            log::error!("❌ STT 识别失败: {}", e);
-                            let _ = event_tx_clone.send(ListenerEvent::Error {
-                                message: format!("STT 失败: {}", e),
-                            });
-                            
-                            // 重置 VAD 状态
-                            let mut s = state_clone.lock().unwrap();
-                            s.vad.reset();
-                        }
-                    }
-                });
+                // 不执行自动STT,不取出音频数据,等待用户手动停止以触发阿里云ASR
+                // 这样可以避免Windows STT的采样率问题,并且保留音频数据
             }
+
+            // 等待下一次处理
         }
 
         // 停止录音
@@ -308,6 +392,63 @@ impl ContinuousListener {
     #[cfg(not(windows))]
     async fn process_voice_segment(_audio_data: &[f32], _sample_rate: u32) -> Result<String> {
         anyhow::bail!("STT 仅支持 Windows 平台");
+    }
+
+    /// 重采样音频数据到16kHz
+    /// 输入: f32样本数据, 原始采样率
+    /// 输出: 16kHz PCM u8数据 (16-bit little-endian)
+    fn resample_to_16khz(samples: &[f32], from_rate: u32) -> Result<Vec<u8>> {
+        const TARGET_RATE: u32 = 16000;
+        
+        if from_rate == TARGET_RATE {
+            // 不需要重采样,直接转换为PCM
+            let pcm_data: Vec<u8> = samples
+                .iter()
+                .flat_map(|&s| {
+                    let sample_i16 = (s.clamp(-1.0, 1.0) * 32767.0) as i16;
+                    sample_i16.to_le_bytes()
+                })
+                .collect();
+            return Ok(pcm_data);
+        }
+        
+        log::info!("🔄 重采样: {} Hz -> {} Hz ({} 样本)", from_rate, TARGET_RATE, samples.len());
+        
+        // 创建重采样器
+        let params = SincInterpolationParameters {
+            sinc_len: 256,
+            f_cutoff: 0.95,
+            interpolation: SincInterpolationType::Linear,
+            oversampling_factor: 256,
+            window: WindowFunction::BlackmanHarris2,
+        };
+        
+        let mut resampler = SincFixedIn::<f32>::new(
+            TARGET_RATE as f64 / from_rate as f64,
+            2.0,
+            params,
+            samples.len(),
+            1, // mono
+        ).context("创建重采样器失败")?;
+        
+        // 重采样 (需要 Vec<Vec<f32>> 格式)
+        let input = vec![samples.to_vec()];
+        let output = resampler.process(&input, None).context("重采样失败")?;
+        
+        // 转换为PCM (16-bit little-endian)
+        let resampled_samples = &output[0];
+        let pcm_data: Vec<u8> = resampled_samples
+            .iter()
+            .flat_map(|&s| {
+                let sample_i16 = (s.clamp(-1.0, 1.0) * 32767.0) as i16;
+                sample_i16.to_le_bytes()
+            })
+            .collect();
+        
+        log::info!("✅ 重采样完成: {} 样本 -> {} 样本 ({} 字节 PCM)",
+                  samples.len(), resampled_samples.len(), pcm_data.len());
+        
+        Ok(pcm_data)
     }
 }
 
