@@ -14,6 +14,7 @@ import {
   Tabs,
   Alert,
   Slider,
+  Modal,
 } from "antd";
 import {
   SettingOutlined,
@@ -24,6 +25,7 @@ import {
   PictureOutlined,
   UserOutlined,
   SoundOutlined,
+  ReloadOutlined,
 } from "@ant-design/icons";
 import { invoke } from "@tauri-apps/api/core";
 import "./styles.scss";
@@ -90,15 +92,36 @@ interface ModelConfig {
   maxTokens?: number;
 }
 
+interface WindowInfo {
+  id: number;
+  title: string;
+  app_name: string;
+  width: number;
+  height: number;
+  x: number;
+  y: number;
+}
+
 const SettingsPanel: React.FC = () => {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [settings, setSettings] = useState<AppSettings | null>(null);
+  const [windows, setWindows] = useState<WindowInfo[]>([]);
 
   useEffect(() => {
     loadSettings();
+    loadWindows();
   }, []);
+
+  const loadWindows = async () => {
+    try {
+      const windowList = await invoke<WindowInfo[]>("list_windows_command");
+      setWindows(windowList);
+    } catch (error) {
+      console.error("获取窗口列表失败:", error);
+    }
+  };
 
   const loadSettings = async () => {
     setLoading(true);
@@ -169,7 +192,7 @@ const SettingsPanel: React.FC = () => {
         },
         tts: {
           enabled: data.tts?.enabled || false,
-          provider: data.tts?.provider || 'windows',
+          provider: data.tts?.provider || "windows",
           aliyunAccessKey: data.tts?.aliyun_access_key || null,
           aliyunAccessSecret: data.tts?.aliyun_access_secret || null,
           aliyunAppKey: data.tts?.aliyun_appkey || null,
@@ -265,7 +288,7 @@ const SettingsPanel: React.FC = () => {
         tts: values.tts
           ? {
               enabled: values.tts.enabled,
-              provider: values.tts.provider || 'windows',
+              provider: values.tts.provider || "windows",
               aliyun_access_key: values.tts.aliyunAccessKey || null,
               aliyun_access_secret: values.tts.aliyunAccessSecret || null,
               aliyun_appkey: values.tts.aliyunAppKey || null,
@@ -1105,7 +1128,7 @@ const SettingsPanel: React.FC = () => {
                   label="启用智能截图"
                   name={["screenshot", "enabled"]}
                   valuePropName="checked"
-                  tooltip="启用后可以自动截取游戏画面"
+                  tooltip="启用后可以自动截取游戏画面, 即使不开启智能截图, AI也会在对话时自动截取屏幕截图"
                 >
                   <Switch />
                 </Form.Item>
@@ -1117,9 +1140,9 @@ const SettingsPanel: React.FC = () => {
                 >
                   <Select>
                     <Select.Option value="fullscreen">
-                      🖥️ 全屏截图
+                      全屏截图
                     </Select.Option>
-                    <Select.Option value="window">🪟 窗口截图</Select.Option>
+                    <Select.Option value="window">窗口截图</Select.Option>
                   </Select>
                 </Form.Item>
 
@@ -1141,59 +1164,59 @@ const SettingsPanel: React.FC = () => {
                         <>
                           <Form.Item
                             label="目标窗口"
-                            tooltip="设置后将自动截取该窗口"
+                            tooltip="选择要截图的窗口"
                           >
-                            <Space.Compact style={{ width: "100%" }}>
+                            <Space
+                              direction="vertical"
+                              style={{ width: "100%" }}
+                              size="small"
+                            >
+                              <Space.Compact style={{ width: "100%" }}>
+                                <Form.Item
+                                  name={["screenshot", "targetWindowId"]}
+                                  noStyle
+                                >
+                                  <Select
+                                    placeholder="请选择窗口"
+                                    showSearch
+                                    optionFilterProp="label"
+                                    style={{ maxWidth: "calc(100% - 84px)", marginRight: 8 }}
+                                    options={windows.map((w) => ({
+                                      label: `${w.title} - ${w.app_name} (${w.width}x${w.height})`,
+                                      value: w.id,
+                                    }))}
+                                    onChange={(windowId) => {
+                                      const selectedWindow = windows.find(
+                                        (w) => w.id === windowId,
+                                      );
+                                      if (selectedWindow) {
+                                        form.setFieldsValue({
+                                          screenshot: {
+                                            targetWindowId: selectedWindow.id,
+                                            targetWindowName:
+                                              selectedWindow.title ||
+                                              selectedWindow.app_name,
+                                          },
+                                        });
+                                      }
+                                    }}
+                                  />
+                                  <Button
+                                    icon={<ReloadOutlined />}
+                                    onClick={loadWindows}
+                                    title="刷新窗口列表"
+                                  >
+                                    刷新
+                                  </Button>
+                                </Form.Item>
+                              </Space.Compact>
                               <Form.Item
                                 name={["screenshot", "targetWindowName"]}
                                 noStyle
                               >
-                                <Input
-                                  placeholder="点击右侧按钮选择窗口"
-                                  readOnly
-                                  style={{ flex: 1 }}
-                                />
+                                <Input type="hidden" />
                               </Form.Item>
-                              <Button
-                                onClick={async () => {
-                                  try {
-                                    const windows = await invoke<any[]>(
-                                      "list_windows_command",
-                                    );
-                                    if (windows.length === 0) {
-                                      message.warning("未找到可用窗口");
-                                      return;
-                                    }
-
-                                    // 显示窗口选择对话框
-                                    // const windowOptions = windows.map(
-                                    //   (w: any) => ({
-                                    //     label: `${w.title || w.app_name} (${w.app_name})`,
-                                    //     value: w.id,
-                                    //   }),
-                                    // );
-
-                                    // 简单实现: 选择第一个窗口 (实际应该弹出选择框)
-                                    const selectedWindow = windows[0];
-                                    form.setFieldsValue({
-                                      screenshot: {
-                                        targetWindowId: selectedWindow.id,
-                                        targetWindowName:
-                                          selectedWindow.title ||
-                                          selectedWindow.app_name,
-                                      },
-                                    });
-                                    message.success(
-                                      `已选择: ${selectedWindow.title || selectedWindow.app_name}`,
-                                    );
-                                  } catch (error: any) {
-                                    message.error(`获取窗口列表失败: ${error}`);
-                                  }
-                                }}
-                              >
-                                选择窗口
-                              </Button>
-                            </Space.Compact>
+                            </Space>
                           </Form.Item>
                           <Alert
                             message="提示"
@@ -1302,6 +1325,126 @@ const SettingsPanel: React.FC = () => {
                   <Switch />
                 </Form.Item>
               </Card>
+
+              {/* 截图测试 */}
+              <Card type="inner" title="测试截图" style={{ marginTop: 16 }}>
+                <Form.Item
+                  noStyle
+                  shouldUpdate={(prevValues, currentValues) =>
+                    prevValues.screenshot?.captureMode !==
+                      currentValues.screenshot?.captureMode ||
+                    prevValues.screenshot?.targetWindowId !==
+                      currentValues.screenshot?.targetWindowId
+                  }
+                >
+                  {({ getFieldValue }) => {
+                    const captureMode = getFieldValue([
+                      "screenshot",
+                      "captureMode",
+                    ]);
+                    const targetWindowId = getFieldValue([
+                      "screenshot",
+                      "targetWindowId",
+                    ]);
+
+                    return (
+                      <>
+                        <Alert
+                          message="测试当前配置"
+                          description="点击下方按钮测试截图功能,查看实际效果"
+                          type="info"
+                          showIcon
+                          style={{ marginBottom: 16 }}
+                        />
+                        <Button
+                          type="primary"
+                          block
+                          icon={<PictureOutlined />}
+                          onClick={async () => {
+                            try {
+                              message.loading({
+                                content: "正在截图...",
+                                key: "screenshot-test",
+                              });
+
+                              let screenshot: any;
+                              if (captureMode === "fullscreen") {
+                                screenshot = await invoke(
+                                  "capture_fullscreen",
+                                  {
+                                    displayId: 0,
+                                  },
+                                );
+                              } else if (captureMode === "window") {
+                                if (!targetWindowId) {
+                                  message.warning({
+                                    content: "请先选择目标窗口",
+                                    key: "screenshot-test",
+                                  });
+                                  return;
+                                }
+                                screenshot = await invoke(
+                                  "capture_window_command",
+                                  {
+                                    windowId: targetWindowId,
+                                  },
+                                );
+                              }
+
+                              message.success({
+                                content: `截图成功! 大小: ${screenshot.width}x${screenshot.height}`,
+                                key: "screenshot-test",
+                              });
+
+                              // 显示截图预览 (可选 - 使用 Modal)
+                              const modal = Modal.info({
+                                title: "截图预览",
+                                width: 800,
+                                content: (
+                                  <div
+                                    style={{
+                                      textAlign: "center",
+                                      marginTop: 16,
+                                    }}
+                                  >
+                                    <img
+                                      src={screenshot.data}
+                                      alt="Screenshot"
+                                      style={{
+                                        maxWidth: "100%",
+                                        maxHeight: "500px",
+                                        objectFit: "contain",
+                                      }}
+                                    />
+                                    <div style={{ marginTop: 16 }}>
+                                      <Text type="secondary">
+                                        分辨率: {screenshot.width}x
+                                        {screenshot.height} | 模式:{" "}
+                                        {captureMode === "fullscreen"
+                                          ? "全屏"
+                                          : "窗口"}
+                                      </Text>
+                                    </div>
+                                  </div>
+                                ),
+                                okText: "关闭",
+                                onOk: () => modal.destroy(),
+                              });
+                            } catch (error: any) {
+                              message.error({
+                                content: `截图失败: ${error}`,
+                                key: "screenshot-test",
+                              });
+                            }
+                          }}
+                        >
+                          测试截图
+                        </Button>
+                      </>
+                    );
+                  }}
+                </Form.Item>
+              </Card>
             </Tabs.TabPane>
 
             {/* TTS 语音设置 */}
@@ -1389,7 +1532,10 @@ const SettingsPanel: React.FC = () => {
                       0.5: "中等",
                       1.0: "最大",
                     }}
-                    tooltip={{ formatter: (value) => `${((value || 0) * 100).toFixed(0)}%` }}
+                    tooltip={{
+                      formatter: (value) =>
+                        `${((value || 0) * 100).toFixed(0)}%`,
+                    }}
                   />
                 </Form.Item>
 
@@ -1401,15 +1547,19 @@ const SettingsPanel: React.FC = () => {
                   <Select
                     onChange={(value: string) => {
                       // 如果选择本地或系统，可以清空阿里云 Access Key
-                      if (value !== 'aliyun') {
-                        form.setFieldValue(['tts', 'aliyunAccessKey'], null);
-                        form.setFieldValue(['tts', 'aliyunAccessSecret'], null);
-                        form.setFieldValue(['tts', 'aliyunAppKey'], null);
+                      if (value !== "aliyun") {
+                        form.setFieldValue(["tts", "aliyunAccessKey"], null);
+                        form.setFieldValue(["tts", "aliyunAccessSecret"], null);
+                        form.setFieldValue(["tts", "aliyunAppKey"], null);
                       }
                     }}
                   >
-                    <Select.Option value="windows">系统 TTS (Windows)</Select.Option>
-                    <Select.Option value="aliyun">阿里云-智能语音交互</Select.Option>
+                    <Select.Option value="windows">
+                      系统 TTS (Windows)
+                    </Select.Option>
+                    <Select.Option value="aliyun">
+                      阿里云-智能语音交互
+                    </Select.Option>
                   </Select>
                 </Form.Item>
 
@@ -1420,14 +1570,19 @@ const SettingsPanel: React.FC = () => {
                   }
                 >
                   {({ getFieldValue }) => {
-                    const provider = getFieldValue(['tts', 'provider']);
-                    if (provider === 'aliyun') {
+                    const provider = getFieldValue(["tts", "provider"]);
+                    if (provider === "aliyun") {
                       return (
                         <>
                           <Form.Item
                             label="阿里云 Access Key"
                             name={["tts", "aliyunAccessKey"]}
-                            rules={[{ required: true, message: '请输入阿里云 Access Key' }]}
+                            rules={[
+                              {
+                                required: true,
+                                message: "请输入阿里云 Access Key",
+                              },
+                            ]}
                             tooltip="用于阿里云语音服务的 Access Key (仅示例，生产环境请使用安全存储)"
                           >
                             <Input.Password placeholder="AccessKeyId:AccessKeySecret" />
@@ -1435,7 +1590,12 @@ const SettingsPanel: React.FC = () => {
                           <Form.Item
                             label="阿里云 Access Secret"
                             name={["tts", "aliyunAccessSecret"]}
-                            rules={[{ required: true, message: '请输入阿里云 Access Secret' }]}
+                            rules={[
+                              {
+                                required: true,
+                                message: "请输入阿里云 Access Secret",
+                              },
+                            ]}
                             tooltip="用于阿里云语音服务的 Access Secret (仅示例，生产环境请使用安全存储)"
                           >
                             <Input.Password placeholder="AccessKeyId:AccessKeySecret" />
@@ -1443,7 +1603,12 @@ const SettingsPanel: React.FC = () => {
                           <Form.Item
                             label="阿里云 AppKey"
                             name={["tts", "aliyunAppKey"]}
-                            rules={[{ required: true, message: '请输入阿里云 AppKey' }]}
+                            rules={[
+                              {
+                                required: true,
+                                message: "请输入阿里云 AppKey",
+                              },
+                            ]}
                             tooltip="智能语音交互中创建的项目 AppKey，用于实时 ASR"
                           >
                             <Input placeholder="项目 AppKey" />
@@ -1463,7 +1628,7 @@ const SettingsPanel: React.FC = () => {
                 >
                   {({ getFieldValue }) => {
                     const ttsEnabled = getFieldValue(["tts", "enabled"]);
-                    
+
                     return ttsEnabled ? (
                       <>
                         <Form.Item label="测试播报">
@@ -1471,10 +1636,13 @@ const SettingsPanel: React.FC = () => {
                             <Button
                               onClick={async () => {
                                 try {
-                                  const { invoke } = await import("@tauri-apps/api/core");
-                                  const rate = getFieldValue(["tts", "rate"]) || 1.0;
-                                  const volume = getFieldValue(["tts", "volume"]) || 0.8;
-                                  
+                                  const { invoke } =
+                                    await import("@tauri-apps/api/core");
+                                  const rate =
+                                    getFieldValue(["tts", "rate"]) || 1.0;
+                                  const volume =
+                                    getFieldValue(["tts", "volume"]) || 0.8;
+
                                   await invoke("set_tts_rate", { rate });
                                   await invoke("set_tts_volume", { volume });
                                   await invoke("speak_text", {
@@ -1492,7 +1660,8 @@ const SettingsPanel: React.FC = () => {
                             <Button
                               onClick={async () => {
                                 try {
-                                  const { invoke } = await import("@tauri-apps/api/core");
+                                  const { invoke } =
+                                    await import("@tauri-apps/api/core");
                                   await invoke("stop_speaking");
                                   message.info("已停止播报");
                                 } catch (error: any) {

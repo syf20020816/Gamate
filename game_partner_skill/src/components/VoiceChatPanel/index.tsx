@@ -32,19 +32,15 @@ export const VoiceChatPanel: React.FC = () => {
   );
 
   // 使用共享的对话Store
-  const {
-    messages,
-    isThinking,
-    currentGame,
-    deleteMessage,
-  } = useAIAssistantStore();
+  const { messages, isThinking, currentGame, deleteMessage } =
+    useAIAssistantStore();
 
   // 麦克风测试状态
   const [isTesting, setIsTesting] = useState(false);
   const [testVolume, setTestVolume] = useState(0);
   const [testDuration, setTestDuration] = useState(0);
   const [testSamples, setTestSamples] = useState(0);
-  
+
   // 使用 ref 防止重复注册监听器
   const listenersRegistered = React.useRef(false);
 
@@ -181,10 +177,10 @@ export const VoiceChatPanel: React.FC = () => {
       console.log("⚠️ [跳过] 监听器已注册，避免重复");
       return;
     }
-    
+
     console.log("🔧 [初始化] 注册事件监听器...");
     listenersRegistered.current = true;
-    
+
     const unlistenList: (() => void)[] = [];
 
     // 语音转文字事件 - 不再需要,因为会触发自定义事件
@@ -239,7 +235,7 @@ export const VoiceChatPanel: React.FC = () => {
 
     // 阿里云识别请求事件 (后端触发) - 使用 once 防止重复处理
     const recognizeRequestHandled = new Set<string>();
-    
+
     listen<{
       pcm_data: number[];
       sample_rate: number;
@@ -247,13 +243,13 @@ export const VoiceChatPanel: React.FC = () => {
     }>("aliyun_recognize_request", async (event) => {
       // 生成唯一ID防止重复处理
       const eventId = `${event.payload.pcm_data.length}_${event.payload.sample_rate}_${event.payload.duration_secs}`;
-      
+
       if (recognizeRequestHandled.has(eventId)) {
         console.log("⚠️ [跳过重复] 识别请求已处理:", eventId);
         return;
       }
       recognizeRequestHandled.add(eventId);
-      
+
       console.log("🎯🎯🎯 [收到阿里云识别请求!!!]");
       console.log(
         "🎯 [收到阿里云识别请求]",
@@ -292,11 +288,13 @@ export const VoiceChatPanel: React.FC = () => {
         if (result && result.trim()) {
           // 🎯 触发自定义事件: 语音识别完成 (传递识别文字)
           console.log("📢 [触发事件] voice_recognition_completed:", result);
-          window.dispatchEvent(new CustomEvent("voice_recognition_completed", {
-            detail: { text: result }
-          }));
+          window.dispatchEvent(
+            new CustomEvent("voice_recognition_completed", {
+              detail: { text: result },
+            }),
+          );
         }
-        
+
         // 成功后清除标记(允许下次相同长度的音频)
         setTimeout(() => recognizeRequestHandled.delete(eventId), 5000);
       } catch (error) {
@@ -472,15 +470,27 @@ export const VoiceChatPanel: React.FC = () => {
         {/* 主控制按钮 */}
         <div className="control-buttons">
           {!isListening ? (
-            <button className="start-button" onClick={handleStartListening}>
-              <Mic size={20} />
-              <span>开始对话</span>
-            </button>
+            <Button
+              icon={<Mic size={20} />}
+              onClick={handleStartListening}
+              disabled={!currentGame}
+              variant="filled"
+              color="green"
+              className="start-button"
+              style={{ border: "none" }}
+            >
+              开始对话
+            </Button>
           ) : (
-            <button className="stop-button" onClick={handleStopListening}>
-              <MicOff size={20} />
-              <span>停止对话</span>
-            </button>
+            <Button
+              className="stop-button"
+              onClick={handleStopListening}
+              danger
+              icon={<MicOff size={20} />}
+              variant="filled"
+            >
+              停止对话
+            </Button>
           )}
         </div>
 
@@ -539,7 +549,7 @@ export const VoiceChatPanel: React.FC = () => {
       </div>
 
       {/* 底部提示 */}
-      <div className="footer-section">
+      {/* <div className="footer-section">
         <div className="status-legend">
           <div className="legend-item">
             <div className="legend-dot green" />
@@ -557,7 +567,7 @@ export const VoiceChatPanel: React.FC = () => {
         <p className="hint-text">
           💡 提示: 说话结束后系统会自动检测静音并开始识别
         </p>
-      </div>
+      </div> */}
     </div>
   );
 };

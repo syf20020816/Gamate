@@ -3,7 +3,7 @@
 
 import React, { useRef, useEffect } from "react";
 import { Button, Empty, Tag, Collapse } from "antd";
-import { DeleteOutlined } from "@ant-design/icons";
+import { DeleteOutlined, NotificationOutlined } from "@ant-design/icons";
 import { BookOpen, Loader2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import ReactMarkdown from "react-markdown";
@@ -90,7 +90,7 @@ export const ConversationArea: React.FC<ConversationAreaProps> = ({
             <Button
               type="text"
               size="small"
-              icon={<span>{speakingMessageId === msg.id ? "�" : "�🔊"}</span>}
+              icon={<NotificationOutlined/>}
               onClick={async () => {
                 try {
                   // 如果当前正在播报这条消息,则停止

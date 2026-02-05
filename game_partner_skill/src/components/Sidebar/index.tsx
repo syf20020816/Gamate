@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { Layout, Menu, Button } from "antd";
 import {
-  Monitor,
   Gamepad2,
   Database,
   Settings,
@@ -32,11 +31,6 @@ const Sidebar: React.FC<SidebarProps> = ({ selectedMenu, onMenuChange }) => {
       key: "home",
       icon: <Home size={20} />,
       label: "主页",
-    },
-    {
-      key: "screen-capture",
-      icon: <Monitor size={20} />,
-      label: "屏幕识别",
     },
     {
       key: "wiki-search",

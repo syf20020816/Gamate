@@ -838,9 +838,16 @@
   - ✅ 重复事件去重 (双层 Set 机制)
   - ✅ Mock 失败简化播报 ([TTS_SIMPLE] 标记)
   - ✅ 可停止播报功能 (🔇 按钮)
+  - ✅ OpenAI Vision base64 修复 (sanitize_base64_image)
+  - ✅ 屏幕截图整合到设置页面
   - ✅ 文档: VOICE_INTERACTION_FLOW.md
   - ✅ 文档: BUGFIX_DUPLICATE_EVENTS.md
   - ✅ 文档: TTS_OPTIMIZATION.md
+  - ✅ 文档: BUGFIX_BASE64_IMAGE.md
+  - ✅ 文档: REFACTOR_SCREENSHOT_INTEGRATION.md
+  - ✅ 文档: QUICK_REFERENCE.md
+  - ✅ 文档: CHANGELOG_DAY22.md
+  - ✅ 文档: DAY22_COMPLETE_SUMMARY.md
 
 **📅 待开始:**
 - Day 23-24: 弹幕与互动系统

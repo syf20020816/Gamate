@@ -2,6 +2,7 @@ use crate::rag::{build_rag_context, build_prompt, AIResponse, WikiReference};
 use crate::settings::AppSettings;
 use crate::llm::{OpenAIClient, OllamaClient};
 use anyhow::Result;
+use base64::{Engine as _, engine::general_purpose};
 
 /// 生成 AI 回复 (Tauri 命令)
 #[tauri::command]
@@ -68,6 +69,46 @@ fn get_game_name(game_id: &str) -> String {
     .to_string()
 }
 
+/// 净化 base64 图片字符串
+/// 
+/// 功能:
+/// 1. 去除 data:image/...;base64, 前缀 (如果有)
+/// 2. 移除换行符和空白字符
+/// 3. 校验 base64 格式是否有效
+/// 
+/// 返回: 纯净的 base64 字符串
+fn sanitize_base64_image(s: &str) -> Result<String> {
+    let mut cleaned = s.trim().to_string();
+    
+    // 1. 去除 data URL 前缀
+    if let Some(comma_idx) = cleaned.find(',') {
+        // 先复制前缀用于日志,避免借用冲突
+        let prefix = cleaned[..comma_idx].to_string();
+        if prefix.starts_with("data:") && prefix.contains("base64") {
+            cleaned = cleaned[comma_idx + 1..].to_string();
+            log::info!("🧹 检测到 data URL 前缀,已移除: {}", prefix);
+        }
+    }
+    
+    // 2. 移除所有换行符和空白字符
+    cleaned.retain(|c| !c.is_whitespace());
+    
+    // 3. 校验 base64 格式
+    match general_purpose::STANDARD.decode(&cleaned) {
+        Ok(decoded) => {
+            log::info!("✅ base64 图片校验成功 (解码后大小: {} bytes)", decoded.len());
+            Ok(cleaned)
+        }
+        Err(e) => {
+            log::error!("❌ base64 图片格式无效: {}", e);
+            log::error!("   原始字符串长度: {}", s.len());
+            log::error!("   清理后字符串长度: {}", cleaned.len());
+            log::error!("   前 50 字符: {}", &cleaned.chars().take(50).collect::<String>());
+            Err(anyhow::anyhow!("无效的 base64 图片格式: {}", e))
+        }
+    }
+}
+
 /// 调用 LLM (根据配置选择不同的实现)
 async fn call_llm(
     system_prompt: &str,
@@ -95,6 +136,19 @@ async fn call_llm(
     
     log::info!("🤖 使用 {} 客户端", if is_local { "Ollama" } else { "OpenAI" });
 
+    // 净化 base64 图片 (如果有截图)
+    let clean_screenshot = if let Some(ref img) = screenshot {
+        match sanitize_base64_image(img) {
+            Ok(clean) => Some(clean),
+            Err(e) => {
+                log::error!("❌ 图片格式校验失败: {}", e);
+                return Err(anyhow::anyhow!("图片格式无效,请重新截图"));
+            }
+        }
+    } else {
+        None
+    };
+
     // 调用 API (带重试)
     for attempt in 1..=3 {
         log::info!("🔄 尝试调用 LLM API (第 {}/3 次)", attempt);
@@ -114,7 +168,7 @@ async fn call_llm(
                 }
             };
 
-            if let Some(img) = screenshot {
+            if let Some(ref img) = clean_screenshot {
                 client.chat_with_vision(system_prompt, user_prompt, img).await
             } else {
                 client.chat(system_prompt, user_prompt).await
@@ -134,7 +188,7 @@ async fn call_llm(
                 }
             };
 
-            if let Some(img) = screenshot {
+            if let Some(ref img) = clean_screenshot {
                 client.chat_with_vision(system_prompt, user_prompt, img).await
             } else {
                 client.chat(system_prompt, user_prompt).await

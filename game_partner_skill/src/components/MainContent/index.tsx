@@ -1,4 +1,3 @@
-import ScreenCapture from "../ScreenCapture";
 import GameLibrary from "../GameLibrary";
 import SkillDatabase from "../SkillDatabase";
 import Home from "../Home";
@@ -18,8 +17,6 @@ const MainContent: React.FC<MainContentProps> = ({ selectedMenu, onMenuChange })
     switch (selectedMenu) {
       case "home":
         return <Home onNavigate={onMenuChange} />;
-      case "screen-capture":
-        return <ScreenCapture />;
       case "wiki-search":
         return <WikiKnowledgeBase />;
       case "ai-assistant":

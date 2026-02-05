@@ -6,30 +6,26 @@ import {
   Empty,
   message as antdMessage,
   Tag,
-  Collapse,
   Select,
   Tabs,
 } from "antd";
-import { SendOutlined, DeleteOutlined, ClearOutlined } from "@ant-design/icons";
+import { SendOutlined, ClearOutlined } from "@ant-design/icons";
 import {
   Image as ImageIcon,
   BookOpen,
-  Loader2,
 } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
+import { motion } from "framer-motion";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { useAIAssistantStore, Message } from "../../stores/aiAssistantStore";
+import { useAIAssistantStore } from "../../stores/aiAssistantStore";
 import { useUserStore } from "../../stores/userStore";
 import { useSkillLibraryStore } from "../../stores/skillLibraryStore";
 import { getGameById } from "../../data/games";
 import { VoiceChatPanel } from "../VoiceChatPanel";
+import { ConversationArea } from "../ConversationArea";
 import "./index.css";
 
 const { TextArea } = Input;
-const { Panel } = Collapse;
 
 // 清理 Markdown 标记，用于 TTS 播报 (与 ConversationArea 中的函数一致)
 const cleanMarkdownForTTS = (text: string): string => {
@@ -77,7 +73,6 @@ const AIAssistant: React.FC = () => {
 
   const [inputValue, setInputValue] = useState("");
   const [useScreenshot, setUseScreenshot] = useState(true);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
   const voiceListenerRegistered = useRef(false); // 防止重复注册语音识别监听器
 
   // 可用的游戏列表
@@ -90,15 +85,6 @@ const AIAssistant: React.FC = () => {
   const availableGames = selectedGames.filter((game) =>
     gamesWithSkills.includes(game!.id),
   );
-
-  // 自动滚动到底部
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
-
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
 
   // 监听截图事件
   useEffect(() => {
@@ -406,175 +392,6 @@ const AIAssistant: React.FC = () => {
     antdMessage.success("已清空对话历史");
   };
 
-  // 渲染消息
-  const renderMessage = (msg: Message) => {
-    const isUser = msg.role === "user";
-
-    return (
-      <motion.div
-        key={msg.id}
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: -20 }}
-        transition={{ duration: 0.3 }}
-        className={`message-item ${isUser ? "user-message" : "ai-message"}`}
-        style={{ backgroundColor: "#1e1e1e" }}
-      >
-        <div className="message-header">
-          <span className="message-role">{isUser ? "玩家" : "AI 助手"}</span>
-          <span className="message-time">
-            {new Date(msg.timestamp).toLocaleTimeString()}
-          </span>
-          {/* AI 消息显示播报按钮 */}
-          {!isUser && (
-            <Button
-              type="text"
-              size="small"
-              icon={<span>🔊</span>}
-              onClick={async () => {
-                try {
-                  const ttsSettings = await invoke<any>(
-                    "get_app_settings",
-                  ).then((settings: any) => settings.tts);
-
-                  if (!ttsSettings?.enabled) {
-                    antdMessage.warning("请先在设置中启用 TTS");
-                    return;
-                  }
-
-                  await invoke("set_tts_rate", {
-                    rate: ttsSettings.rate || 1.0,
-                  });
-                  await invoke("set_tts_volume", {
-                    volume: ttsSettings.volume || 0.8,
-                  });
-                  await invoke("speak_text", {
-                    text: msg.content,
-                    interrupt: true,
-                  });
-                  antdMessage.success("开始播报");
-                } catch (error) {
-                  antdMessage.error(`播报失败: ${error}`);
-                }
-              }}
-              title="播报此消息"
-            />
-          )}
-          <Button
-            type="text"
-            size="small"
-            icon={<DeleteOutlined />}
-            onClick={() => deleteMessage(msg.id)}
-            style={{ marginLeft: "auto" }}
-          />
-        </div>
-
-        <div className="message-content">
-          {isUser ? (
-            <div>{msg.content}</div>
-          ) : (
-            <div className="markdown-content">
-              {/* 检查是否包含 thinking 内容 */}
-              {msg.content.includes("Thinking...") &&
-              msg.content.includes("...done thinking.") ? (
-                <>
-                  {/* 提取 thinking 部分 */}
-                  {(() => {
-                    const thinkingStart = msg.content.indexOf("Thinking...");
-                    const thinkingEnd =
-                      msg.content.indexOf("...done thinking.") +
-                      "...done thinking.".length;
-                    const thinkingContent = msg.content.substring(
-                      thinkingStart,
-                      thinkingEnd,
-                    );
-                    const actualResponse = msg.content
-                      .substring(thinkingEnd)
-                      .trim();
-
-                    return (
-                      <>
-                        {/* Thinking 过程（可折叠） */}
-                        <Collapse ghost style={{ marginBottom: 12 }}>
-                          <Panel
-                            header={
-                              <span style={{ color: "#888", fontSize: "13px" }}>
-                                <span style={{ marginRight: 8 }}>🧠</span>
-                                AI 思考过程
-                              </span>
-                            }
-                            key="thinking"
-                          >
-                            <div
-                              style={{
-                                background: "#f5f5f5",
-                                padding: "12px",
-                                borderRadius: "4px",
-                                fontSize: "13px",
-                                color: "#666",
-                                whiteSpace: "pre-wrap",
-                                fontFamily: "monospace",
-                              }}
-                            >
-                              {thinkingContent}
-                            </div>
-                          </Panel>
-                        </Collapse>
-
-                        {/* 实际回复 */}
-                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                          {actualResponse || msg.content}
-                        </ReactMarkdown>
-                      </>
-                    );
-                  })()}
-                </>
-              ) : (
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                  {msg.content}
-                </ReactMarkdown>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* 显示截图 */}
-        {msg.screenshot && (
-          <div className="message-screenshot">
-            <img src={msg.screenshot} alt="游戏截图" />
-          </div>
-        )}
-
-        {/* 显示 Wiki 引用 */}
-        {msg.wikiReferences && msg.wikiReferences.length > 0 && (
-          <Collapse ghost className="wiki-references">
-            <Panel
-              header={
-                <span>
-                  <BookOpen size={14} style={{ marginRight: 8 }} />
-                  参考资料 ({msg.wikiReferences.length})
-                </span>
-              }
-              key="wiki"
-            >
-              {msg.wikiReferences.map((ref, index) => (
-                <div key={index} className="wiki-ref-item">
-                  <div className="wiki-ref-header">
-                    <strong>{ref.title}</strong>
-                    <Tag color="blue">{(ref.score * 100).toFixed(1)}%</Tag>
-                  </div>
-                  <div className="wiki-ref-content">
-                    {ref.content.substring(0, 200)}...
-                  </div>
-                </div>
-              ))}
-            </Panel>
-          </Collapse>
-        )}
-      </motion.div>
-    );
-  };
-
   const [tabKey, setTabKey] = useState("audio");
 
   return (
@@ -595,20 +412,6 @@ const AIAssistant: React.FC = () => {
             </Select.Option>
           ))}
         </Select>
-        {/* {!isAIRunning ? (
-          <Button
-            type="primary"
-            size="small"
-            onClick={handleStartAI}
-            disabled={!currentGame}
-          >
-            开始对话
-          </Button>
-        ) : (
-          <Button type="default" size="small" danger onClick={handleStopAI}>
-            停止对话
-          </Button>
-        )} */}
       </div>
       <Tabs
         activeKey={tabKey}
@@ -625,7 +428,7 @@ const AIAssistant: React.FC = () => {
           </div>
         </Tabs.TabPane>
         <Tabs.TabPane tab="文本对话" key="word">
-          {/* 主对话区 */}
+          {/* 主对话区 - 使用统一的 ConversationArea 组件 */}
           <div
             className="main-conversation-area"
             style={{ height: "calc(100vh - 132px)" }}
@@ -641,9 +444,8 @@ const AIAssistant: React.FC = () => {
               }}
               className="conversation-card"
             >
-              {/* 侧边栏: 参考资料和语音聊天 */}
+              {/* 侧边栏: 参考资料 */}
               <div className="sidebar-area">
-                {/* 参考资料 */}
                 <Card
                   title={
                     <span style={{ display: "flex", alignItems: "center" }}>
@@ -686,37 +488,14 @@ const AIAssistant: React.FC = () => {
                 </Card>
               </div>
 
+              {/* 使用统一的对话区域组件 */}
               <div className="messages-area-container">
-                <div className="messages-container">
-                  <AnimatePresence>
-                    {messages.length === 0 ? (
-                      <Empty
-                        description={
-                          currentGame
-                            ? "开始对话吧!问我任何关于游戏的问题~"
-                            : "请先选择游戏"
-                        }
-                        image={Empty.PRESENTED_IMAGE_SIMPLE}
-                      />
-                    ) : (
-                      messages.map(renderMessage)
-                    )}
-                  </AnimatePresence>
-
-                  {/* AI 思考中 */}
-                  {isThinking && (
-                    <motion.div
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      className="thinking-indicator"
-                    >
-                      <Loader2 size={16} className="spin-icon" />
-                      <span>AI 思考中...</span>
-                    </motion.div>
-                  )}
-
-                  <div ref={messagesEndRef} />
-                </div>
+                <ConversationArea
+                  messages={messages}
+                  isThinking={isThinking}
+                  currentGame={currentGame}
+                  onDeleteMessage={deleteMessage}
+                />
 
                 {/* 输入框 */}
                 <div className="input-area">

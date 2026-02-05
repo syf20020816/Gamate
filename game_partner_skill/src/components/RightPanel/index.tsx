@@ -10,7 +10,7 @@ import {
   Switch,
   message,
 } from "antd";
-import { Database, Zap, MessageCircle, PlayCircle, Camera } from "lucide-react";
+import { Database, Zap, MessageCircle, PlayCircle, Camera, Mic } from "lucide-react";
 import { motion } from "framer-motion";
 import { invoke } from "@tauri-apps/api/core";
 import { useUserStore } from "../../stores/userStore";
@@ -284,7 +284,7 @@ const RightPanel: React.FC<RightPanelProps> = ({ onMenuChange }) => {
                 type="primary"
                 size="large"
                 block
-                icon={<PlayCircle size={18} />}
+                icon={<Mic size={20} />}
                 disabled={!aiSelectedGame}
                 onClick={handleStartAI}
               >
