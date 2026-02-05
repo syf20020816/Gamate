@@ -111,7 +111,7 @@ impl Default for Config {
                     name: "恐鬼症".to_string(),
                     name_en: Some("Phasmophobia".to_string()),
                     icon: "/games/phasmophobia.png".to_string(),
-                    banner: Some("/games/phasmophobia-banner.jpg".to_string()),
+                    banner: Some("/games/phasmophobia.png".to_string()),
                     description: "恐鬼症是一款4人在线合作心理恐怖游戏。你和你的超自然现象调查小组将进入闹鬼的地点，收集尽可能多的超自然现象证据。".to_string(),
                     category: "horror".to_string(),
                     tags: vec!["合作".to_string(), "多人".to_string(), "恐怖".to_string(), "调查".to_string(), "VR支持".to_string()],

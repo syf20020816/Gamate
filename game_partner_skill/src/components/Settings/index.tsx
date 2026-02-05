@@ -340,8 +340,7 @@ const SettingsPanel: React.FC = () => {
     <div className="settings-page">
       <Card>
         <Space align="center" style={{ marginBottom: 16 }}>
-          <SettingOutlined style={{ fontSize: 24 }} />
-          <Title level={2} style={{ margin: 0 }}>
+          <Title level={3} style={{ margin: 0 }}>
             应用设置
           </Title>
         </Space>

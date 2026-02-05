@@ -18,8 +18,6 @@ import { motion } from "framer-motion";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { useAIAssistantStore } from "../../stores/aiAssistantStore";
-import { useUserStore } from "../../stores/userStore";
-import { useSkillLibraryStore } from "../../stores/skillLibraryStore";
 import { getGameById } from "../../data/games";
 import { VoiceChatPanel } from "../VoiceChatPanel";
 import { ConversationArea } from "../ConversationArea";
@@ -68,23 +66,54 @@ const AIAssistant: React.FC = () => {
     deleteMessage,
   } = useAIAssistantStore();
 
-  const { user } = useUserStore();
-  const { downloadedLibraries } = useSkillLibraryStore();
+  const [downloadedLibraries, setDownloadedLibraries] = useState<any[]>([]);
+  const [availableGames, setAvailableGames] = useState<any[]>([]);
 
   const [inputValue, setInputValue] = useState("");
   const [useScreenshot, setUseScreenshot] = useState(true);
   const voiceListenerRegistered = useRef(false); // 防止重复注册语音识别监听器
 
-  // 可用的游戏列表
-  const gamesWithSkills = [
-    ...new Set(downloadedLibraries.map((lib) => lib.gameId)),
-  ];
-  const selectedGames =
-    user?.config.selectedGames.map((id) => getGameById(id)).filter(Boolean) ||
-    [];
-  const availableGames = selectedGames.filter((game) =>
-    gamesWithSkills.includes(game!.id),
-  );
+  // ✅ 从后端扫描已下载的技能库
+  useEffect(() => {
+    const loadLibraries = async () => {
+      try {
+        const libraries = await invoke<any[]>('scan_downloaded_libraries');
+        setDownloadedLibraries(libraries);
+      } catch (error) {
+        console.error('扫描技能库失败:', error);
+      }
+    };
+    loadLibraries();
+  }, []);
+
+  // ✅ 从后端加载用户选择的游戏并过滤出有技能库的
+  useEffect(() => {
+    const loadAvailableGames = async () => {
+      try {
+        const settings = await invoke<any>('get_app_settings');
+        const selectedGameIds = settings.user?.selected_games || [];
+        
+        // 获取有技能库的游戏 ID
+        const gamesWithSkills = [...new Set(downloadedLibraries.map((lib) => lib.gameId))];
+        
+        // 过滤出既被选择又有技能库的游戏
+        const games = selectedGameIds
+          .filter((id: string) => gamesWithSkills.includes(id))
+          .map((id: string) => getGameById(id))
+          .filter(Boolean);
+        
+        setAvailableGames(games);
+        
+        console.log('✅ [AIAssistant] 加载可用游戏:', games.map((g: any) => g?.name));
+      } catch (error) {
+        console.error('加载游戏配置失败:', error);
+      }
+    };
+    
+    if (downloadedLibraries.length > 0) {
+      loadAvailableGames();
+    }
+  }, [downloadedLibraries]);
 
   // 监听截图事件
   useEffect(() => {

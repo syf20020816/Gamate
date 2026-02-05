@@ -32,8 +32,9 @@ import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { motion } from "framer-motion";
 import { useSkillLibraryStore } from "../../stores/skillLibraryStore";
-import { getGameById } from "../../data/games";
+import { getGameById } from "../../services/configService";
 import type { DownloadedSkillLibrary } from "../../types/skillLibrary";
+import type { Game } from "../../types/game";
 import "./styles.scss";
 
 const { Title, Text, Paragraph } = Typography;
@@ -46,12 +47,14 @@ interface SkillLibraryConfig {
 }
 
 const SkillDatabase: React.FC = () => {
-  const { downloadedLibraries, removeDownloadedLibrary, setActiveVersion } = useSkillLibraryStore();
+  const { setActiveVersion } = useSkillLibraryStore();
   const [config, setConfig] = useState<SkillLibraryConfig | null>(null);
   const [configModalVisible, setConfigModalVisible] = useState(false);
   const [form] = Form.useForm();
   const [validating, setValidating] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [gameCache, setGameCache] = useState<Map<string, Game>>(new Map());
+  const [downloadedLibraries, setDownloadedLibraries] = useState<DownloadedSkillLibrary[]>([]);
 
   // 从后端加载配置
   useEffect(() => {
@@ -79,40 +82,45 @@ const SkillDatabase: React.FC = () => {
     loadConfig();
   }, []);
 
-  // 启动时验证所有已下载的库
+  // 从后端扫描已下载的技能库
   useEffect(() => {
-    const validateLibraries = async () => {
-      if (downloadedLibraries.length === 0) return;
-      
-      setValidating(true);
-      let invalidCount = 0;
-
-      for (const library of downloadedLibraries) {
-        try {
-          const isValid = await invoke<boolean>('validate_skill_library', {
-            storagePath: library.storagePath,
-          });
-
-          if (!isValid) {
-            console.warn(`无效的技能库（文件不存在）: ${library.gameName} - ${library.storagePath}`);
-            // 自动清理无效记录
-            removeDownloadedLibrary(library.id);
-            invalidCount++;
-          }
-        } catch (error) {
-          console.error('验证失败:', error);
-        }
-      }
-
-      setValidating(false);
-
-      if (invalidCount > 0) {
-        message.warning(`已自动清理 ${invalidCount} 个无效的技能库记录`);
+    const scanLibraries = async () => {
+      try {
+        const libraries = await invoke<any[]>('scan_downloaded_libraries');
+        setDownloadedLibraries(libraries);
+      } catch (error) {
+        console.error('❌ 扫描技能库失败:', error);
+        message.error(`扫描技能库失败: ${error}`);
       }
     };
+    
+    scanLibraries();
+  }, []);
 
-    validateLibraries();
-  }, []); // 只在组件挂载时执行一次
+  // 加载游戏信息缓存
+  useEffect(() => {
+    const loadGameCache = async () => {
+      const cache = new Map<string, Game>();
+      const uniqueGameIds = Array.from(new Set(downloadedLibraries.map(lib => lib.gameId)));
+      
+      for (const gameId of uniqueGameIds) {
+        try {
+          const game = await getGameById(gameId);
+          if (game) {
+            cache.set(gameId, game);
+          }
+        } catch (error) {
+          console.error(`加载游戏 ${gameId} 失败:`, error);
+        }
+      }
+      
+      setGameCache(cache);
+    };
+    
+    if (downloadedLibraries.length > 0) {
+      loadGameCache();
+    }
+  }, [downloadedLibraries]);
 
   // 手动验证并清理无效记录
   const handleValidateLibraries = async () => {
@@ -134,13 +142,16 @@ const SkillDatabase: React.FC = () => {
 
         if (!isValid) {
           console.warn(`清理无效记录: ${library.gameName} - ${library.storagePath}`);
-          removeDownloadedLibrary(library.id);
           invalidCount++;
         }
       } catch (error) {
         console.error('验证失败:', error);
       }
     }
+
+    // 重新扫描
+    const libraries = await invoke<any[]>('scan_downloaded_libraries');
+    setDownloadedLibraries(libraries);
 
     setValidating(false);
 
@@ -255,18 +266,17 @@ const SkillDatabase: React.FC = () => {
         try {
           message.loading({ content: "正在删除...", key: "delete" });
           
-          // 调用 Tauri 后端删除文件（即使文件不存在也会成功）
+          // 调用 Tauri 后端删除文件
           await invoke('delete_skill_library', { storagePath: library.storagePath });
           
-          // 从 store 中移除记录（确保即使后端失败也能清理）
-          removeDownloadedLibrary(library.id);
+          // 重新扫描
+          const libraries = await invoke<any[]>('scan_downloaded_libraries');
+          setDownloadedLibraries(libraries);
           
           message.success({ content: "已删除技能库", key: "delete" });
         } catch (error) {
           console.error('删除失败:', error);
-          // 即使删除文件失败，仍然移除记录
-          removeDownloadedLibrary(library.id);
-          message.warning({ content: `文件删除失败，但已清理记录: ${error}`, key: "delete" });
+          message.error({ content: `删除失败: ${error}`, key: "delete" });
         }
       },
     });
@@ -445,7 +455,7 @@ const SkillDatabase: React.FC = () => {
         ) : (
           <Space direction="vertical" size="large" style={{ width: "100%" }}>
             {Object.entries(groupedLibraries).map(([gameId, libraries]) => {
-              const game = getGameById(gameId);
+              const game = gameCache.get(gameId);
 
               return (
                 <Card

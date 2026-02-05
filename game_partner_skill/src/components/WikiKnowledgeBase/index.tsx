@@ -12,7 +12,6 @@ import {
 import { invoke } from "@tauri-apps/api/core";
 import "./index.css";
 import WikiSearch from "../WikiSearch";
-import { useSkillLibraryStore } from "../../stores/skillLibraryStore";
 
 const { Text } = Typography;
 
@@ -30,23 +29,31 @@ const WikiKnowledgeBase: React.FC = () => {
   const [hasData, setHasData] = useState(false);
   const [availableGames, setAvailableGames] = useState<Game[]>([]);
   const [gamesWithSkills, setGamesWithSkills] = useState<string[]>([]); // 已下载技能库的游戏ID列表
-  const [importedGames, setImportedGames] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [vectorDbMode, setVectorDbMode] = useState<string>("local"); // 向量数据库模式
-  const { downloadedLibraries } = useSkillLibraryStore();
 
   // 加载游戏配置和已导入状态
   useEffect(() => {
     loadVectorDbMode();
     loadGamesConfig();
-    loadImportedGames();
+    loadDownloadedLibraries(); // ✅ 从后端扫描
   }, []);
 
-  // 根据 downloadedLibraries 更新有技能库的游戏列表
-  useEffect(() => {
-    const gameIds = [...new Set(downloadedLibraries.map((lib) => lib.gameId))];
-    setGamesWithSkills(gameIds);
-  }, [downloadedLibraries]);
+  // ✅ 从后端扫描已下载的技能库
+  const loadDownloadedLibraries = async () => {
+    try {
+      const libraries = await invoke<any[]>('scan_downloaded_libraries');
+      const gameIds = [...new Set(libraries.map((lib: any) => lib.gameId))];
+      setGamesWithSkills(gameIds);
+      
+      // 如果还没选择游戏,自动选择第一个有技能库的游戏
+      if (!selectedGame && gameIds.length > 0) {
+        setSelectedGame(gameIds[0]);
+      }
+    } catch (error) {
+      console.error('扫描技能库失败:', error);
+    }
+  };
 
   // 当选择游戏时检查是否已导入
   useEffect(() => {
@@ -69,27 +76,11 @@ const WikiKnowledgeBase: React.FC = () => {
     try {
       const config = await invoke<{ games: Game[] }>("get_games_config");
       setAvailableGames(config.games);
-      // 默认选择第一个有技能库的游戏
-      const firstGameWithSkills = config.games.find((game) =>
-        downloadedLibraries.some((lib) => lib.gameId === game.id),
-      );
-      if (firstGameWithSkills) {
-        setSelectedGame(firstGameWithSkills.id);
-      }
     } catch (error) {
       console.error("加载游戏配置失败:", error);
       message.error("加载游戏列表失败");
     } finally {
       setLoading(false);
-    }
-  };
-
-  const loadImportedGames = async () => {
-    try {
-      const games = await invoke<string[]>("list_imported_games");
-      setImportedGames(games);
-    } catch (error) {
-      console.error("获取已导入游戏失败:", error);
     }
   };
 
@@ -135,8 +126,6 @@ const WikiKnowledgeBase: React.FC = () => {
       setImportProgress(100);
       setImportResult(result);
       setHasData(true);
-      // 刷新已导入游戏列表
-      await loadImportedGames();
       message.success("导入成功!");
     } catch (error: any) {
       message.error(`导入失败: ${error}`);

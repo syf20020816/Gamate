@@ -9,6 +9,9 @@ use std::env;
 pub struct AppSettings {
     /// 通用设置
     pub general: GeneralSettings,
+    /// 用户配置
+    #[serde(default)]
+    pub user: UserSettings,
     /// 技能库设置
     pub skill_library: SkillLibrarySettings,
     /// AI 模型设置
@@ -19,6 +22,23 @@ pub struct AppSettings {
     /// TTS 语音播报设置
     #[serde(default)]
     pub tts: TtsSettings,
+}
+
+/// 用户设置
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub struct UserSettings {
+    /// 用户选择的游戏列表
+    #[serde(default)]
+    pub selected_games: Vec<String>,
+}
+
+impl Default for UserSettings {
+    fn default() -> Self {
+        Self {
+            selected_games: Vec::new(),
+        }
+    }
 }
 
 /// 通用设置
@@ -239,6 +259,7 @@ impl Default for AppSettings {
                 theme: "auto".to_string(),
                 hud_mode: default_hud_mode(),
             },
+            user: UserSettings::default(),
             skill_library: SkillLibrarySettings {
                 storage_base_path: "./data/skills".to_string(),
                 max_versions_to_keep: 3,
@@ -315,11 +336,93 @@ impl AppSettings {
         }
 
         let content = std::fs::read_to_string(&path)?;
-        let settings: Self = toml::from_str(&content)
+        let mut settings: Self = toml::from_str(&content)
             .map_err(|e| anyhow::anyhow!("解析配置文件失败: {}", e))?;
         
         log::info!("✅ 加载配置成功: {:?}", path);
+        
+        // 🔍 加载后自动同步已下载的技能库
+        if let Err(e) = settings.sync_downloaded_libraries() {
+            log::warn!("⚠️ 自动同步技能库失败: {}", e);
+        }
+        
         Ok(settings)
+    }
+    
+    /// 同步已下载的技能库到 selected_games
+    fn sync_downloaded_libraries(&mut self) -> Result<()> {
+        use std::collections::HashSet;
+        
+        let base_path = PathBuf::from(&self.skill_library.storage_base_path);
+        
+        if !base_path.exists() {
+            log::info!("📂 技能库目录不存在，跳过自动同步");
+            return Ok(());
+        }
+        
+        let mut detected_games: HashSet<String> = HashSet::new();
+        
+        // 遍历游戏目录
+        // 目录结构: E:\projects\gps_test\phasmophobia\1769626506\wiki_raw.jsonl
+        if let Ok(entries) = std::fs::read_dir(&base_path) {
+            for entry in entries.flatten() {
+                let game_id = entry.file_name().to_string_lossy().to_string();
+                let game_path = entry.path();
+                
+                if !game_path.is_dir() {
+                    continue;
+                }
+                
+                // 检查是否有时间戳子目录且包含 wiki_raw.jsonl (大小 > 1KB)
+                if let Ok(sub_entries) = std::fs::read_dir(&game_path) {
+                    for sub_entry in sub_entries.flatten() {
+                        let sub_path = sub_entry.path();
+                        if !sub_path.is_dir() {
+                            continue;
+                        }
+                        
+                        let jsonl_path = sub_path.join("wiki_raw.jsonl");
+                        if jsonl_path.exists() {
+                            // 检查文件大小是否超过 1KB
+                            if let Ok(metadata) = std::fs::metadata(&jsonl_path) {
+                                if metadata.len() > 1024 {
+                                    log::info!("✅ 检测到有效技能库: {} ({})", game_id, jsonl_path.display());
+                                    detected_games.insert(game_id.clone());
+                                    break;
+                                } else {
+                                    log::warn!("⚠️ 技能库文件过小 ({} bytes): {}", metadata.len(), jsonl_path.display());
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        if detected_games.is_empty() {
+            log::info!("📦 未检测到已下载的技能库");
+            return Ok(());
+        }
+        
+        // 合并到 selected_games
+        let mut current_selected: HashSet<String> = self.user.selected_games.iter().cloned().collect();
+        let before_count = current_selected.len();
+        
+        for game_id in detected_games {
+            current_selected.insert(game_id);
+        }
+        
+        self.user.selected_games = current_selected.into_iter().collect();
+        self.user.selected_games.sort();
+        
+        let after_count = self.user.selected_games.len();
+        
+        if after_count > before_count {
+            log::info!("✅ 自动同步: 检测到 {} 个新游戏，已添加到配置", after_count - before_count);
+            self.save()?;
+        }
+        
+        Ok(())
     }
 
     /// 保存设置

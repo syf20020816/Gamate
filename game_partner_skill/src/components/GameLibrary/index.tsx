@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Card,
   Typography,
@@ -13,6 +13,7 @@ import {
   message,
   Progress,
   Flex,
+  Empty,
 } from "antd";
 import {
   Plus,
@@ -22,20 +23,21 @@ import {
   AlertCircle,
   Search,
   Filter,
+  RefreshCw,
 } from "lucide-react";
 import { motion } from "framer-motion";
-import { GAMES, getSkillConfigsByGameId } from "../../data/games";
 import { useUserStore } from "../../stores/userStore";
 import { useSkillLibraryStore } from "../../stores/skillLibraryStore";
 import { GameType, GameTypeLabels, SkillStatus } from "../../types/game";
 import type { Game, GameSkillConfig } from "../../types/game";
 import type { DownloadedSkillLibrary } from "../../types/skillLibrary";
+import { getGames, getSkillConfigsByGameId } from "../../services/configService";
 import "./styles.scss";
 
 const { Title, Text, Paragraph } = Typography;
 
 const GameLibrary: React.FC = () => {
-  const { user, addSelectedGame, removeSelectedGame } = useUserStore();
+  const { addSelectedGame, removeSelectedGame } = useUserStore();
   const { config, addDownloadedLibrary } = useSkillLibraryStore();
   const [searchText, setSearchText] = useState("");
   const [filterType, setFilterType] = useState<GameType | "all">("all");
@@ -43,17 +45,100 @@ const GameLibrary: React.FC = () => {
   const [skillModalVisible, setSkillModalVisible] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState(0);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [games, setGames] = useState<Game[]>([]);
+  const [skillConfigs, setSkillConfigs] = useState<GameSkillConfig[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedGameIds, setSelectedGameIds] = useState<string[]>([]);
+  const [syncing, setSyncing] = useState(false);
 
-  const selectedGameIds = user?.config.selectedGames || [];
+  // 从后端加载选中的游戏列表
+  useEffect(() => {
+    const loadSelectedGames = async () => {
+      try {
+        const { invoke } = await import("@tauri-apps/api/core");
+        const settings = await invoke<any>('get_app_settings');
+        const selected = settings?.user?.selected_games || [];
+        setSelectedGameIds(selected);
+      } catch (error) {
+        console.error('加载选中游戏失败:', error);
+      }
+    };
+    loadSelectedGames();
+  }, []);
+
+  // 从后端加载游戏列表
+  useEffect(() => {
+    const loadGames = async () => {
+      try {
+        setLoading(true);
+        const loadedGames = await getGames();
+        setGames(loadedGames);
+      } catch (error) {
+        console.error('加载游戏列表失败:', error);
+        message.error('加载游戏列表失败');
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadGames();
+  }, []);
+
+  // 当选择游戏时加载其技能配置
+  useEffect(() => {
+    const loadSkillConfigs = async () => {
+      if (!selectedGame) {
+        setSkillConfigs([]);
+        return;
+      }
+      try {
+        const configs = await getSkillConfigsByGameId(selectedGame.id);
+        setSkillConfigs(configs);
+      } catch (error) {
+        console.error('加载技能配置失败:', error);
+        message.error('加载技能配置失败');
+      }
+    };
+    loadSkillConfigs();
+  }, [selectedGame]);
+
+  // 手动同步已下载的技能库
+  const handleSyncLibraries = async () => {
+    try {
+      setSyncing(true);
+      message.loading({ content: '正在检测已下载的技能库...', key: 'sync' });
+      
+      const { invoke } = await import("@tauri-apps/api/core");
+      const updatedGameIds = await invoke<string[]>('sync_libraries_to_config');
+      
+      setSelectedGameIds(updatedGameIds);
+      
+      if (updatedGameIds.length > selectedGameIds.length) {
+        const newCount = updatedGameIds.length - selectedGameIds.length;
+        message.success({ 
+          content: `检测完成！发现 ${newCount} 个新游戏已添加到配置`, 
+          key: 'sync' 
+        });
+      } else {
+        message.success({ content: '检测完成，配置已是最新', key: 'sync' });
+      }
+    } catch (error) {
+      console.error('同步失败:', error);
+      message.error({ content: `同步失败: ${error}`, key: 'sync' });
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   // 过滤游戏
-  const filteredGames = GAMES.filter((game) => {
+  const filteredGames = games.filter((game) => {
     const matchSearch =
       game.name.toLowerCase().includes(searchText.toLowerCase()) ||
       game.nameEn?.toLowerCase().includes(searchText.toLowerCase());
     const matchType = filterType === "all" || game.category === filterType;
     return matchSearch && matchType;
   });
+
+  console.warn(games);
 
   const handleAddGame = (game: Game) => {
     setSelectedGame(game);
@@ -126,7 +211,17 @@ const GameLibrary: React.FC = () => {
       };
 
       addDownloadedLibrary(library);
-      addSelectedGame(selectedGame.id);
+      
+      // 保存到后端配置
+      const { invoke: invoke2 } = await import("@tauri-apps/api/core");
+      const settings = await invoke2<any>('get_app_settings');
+      if (!settings.user.selected_games.includes(selectedGame.id)) {
+        settings.user.selected_games.push(selectedGame.id);
+        await invoke2('save_app_settings', { settings });
+        setSelectedGameIds([...selectedGameIds, selectedGame.id]);
+      }
+      
+      addSelectedGame(selectedGame.id); // 同步到 userStore (向后兼容)
 
       message.success(
         `${selectedGame.name} 技能库下载完成！共 ${result.totalEntries} 条目`,
@@ -147,15 +242,27 @@ const GameLibrary: React.FC = () => {
     }
   };
 
-  const handleRemoveGame = (gameId: string) => {
+  const handleRemoveGame = async (gameId: string) => {
     Modal.confirm({
       title: "确认移除",
       content: "确定要从游戏库中移除这个游戏吗？",
       okText: "确认",
       cancelText: "取消",
-      onOk: () => {
-        removeSelectedGame(gameId);
-        message.success("已移除游戏");
+      onOk: async () => {
+        try {
+          const { invoke } = await import("@tauri-apps/api/core");
+          const settings = await invoke<any>('get_app_settings');
+          settings.user.selected_games = settings.user.selected_games.filter(
+            (id: string) => id !== gameId
+          );
+          await invoke('save_app_settings', { settings });
+          setSelectedGameIds(settings.user.selected_games);
+          removeSelectedGame(gameId); // 同步到 userStore
+          message.success("已移除游戏");
+        } catch (error) {
+          console.error('移除游戏失败:', error);
+          message.error('移除游戏失败');
+        }
       },
     });
   };
@@ -211,6 +318,15 @@ const GameLibrary: React.FC = () => {
             </Paragraph>
           </div>
           <Space>
+            <Tooltip title="检测已下载的技能库并同步到配置">
+              <Button 
+                icon={<RefreshCw size={18} />}
+                onClick={handleSyncLibraries}
+                loading={syncing}
+              >
+                检测同步
+              </Button>
+            </Tooltip>
             <Badge count={selectedGameIds.length} showZero>
               <Button type="primary" icon={<CheckCircle size={18} />}>
                 我的游戏
@@ -247,19 +363,23 @@ const GameLibrary: React.FC = () => {
         </Card>
 
         {/* 游戏卡片列表 */}
-        <Flex wrap="wrap" gap={16} align="flex-start" justify="space-between">
-          {filteredGames.map((game, index) => {
-            const isAdded = selectedGameIds.includes(game.id);
-            const skillConfigs = getSkillConfigsByGameId(game.id);
+        {loading ? (
+          <Card loading>
+            <Empty description="正在加载游戏列表..." />
+          </Card>
+        ) : (
+          <Flex wrap="wrap" gap={16} align="flex-start" justify="space-between">
+            {filteredGames.map((game, index) => {
+              const isAdded = selectedGameIds.includes(game.id);
 
-            return (
-              <div key={game.id} style={{ width: "46%", minWidth: 240 }}>
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.05 }}
-                >
-                  <Card
+              return (
+                <div key={game.id} style={{ width: "46%", minWidth: 240 }}>
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: index * 0.05 }}
+                  >
+                    <Card
                     hoverable
                     className={`game-card ${isAdded ? "game-card-added" : ""}`}
                     cover={
@@ -315,7 +435,7 @@ const GameLibrary: React.FC = () => {
                     <div className="game-footer">
                       <Space size="small">
                         <Text type="secondary" style={{ fontSize: 12 }}>
-                          {skillConfigs.length} 个技能库
+                          技能库可用
                         </Text>
                       </Space>
                       {!isAdded ? (
@@ -340,7 +460,8 @@ const GameLibrary: React.FC = () => {
               </div>
             );
           })}
-        </Flex>
+          </Flex>
+        )}
       </motion.div>
 
       {/* 技能库选择弹窗 */}
@@ -381,7 +502,7 @@ const GameLibrary: React.FC = () => {
                 size="middle"
                 style={{ width: "100%" }}
               >
-                {getSkillConfigsByGameId(selectedGame.id).map((config) => {
+                {skillConfigs.map((config) => {
                   const badge = getStatusBadge(config.status);
                   return (
                     <Card
