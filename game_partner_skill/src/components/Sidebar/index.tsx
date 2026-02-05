@@ -76,17 +76,16 @@ const Sidebar: React.FC<SidebarProps> = ({ selectedMenu, onMenuChange }) => {
     >
       <div className="sidebar-header">
         {!collapsed && (
-          <>
-            <Gamepad2 size={32} className="logo-icon" />
-            <h2 className="logo-title">Game Partner</h2>
-          </>
+          <img src="/logo.svg" alt="Gamate Logo" className="logo-icon" />
         )}
-        {collapsed && <Gamepad2 size={32} className="logo-icon" />}
+        {collapsed && (
+          <img src="/logo.svg" alt="Gamate Logo" className="logo-icon" />
+        )}
       </div>
 
       <Menu
         theme="dark"
-        style={{backgroundColor: 'transparent'}}
+        style={{ backgroundColor: "transparent" }}
         mode="inline"
         selectedKeys={[selectedMenu]}
         items={menuItems}
@@ -96,7 +95,9 @@ const Sidebar: React.FC<SidebarProps> = ({ selectedMenu, onMenuChange }) => {
       <div className="sidebar-footer">
         <Button
           type="text"
-          icon={collapsed ? <ChevronRight size={20} /> : <ChevronLeft size={20} />}
+          icon={
+            collapsed ? <ChevronRight size={20} /> : <ChevronLeft size={20} />
+          }
           onClick={() => setCollapsed(!collapsed)}
           className="collapse-btn"
         >

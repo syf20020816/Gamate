@@ -308,7 +308,7 @@ assistant = """
 [metadata]
 version = "1.0.0"
 last_updated = "2026-02-03"
-author = "Game Partner Skill Team"
+author = "Gamate Skill Team"
 description = "幽默损友风格的 AI 陪玩助手提示词配置"
 
 # 使用说明

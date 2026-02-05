@@ -1,0 +1,26 @@
+<svg width="800" height="800" viewBox="0 0 800 800" xmlns="http://www.w3.org/2000/svg">
+  <!-- 主体手柄 左蓝色圆角矩形 -->
+  <rect x="120" y="120" width="400" height="400" rx="60" ry="60" fill="#33A3E6"/>
+  <!-- 主体右红色圆角矩形 -->
+  <rect x="280" y="280" width="400" height="400" rx="60" ry="60" fill="#F74F40"/>
+  
+  <!-- 中间白色拼接块 -->
+  <rect x="280" y="280" width="240" height="240" rx="0" ry="0" fill="#FFFFFF"/>
+  
+  <!-- 左侧白色十字键 -->
+  <g transform="translate(120,120)">
+    <rect x="60" y="30" width="40" height="100" rx="22" fill="#FFFFFF"/>
+    <rect x="30" y="60" width="100" height="40" rx="22" fill="#FFFFFF"/>
+  </g>
+
+  <!-- 右侧四按键圆点 -->
+  <g transform="translate(570,570)">
+    <circle cx="0" cy="0" r="22" fill="#FFFFFF"/>
+    <circle cx="60" cy="0" r="22" fill="#FFFFFF"/>
+    <circle cx="0" cy="60" r="22" fill="#FFFFFF"/>
+    <circle cx="60" cy="60" r="22" fill="#FFFFFF"/>
+  </g>
+
+  <!-- 中间字母 G -->
+  <text x="400" y="450" font-family="Arial, sans-serif" font-weight="bold" font-size="140" text-anchor="middle" fill="#2A3B66">G</text>
+</svg>

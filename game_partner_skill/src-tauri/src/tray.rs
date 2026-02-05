@@ -23,6 +23,7 @@ pub fn create_tray<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
     // 创建托盘图标
     let _tray = TrayIconBuilder::new()
         .menu(&menu)
+        .icon(app.default_window_icon().unwrap().clone())
         .on_menu_event(|app, event| match event.id.as_ref() {
             "show" => {
                 if let Some(window) = app.get_webview_window("main") {
