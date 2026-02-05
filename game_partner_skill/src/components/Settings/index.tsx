@@ -36,6 +36,7 @@ interface AppSettings {
   general: {
     language: string;
     theme: string;
+    hud_mode?: boolean; // HUD 浮窗模式
   };
   skillLibrary: {
     storageBasePath: string;
@@ -391,6 +392,73 @@ const SettingsPanel: React.FC = () => {
                     <Select.Option value="dark">深色模式</Select.Option>
                   </Select>
                 </Form.Item>
+
+                <Divider />
+
+                <Form.Item
+                  label="HUD 浮窗模式"
+                  name={["general", "hud_mode"]}
+                  valuePropName="checked"
+                  tooltip="启用后,应用最小化到托盘时,HUD浮窗会保持显示。关闭后,HUD浮窗会随主窗口一起隐藏"
+                >
+                  <Switch 
+                    checkedChildren="开启" 
+                    unCheckedChildren="关闭"
+                  />
+                </Form.Item>
+
+                <Form.Item label="HUD 位置预览">
+                  <Space>
+                    <Button
+                      icon={<PictureOutlined />}
+                      onClick={async () => {
+                        try {
+                          await invoke("open_hud_window");
+                          message.success("HUD 浮窗已打开,您可以拖动调整位置");
+                        } catch (error) {
+                          message.error(`打开HUD浮窗失败: ${error}`);
+                        }
+                      }}
+                    >
+                      预览位置
+                    </Button>
+                    <Button
+                      onClick={async () => {
+                        try {
+                          await invoke("close_hud_window");
+                          message.info("HUD 浮窗已关闭");
+                        } catch (error) {
+                          message.error(`关闭HUD浮窗失败: ${error}`);
+                        }
+                      }}
+                    >
+                      关闭预览
+                    </Button>
+                  </Space>
+                </Form.Item>
+
+                <Alert
+                  message="HUD 模式说明"
+                  description={
+                    <ul style={{ marginBottom: 0, paddingLeft: 20 }}>
+                      <li>
+                        <strong>HUD 浮窗模式</strong>: 控制最小化时是否保持 HUD 显示
+                      </li>
+                      <li>
+                        <strong>预览位置</strong>: 打开 HUD 浮窗进行位置调整,可拖动到合适位置
+                      </li>
+                      <li>
+                        <strong>主窗口关闭</strong>: 点击关闭按钮会最小化到托盘,右键托盘图标可退出应用
+                      </li>
+                      <li>
+                        <strong>双击托盘</strong>: 快速显示/隐藏主窗口
+                      </li>
+                    </ul>
+                  }
+                  type="info"
+                  showIcon
+                  style={{ marginTop: 8 }}
+                />
               </Card>
             </Tabs.TabPane>
 

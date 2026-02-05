@@ -29,6 +29,13 @@ pub struct GeneralSettings {
     pub language: String,
     /// 主题 (light, dark, auto)
     pub theme: String,
+    /// HUD 浮窗模式 (默认开启)
+    #[serde(default = "default_hud_mode")]
+    pub hud_mode: bool,
+}
+
+fn default_hud_mode() -> bool {
+    true
 }
 
 /// 技能库设置
@@ -230,6 +237,7 @@ impl Default for AppSettings {
             general: GeneralSettings {
                 language: "zh-CN".to_string(),
                 theme: "auto".to_string(),
+                hud_mode: default_hud_mode(),
             },
             skill_library: SkillLibrarySettings {
                 storage_base_path: "./data/skills".to_string(),

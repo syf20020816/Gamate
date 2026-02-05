@@ -9,6 +9,8 @@
 language = "zh-CN"
 # 主题 (auto, light, dark)
 theme = "auto"
+# HUD 浮窗模式 (默认开启)
+hud_mode = true
 
 # ========================================
 # 技能库设置

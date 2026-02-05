@@ -10,6 +10,7 @@ mod personality;
 mod tts;
 mod audio;
 mod aliyun_voice_service;
+mod tray;
 pub mod vector_db;
 
 use commands::*;
@@ -59,6 +60,20 @@ pub fn run() {
         .manage(game_config) // 将配置注入到应用状态
         .manage(screenshot_state) // 注入截图状态
         .manage(audio_state) // 注入音频状态
+        .setup(|app| {
+            // 创建系统托盘
+            tray::create_tray(app.handle())?;
+            Ok(())
+        })
+        .on_window_event(|window, event| {
+            // 拦截窗口关闭事件,改为隐藏到托盘
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                if window.label() == "main" {
+                    let _ = window.hide();
+                    api.prevent_close();
+                }
+            }
+        })
         .invoke_handler(tauri::generate_handler![
             greet,
             download_wiki,
@@ -118,6 +133,10 @@ pub fn run() {
             aliyun_voice_service::aliyun_test_connection,
             aliyun_voice_service::aliyun_one_sentence_recognize,
             aliyun_voice_service::aliyun_tts_synthesize,
+            // HUD 浮窗命令
+            open_hud_window,
+            close_hud_window,
+            toggle_hud_window,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
