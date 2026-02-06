@@ -75,6 +75,43 @@ const AIAssistant: React.FC = () => {
   const [hudVisible, setHudVisible] = useState(false); // HUD 可见性状态
   const voiceListenerRegistered = useRef(false); // 防止重复注册语音识别监听器
 
+  // 🔍 调试: 监听 currentGame 变化
+  useEffect(() => {
+    console.log("🎮 [AIAssistant] currentGame 变化:", currentGame);
+  }, [currentGame]);
+
+  // 🔥 监听来自 HUD 的游戏切换事件
+  useEffect(() => {
+    const setupGameChangeListener = async () => {
+      try {
+        const { listen: listenEvent } = await import("@tauri-apps/api/event");
+        
+        const unlisten = await listenEvent<{ gameId: string }>("game-changed", (event) => {
+          console.log("📡 [AIAssistant] 收到 game-changed 事件:", event.payload.gameId);
+          setCurrentGame(event.payload.gameId);
+        });
+        
+        return unlisten;
+      } catch (error) {
+        console.error("❌ [AIAssistant] 监听器注册失败:", error);
+        throw error;
+      }
+    };
+    
+    let unlistenFn: (() => void) | null = null;
+    setupGameChangeListener().then(fn => { 
+      unlistenFn = fn;
+    }).catch(err => {
+      console.error("❌ [AIAssistant] 监听器设置失败:", err);
+    });
+    
+    return () => {
+      if (unlistenFn) {
+        unlistenFn();
+      }
+    };
+  }, [setCurrentGame]);
+
   // ✅ 从后端扫描已下载的技能库
   useEffect(() => {
     const loadLibraries = async () => {
@@ -180,6 +217,14 @@ const AIAssistant: React.FC = () => {
         // 1. 自动截图
         console.log("📸 [语音对话] 开始自动截图...");
         antdMessage.loading({ content: "正在截图...", key: "voice_screenshot" });
+        
+        // 🔥 通知 HUD: 正在截图
+        try {
+          const { emit } = await import("@tauri-apps/api/event");
+          await emit("screenshot_started", {});
+        } catch (e) {
+          console.warn("发送 screenshot_started 事件失败:", e);
+        }
 
         screenshot = await invoke<string>("capture_screenshot");
 
@@ -203,6 +248,14 @@ const AIAssistant: React.FC = () => {
 
       try {
         console.log("🤖 [语音对话] 准备调用 generate_ai_response");
+        
+        // 🔥 通知 HUD: AI 思考中
+        try {
+          const { emit } = await import("@tauri-apps/api/event");
+          await emit("ai_thinking", {});
+        } catch (e) {
+          console.warn("发送 ai_thinking 事件失败:", e);
+        }
 
         // 3. 调用 AI 生成回复
         const response = await invoke<{
@@ -222,6 +275,14 @@ const AIAssistant: React.FC = () => {
 
         // 4. 添加 AI 回复到对话历史
         receiveAIResponse(response.content, response.wiki_references);
+        
+        // 🔥 通知 HUD: AI 回答准备好了
+        try {
+          const { emit } = await import("@tauri-apps/api/event");
+          await emit("ai_response_ready", {});
+        } catch (e) {
+          console.warn("发送 ai_response_ready 事件失败:", e);
+        }
 
         // 5. TTS 播报 AI 回复 (清理 Markdown 标记)
         try {
@@ -448,6 +509,16 @@ const AIAssistant: React.FC = () => {
         await invoke("open_hud_window");
         setHudVisible(true);
         antdMessage.success("HUD 浮窗已打开");
+        
+        // 🔧 开发模式下自动打开 DevTools (已注释)
+        // if (import.meta.env.DEV) {
+        //   try {
+        //     await invoke("open_hud_devtools");
+        //     console.log("✅ HUD DevTools 已打开");
+        //   } catch (err) {
+        //     console.warn("打开 HUD DevTools 失败:", err);
+        //   }
+        // }
       } else {
         await invoke("close_hud_window");
         setHudVisible(false);
@@ -459,6 +530,29 @@ const AIAssistant: React.FC = () => {
       setHudVisible(!checked);
     }
   };
+  
+  // 手动打开 HUD DevTools (已注释)
+  // const openHudDevTools = async () => {
+  //   try {
+  //     await invoke("open_hud_devtools");
+  //     antdMessage.success("HUD DevTools 已打开,请查看 HUD 窗口");
+  //   } catch (error) {
+  //     antdMessage.error(`打开 DevTools 失败: ${error}`);
+  //   }
+  // };
+  
+  // 包装 setCurrentGame,同时通知 HUD 窗口
+  const handleGameChange = async (gameId: string | null) => {
+    setCurrentGame(gameId);
+    
+    // 通知 HUD 窗口
+    try {
+      const { emit } = await import("@tauri-apps/api/event");
+      await emit("game-changed", { gameId });
+    } catch (error) {
+      console.error("❌ 发送游戏切换事件失败:", error);
+    }
+  };
 
   return (
     <div className="ai-assistant-page">
@@ -467,7 +561,7 @@ const AIAssistant: React.FC = () => {
         <h3 style={{fontSize: 22}}>AI 陪玩对话</h3>
         <Select
           value={currentGame}
-          onChange={setCurrentGame}
+          onChange={handleGameChange}
           placeholder="选择游戏"
           style={{ width: 200, marginLeft: "auto" }}
           size="middle"
@@ -486,6 +580,17 @@ const AIAssistant: React.FC = () => {
             checkedChildren="显示"
             unCheckedChildren="关闭"
           />
+          {/* 🔧 调试按钮 (已注释)
+          {hudVisible && import.meta.env.DEV && (
+            <Button 
+              size="small" 
+              onClick={openHudDevTools}
+              style={{ marginLeft: 8 }}
+            >
+              🔧 HUD 控制台
+            </Button>
+          )}
+          */}
         </div>
       </div>
       <Tabs

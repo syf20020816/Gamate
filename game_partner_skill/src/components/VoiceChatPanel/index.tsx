@@ -244,7 +244,8 @@ export const VoiceChatPanel: React.FC = () => {
       processingRequests.add(eventId);
       recognizeRequestHandled.add(eventId);
 
-      console.log("🎯 [收到识别请求]",
+      console.log(
+        "🎯 [收到识别请求]",
         `${event.payload.pcm_data.length} 字节, ${event.payload.sample_rate}Hz, ${event.payload.duration_secs.toFixed(1)}s`,
       );
 
@@ -298,18 +299,18 @@ export const VoiceChatPanel: React.FC = () => {
 
     // 阿里云 ASR 文本事件
     const processedAsrEvents = new Set<string>();
-    
+
     listen<string>("aliyun_asr_event", (event) => {
       try {
         const data = JSON.parse(event.payload);
-        
+
         const eventKey = `${data.header?.task_id}_${data.header?.message_id}_${data.header?.name}`;
-        
+
         if (processedAsrEvents.has(eventKey)) {
           return;
         }
         processedAsrEvents.add(eventKey);
-        
+
         if (processedAsrEvents.size > 100) {
           const iter = processedAsrEvents.values();
           const firstKey = iter.next().value;
@@ -317,7 +318,7 @@ export const VoiceChatPanel: React.FC = () => {
             processedAsrEvents.delete(firstKey);
           }
         }
-        
+
         // 只记录关键事件,忽略中间结果
         if (data.header) {
           const msgName = data.header.name;
@@ -455,10 +456,8 @@ export const VoiceChatPanel: React.FC = () => {
               icon={<Mic size={20} />}
               onClick={handleStartListening}
               disabled={!currentGame}
-              variant="filled"
-              color="green"
-              className="start-button"
-              style={{ border: "none" }}
+              type="primary"
+              style={{ border: "none", cursor: currentGame ? "pointer" : "not-allowed" }}
             >
               开始对话
             </Button>

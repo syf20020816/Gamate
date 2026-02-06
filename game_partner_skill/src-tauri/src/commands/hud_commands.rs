@@ -16,6 +16,13 @@ pub async fn open_hud_window(app: AppHandle) -> Result<(), String> {
     if let Some(window) = app.get_webview_window("hud") {
         window.show().map_err(|e| e.to_string())?;
         window.set_focus().map_err(|e| e.to_string())?;
+        
+        // 🔧 自动打开 DevTools 方便调试 (已注释)
+        // #[cfg(debug_assertions)]
+        // {
+        //     window.open_devtools();
+        // }
+        
         return Ok(());
     }
 
@@ -66,6 +73,12 @@ pub async fn open_hud_window(app: AppHandle) -> Result<(), String> {
 
     // 显示窗口
     hud_window.show().map_err(|e| e.to_string())?;
+    
+    // 🔧 自动打开 DevTools 方便调试 (已注释)
+    // #[cfg(debug_assertions)]
+    // {
+    //     hud_window.open_devtools();
+    // }
 
     Ok(())
 }
@@ -124,6 +137,17 @@ pub async fn is_hud_window_visible(app: AppHandle) -> Result<bool, String> {
         window.is_visible().map_err(|e| e.to_string())
     } else {
         Ok(false)
+    }
+}
+
+/// 打开 HUD 窗口的 DevTools
+#[tauri::command]
+pub async fn open_hud_devtools(app: AppHandle) -> Result<(), String> {
+    if let Some(window) = app.get_webview_window("hud") {
+        window.open_devtools();
+        Ok(())
+    } else {
+        Err("HUD 窗口不存在".to_string())
     }
 }
 
