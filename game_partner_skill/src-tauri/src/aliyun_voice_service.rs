@@ -348,34 +348,34 @@ pub async fn aliyun_one_sentence_recognize(
         log::warn!("⚠️ 音频数据较小: {} 字节", pcm_data.len());
     }
     
-    // 保存为WAV文件用于调试 - 使用时间戳避免覆盖
-    let timestamp = chrono::Local::now().format("%Y%m%d_%H%M%S");
+    // // 保存为WAV文件用于调试 - 使用时间戳避免覆盖
+    // let timestamp = chrono::Local::now().format("%Y%m%d_%H%M%S");
     
-    // 音频应该已经被重采样到 16kHz，所以这里使用 16000
-    let actual_sample_rate = 16000u32;
+    // // 音频应该已经被重采样到 16kHz，所以这里使用 16000
+    // let actual_sample_rate = 16000u32;
     
-    // 尝试多个可能的下载目录
-    let possible_paths = vec![
-        std::env::var("USERPROFILE").ok().map(|p| format!("{}\\Downloads\\debug_audio_{}.wav", p, timestamp)),
-        Some(format!("debug_audio_{}.wav", timestamp)), // 当前目录作为后备
-    ];
+    // // 尝试多个可能的下载目录
+    // let possible_paths = vec![
+    //     std::env::var("USERPROFILE").ok().map(|p| format!("{}\\Downloads\\debug_audio_{}.wav", p, timestamp)),
+    //     Some(format!("debug_audio_{}.wav", timestamp)), // 当前目录作为后备
+    // ];
     
-    let mut saved = false;
-    for path_option in possible_paths {
-        if let Some(debug_filename) = path_option {
-            if let Ok(_) = save_pcm_as_wav(&pcm_data, &debug_filename, actual_sample_rate) {
-                log::info!("💾 已保存调试音频: {}", debug_filename);
-                log::info!("📊 音频信息: {} 字节, {}Hz, 16-bit PCM, 单声道", pcm_data.len(), actual_sample_rate);
-                log::info!("⏱️ 音频时长: 约 {:.2} 秒", pcm_data.len() as f32 / (actual_sample_rate as f32 * 2.0));
-                saved = true;
-                break;
-            }
-        }
-    }
+    // let mut saved = false;
+    // for path_option in possible_paths {
+    //     if let Some(debug_filename) = path_option {
+    //         if let Ok(_) = save_pcm_as_wav(&pcm_data, &debug_filename, actual_sample_rate) {
+    //             log::info!("💾 已保存调试音频: {}", debug_filename);
+    //             log::info!("📊 音频信息: {} 字节, {}Hz, 16-bit PCM, 单声道", pcm_data.len(), actual_sample_rate);
+    //             log::info!("⏱️ 音频时长: 约 {:.2} 秒", pcm_data.len() as f32 / (actual_sample_rate as f32 * 2.0));
+    //             saved = true;
+    //             break;
+    //         }
+    //     }
+    // }
     
-    if !saved {
-        log::warn!("⚠️ 无法保存调试音频文件到任何位置");
-    }
+    // if !saved {
+    //     log::warn!("⚠️ 无法保存调试音频文件到任何位置");
+    // }
     
     let region = region.unwrap_or_else(|| "cn-shanghai".to_string());
 

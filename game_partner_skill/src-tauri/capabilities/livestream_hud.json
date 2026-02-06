@@ -1,0 +1,13 @@
+{
+  "identifier": "livestream_hud",
+  "description": "直播间 HUD 窗口权限",
+  "windows": ["livestream_hud"],
+  "permissions": [
+    "core:event:allow-emit",
+    "core:event:allow-listen",
+    "dialog:allow-message",
+    "core:window:allow-close",
+    "core:window:allow-show",
+    "core:window:allow-hide"
+  ]
+}

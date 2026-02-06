@@ -5,7 +5,7 @@ import React, { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { Mic, MicOff, Volume2 } from "lucide-react";
-import { Button, Modal, Progress } from "antd";
+import { Button, Modal, Progress, Switch, message } from "antd";
 import { useAIAssistantStore } from "../../stores/aiAssistantStore";
 import { ConversationArea } from "../ConversationArea";
 import "./index.scss";
@@ -30,6 +30,9 @@ export const VoiceChatPanel: React.FC = () => {
   const [listenerState, setListenerState] = useState<ListenerState | null>(
     null,
   );
+  
+  // HUD 可见性状态
+  const [hudVisible, setHudVisible] = useState(false);
 
   // 使用共享的对话Store
   const { messages, isThinking, currentGame, deleteMessage } =
@@ -43,6 +46,37 @@ export const VoiceChatPanel: React.FC = () => {
 
   // 使用 ref 防止重复注册监听器
   const listenersRegistered = React.useRef(false);
+  
+  // 检查 HUD 窗口可见性
+  useEffect(() => {
+    const checkHudVisibility = async () => {
+      try {
+        const visible = await invoke<boolean>('is_hud_window_visible');
+        setHudVisible(visible);
+      } catch (error) {
+        console.error('检查 HUD 可见性失败:', error);
+      }
+    };
+    checkHudVisibility();
+  }, []);
+  
+  // 切换 HUD 窗口
+  const handleToggleHud = async (checked: boolean) => {
+    try {
+      if (checked) {
+        await invoke("open_hud_window");
+        setHudVisible(true);
+        message.success("HUD 浮窗已打开");
+      } else {
+        await invoke("close_hud_window");
+        setHudVisible(false);
+        message.info("HUD 浮窗已关闭");
+      }
+    } catch (error) {
+      message.error(`HUD 操作失败: ${error}`);
+      setHudVisible(!checked);
+    }
+  };
 
   // 加载监听器状态
   const loadState = async () => {
@@ -396,13 +430,24 @@ export const VoiceChatPanel: React.FC = () => {
             {" "}
             <Mic size={20} /> 语音对话
           </h3>
-          {!isTesting ? (
-            <Button onClick={handleStartTest}>测试麦克风</Button>
-          ) : (
-            <Button danger onClick={handleStopTest}>
-              停止测试
-            </Button>
-          )}
+          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ fontSize: 14 }}>HUD 浮窗:</span>
+              <Switch
+                checked={hudVisible}
+                onChange={handleToggleHud}
+                checkedChildren="显示"
+                unCheckedChildren="关闭"
+              />
+            </div>
+            {!isTesting ? (
+              <Button onClick={handleStartTest}>测试麦克风</Button>
+            ) : (
+              <Button danger onClick={handleStopTest}>
+                停止测试
+              </Button>
+            )}
+          </div>
         </div>
         {/* 麦克风测试进度 */}
         {isTesting && (

@@ -151,6 +151,96 @@ pub async fn open_hud_devtools(app: AppHandle) -> Result<(), String> {
     }
 }
 
+/// 打开直播间 HUD 浮窗
+/// 
+/// 用于模拟场景系统的直播间 HUD
+#[tauri::command]
+pub async fn open_livestream_hud_window(app: AppHandle) -> Result<(), String> {
+    // 检查窗口是否已存在
+    if let Some(window) = app.get_webview_window("livestream_hud") {
+        window.show().map_err(|e| e.to_string())?;
+        window.set_focus().map_err(|e| e.to_string())?;
+        return Ok(());
+    }
+
+    // 读取保存的位置
+    let settings = AppSettings::load().map_err(|e| e.to_string())?;
+    let (pos_x, pos_y) = if let Some(pos) = settings.general.livestream_hud_position {
+        (pos.x, pos.y)
+    } else {
+        (400.0, 100.0)  // 默认位置
+    };
+
+    // 创建新的直播间 HUD 窗口
+    let hud_window = WebviewWindowBuilder::new(
+        &app,
+        "livestream_hud",
+        WebviewUrl::App("/livestream-hud".into())
+    )
+    .title("直播间 HUD")
+    .position(pos_x, pos_y)          // 使用保存的位置
+    .inner_size(400.0, 600.0)        // 更大的窗口
+    .min_inner_size(400.0, 600.0)    // 最小尺寸
+    .resizable(false)                 
+    .decorations(false)              
+    .transparent(true)             
+    .always_on_top(true)          
+    .skip_taskbar(false)            
+    .focused(true)                  
+    .build()
+    .map_err(|e| format!("创建直播间 HUD 窗口失败: {}", e))?;
+
+    // 监听窗口移动事件,自动保存位置
+    let app_clone = app.clone();
+    hud_window.on_window_event(move |event| {
+        if let tauri::WindowEvent::Moved(position) = event {
+            let x = position.x as f64;
+            let y = position.y as f64;
+            let app_for_save = app_clone.clone();
+            
+            tauri::async_runtime::spawn(async move {
+                if let Err(e) = save_livestream_hud_position(app_for_save, x, y).await {
+                    log::error!("保存直播间 HUD 位置失败: {}", e);
+                }
+            });
+        }
+    });
+
+    hud_window.show().map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
+/// 关闭直播间 HUD 浮窗
+#[tauri::command]
+pub async fn close_livestream_hud_window(app: AppHandle) -> Result<(), String> {
+    if let Some(window) = app.get_webview_window("livestream_hud") {
+        window.close().map_err(|e| e.to_string())?;
+    } else {
+        println!("⚠️ 直播间 HUD 窗口不存在");
+    }
+    Ok(())
+}
+
+/// 保存直播间 HUD 窗口位置到配置文件
+async fn save_livestream_hud_position(app: AppHandle, x: f64, y: f64) -> Result<(), String> {
+    use crate::settings::HudPosition;
+    let mut settings = AppSettings::load().map_err(|e| e.to_string())?;
+    settings.general.livestream_hud_position = Some(HudPosition { x, y });
+    settings.save().map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+/// 检查直播间 HUD 窗口是否可见
+#[tauri::command]
+pub async fn is_livestream_hud_window_visible(app: AppHandle) -> Result<bool, String> {
+    if let Some(window) = app.get_webview_window("livestream_hud") {
+        window.is_visible().map_err(|e| e.to_string())
+    } else {
+        Ok(false)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

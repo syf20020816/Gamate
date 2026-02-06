@@ -8,7 +8,6 @@ import {
   Tag,
   Select,
   Tabs,
-  Switch,
 } from "antd";
 import { SendOutlined, ClearOutlined } from "@ant-design/icons";
 import {
@@ -22,6 +21,7 @@ import { useAIAssistantStore } from "../../stores/aiAssistantStore";
 import { getGameById } from "../../services/configService";
 import { VoiceChatPanel } from "../VoiceChatPanel";
 import { ConversationArea } from "../ConversationArea";
+import { SimulationPanel } from "../SimulationPanel";
 import "./index.css";
 
 const { TextArea } = Input;
@@ -72,7 +72,6 @@ const AIAssistant: React.FC = () => {
 
   const [inputValue, setInputValue] = useState("");
   const [useScreenshot, setUseScreenshot] = useState(true);
-  const [hudVisible, setHudVisible] = useState(false); // HUD 可见性状态
   const voiceListenerRegistered = useRef(false); // 防止重复注册语音识别监听器
 
   // 🔍 调试: 监听 currentGame 变化
@@ -489,58 +488,6 @@ const AIAssistant: React.FC = () => {
 
   const [tabKey, setTabKey] = useState("audio");
 
-  // 检查 HUD 窗口可见性
-  useEffect(() => {
-    const checkHudVisibility = async () => {
-      try {
-        const visible = await invoke<boolean>('is_hud_window_visible');
-        setHudVisible(visible);
-      } catch (error) {
-        console.error('检查 HUD 可见性失败:', error);
-      }
-    };
-    checkHudVisibility();
-  }, []);
-
-  // 切换 HUD 窗口
-  const handleToggleHud = async (checked: boolean) => {
-    try {
-      if (checked) {
-        await invoke("open_hud_window");
-        setHudVisible(true);
-        antdMessage.success("HUD 浮窗已打开");
-        
-        // 🔧 开发模式下自动打开 DevTools (已注释)
-        // if (import.meta.env.DEV) {
-        //   try {
-        //     await invoke("open_hud_devtools");
-        //     console.log("✅ HUD DevTools 已打开");
-        //   } catch (err) {
-        //     console.warn("打开 HUD DevTools 失败:", err);
-        //   }
-        // }
-      } else {
-        await invoke("close_hud_window");
-        setHudVisible(false);
-        antdMessage.info("HUD 浮窗已关闭");
-      }
-    } catch (error) {
-      antdMessage.error(`HUD 操作失败: ${error}`);
-      // 恢复状态
-      setHudVisible(!checked);
-    }
-  };
-  
-  // 手动打开 HUD DevTools (已注释)
-  // const openHudDevTools = async () => {
-  //   try {
-  //     await invoke("open_hud_devtools");
-  //     antdMessage.success("HUD DevTools 已打开,请查看 HUD 窗口");
-  //   } catch (error) {
-  //     antdMessage.error(`打开 DevTools 失败: ${error}`);
-  //   }
-  // };
-  
   // 包装 setCurrentGame,同时通知 HUD 窗口
   const handleGameChange = async (gameId: string | null) => {
     setCurrentGame(gameId);
@@ -572,26 +519,6 @@ const AIAssistant: React.FC = () => {
             </Select.Option>
           ))}
         </Select>
-        <div style={{ marginLeft: 16, display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ fontSize: 14 }}>HUD 浮窗:</span>
-          <Switch
-            checked={hudVisible}
-            onChange={handleToggleHud}
-            checkedChildren="显示"
-            unCheckedChildren="关闭"
-          />
-          {/* 🔧 调试按钮 (已注释)
-          {hudVisible && import.meta.env.DEV && (
-            <Button 
-              size="small" 
-              onClick={openHudDevTools}
-              style={{ marginLeft: 8 }}
-            >
-              🔧 HUD 控制台
-            </Button>
-          )}
-          */}
-        </div>
       </div>
       <Tabs
         activeKey={tabKey}
@@ -724,6 +651,12 @@ const AIAssistant: React.FC = () => {
                 </div>
               </div>
             </Card>
+          </div>
+        </Tabs.TabPane>
+        <Tabs.TabPane tab="模拟场景" key="simulation">
+          {/* 模拟场景面板 */}
+          <div style={{ height: "calc(100% - 40px)", overflow: "auto" }}>
+            <SimulationPanel />
           </div>
         </Tabs.TabPane>
       </Tabs>

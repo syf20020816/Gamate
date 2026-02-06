@@ -52,9 +52,12 @@ pub struct GeneralSettings {
     /// HUD 浮窗模式 (默认开启)
     #[serde(default = "default_hud_mode")]
     pub hud_mode: bool,
-    /// HUD 窗口位置
+    /// HUD 窗口位置 (语音对话 HUD)
     #[serde(default)]
     pub hud_position: Option<HudPosition>,
+    /// 直播间 HUD 窗口位置
+    #[serde(default)]
+    pub livestream_hud_position: Option<HudPosition>,
 }
 
 /// HUD 窗口位置

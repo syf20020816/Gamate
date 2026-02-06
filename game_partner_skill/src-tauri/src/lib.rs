@@ -139,6 +139,10 @@ pub fn run() {
             toggle_hud_window,
             is_hud_window_visible,
             open_hud_devtools,
+            // 直播间 HUD 命令
+            open_livestream_hud_window,
+            close_livestream_hud_window,
+            is_livestream_hud_window_visible,
             // 技能库管理命令
             scan_downloaded_libraries,
             sync_libraries_to_config,

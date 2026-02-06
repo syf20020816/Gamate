@@ -1,0 +1,18 @@
+.simulation-panel {
+  padding: 0px;
+  max-width: 800px;
+  margin: 0 auto;
+  
+  .ant-card {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  }
+  
+  .ant-card-head-title {
+    font-weight: 600;
+  }
+  
+  // 表单项对齐
+  .ant-space-item {
+    width: 100%;
+  }
+}

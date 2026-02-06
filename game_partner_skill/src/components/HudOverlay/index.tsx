@@ -8,6 +8,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { getGameById } from "../../services/configService";
 import { useAIAssistantStore } from "../../stores/aiAssistantStore";
 import "./HudOverlay.scss";
+import { Mic, MicOff } from "lucide-react";
 
 interface HudState {
   isListening: boolean;      // 是否正在监听
@@ -290,7 +291,7 @@ export const HudOverlay: React.FC = () => {
         <div className="hud-controls" style={{ marginTop: 8 }}>
           <Button
             type={state.isListening ? "default" : "primary"}
-            icon={state.isListening ? <PauseCircleOutlined /> : <PlayCircleOutlined />}
+            icon={state.isListening ? <MicOff size={18}></MicOff> : <Mic size={18}></Mic>}
             onClick={handleToggleConversation}
             block
             danger={state.isListening}

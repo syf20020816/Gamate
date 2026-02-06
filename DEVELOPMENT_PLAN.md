@@ -656,6 +656,25 @@
   - config.toml 新增 hud_mode = true
   - GeneralSettings 结构体新增字段
   - 默认值: true (默认开启)
+
+✅ HUD 跨窗口数据同步 (Day 22 核心难点)
+  - 问题: HUD 是独立 Tauri 窗口,有独立 JS 运行时
+  - 问题: zustand store 无法跨窗口共享
+  - 问题: Tauri 2.0 权限系统默认禁止事件 API
+  - 解决: 创建 capabilities/hud.json 权限配置
+  - 解决: 使用 Tauri 事件系统 (emit + listen)
+  - 解决: 游戏选择双向同步 (HUD ↔ 主窗口)
+  - 解决: 状态事件完整流程:
+    * speech_started → "正在聆听..." (蓝色)
+    * speech_ended → "识别中..." (橙色)
+    * screenshot_started → "正在截图..." (青色)
+    * ai_thinking → "AI 思考中..." (紫色)
+    * ai_response_ready → "正在回答..." (绿色)
+  - 文档: HUD_PERMISSION_FIX.md
+  - 文档: HUD_STATUS_FIX.md
+  - 文档: HUD_CROSS_WINDOW_SYNC.md
+  - 文档: HUD_FINAL_SUMMARY.md
+  - 文档: HUD_CLEANUP_SUMMARY.md
 ```
 
 #### 任务清单
@@ -672,20 +691,48 @@
 ✅ 状态同步逻辑
   - 监听语音事件 (speech_started / speech_ended)
   - 监听 AI 事件 (ai_thinking / ai_response_ready)
-  - 监听截图事件 (aliyun_recognize_request)
+  - 监听截图事件 (screenshot_started)
 ✅ 配置集成
   - settings.rs 添加 hud_mode 字段
   - config.toml 添加配置项
   - 前端设置界面添加开关
+✅ 跨窗口数据同步 (核心难点)
+  - Tauri 2.0 权限配置 (capabilities/hud.json)
+  - 事件系统双向通信 (emit + listen)
+  - 游戏选择同步 (game-changed 事件)
+  - 状态事件完整流程 (6个事件)
+  - 代码清理 (移除测试日志)
 
-# Day 23
-□ 弹幕 UI 组件
+# Day 23 ✅ (已完成)
+✅ 模拟场景系统 - 直播间场景
+  - 新建组件: SimulationPanel ✅
+  - 类型定义: src/types/simulation.ts ✅
+  - 状态管理: src/stores/simulationStore.ts ✅
+  - 场景选择: Select 组件 (当前仅直播间) ✅
+  - 直播间配置: ✅
+    * 在线人数: InputNumber (范围 1-10000)
+    * 直播间名称: Input
+    * 直播间描述: TextArea
+    * 弹幕频率: Radio (高/中/低)
+    * 礼物频率: Radio (高/中/低)
+    * 是否可上麦: Switch
+  - AI 员工配置: Card List ✅
+    * AI 性格: Select (复用5个角色)
+    * 互动频率: Radio (高/中/低)
+    * AI 昵称: Input
+    * 支持添加/删除员工 (最多5个)
+  - 集成到 AIAssistant 页面 (新 Tab) ✅
+  - 启动/停止模拟场景控制 ✅
+  - 设计文档: SIMULATION_SCENE_DESIGN.md ✅
+
+# Day 24
+□ 弹幕 UI 组件 (复用到直播间)
   - 使用 framer-motion 实现滚动动画
   - 样式: 半透明、彩色文字
 □ 弹幕生成逻辑
-  - 触发条件: 死亡、胜利、新区域
-  - 内容: AI 生成鼓励/吐槽
-  - 示例: "加油!这个 Boss 很简单!"
+  - 触发条件: AI 员工按频率发送
+  - 内容: AI 生成鼓励/吐槽/提问
+  - 示例: "主播加油!", "这波操作6666"
 □ 弹幕配置
   - 开关、速度、密度
 
