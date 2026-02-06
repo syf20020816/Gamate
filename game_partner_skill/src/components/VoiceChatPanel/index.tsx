@@ -178,35 +178,25 @@ export const VoiceChatPanel: React.FC = () => {
       return;
     }
 
-    console.log("🔧 [初始化] 注册事件监听器...");
+    console.log("🔧 [初始化] 注册语音事件监听器");
     listenersRegistered.current = true;
 
     const unlistenList: (() => void)[] = [];
 
-    // 语音转文字事件 - 不再需要,因为会触发自定义事件
+    // 语音转文字事件
     listen<string>("voice_transcribed", (event) => {
       console.log("📝 [语音转文字]", event.payload);
-      // 已移除 setTranscriptions,由 AIAssistant 统一处理
-    }).then((unlisten) => {
-      console.log("✅ [已注册] voice_transcribed 监听器");
-      unlistenList.push(unlisten);
-    });
+    }).then((unlisten) => unlistenList.push(unlisten));
 
     // 开始说话事件
     listen("speech_started", () => {
       console.log("🎤 [开始说话]");
-    }).then((unlisten) => {
-      console.log("✅ [已注册] speech_started 监听器");
-      unlistenList.push(unlisten);
-    });
+    }).then((unlisten) => unlistenList.push(unlisten));
 
     // 停止说话事件
     listen<number>("speech_ended", (event) => {
       console.log("🔇 [停止说话] 时长:", event.payload.toFixed(2), "秒");
-    }).then((unlisten) => {
-      console.log("✅ [已注册] speech_ended 监听器");
-      unlistenList.push(unlisten);
-    });
+    }).then((unlisten) => unlistenList.push(unlisten));
 
     // 错误事件
     listen<string>("voice_error", (event) => {
@@ -228,31 +218,33 @@ export const VoiceChatPanel: React.FC = () => {
     // 麦克风测试结束事件 (10秒自动结束)
     listen("microphone_test_finished", () => {
       setIsTesting(false);
-    }).then((unlisten) => {
-      console.log("✅ [已注册] microphone_test_finished 监听器");
-      unlistenList.push(unlisten);
-    });
+    }).then((unlisten) => unlistenList.push(unlisten));
 
-    // 阿里云识别请求事件 (后端触发) - 使用 once 防止重复处理
+    // 阿里云识别请求事件 (后端触发)
     const recognizeRequestHandled = new Set<string>();
+    const processingRequests = new Set<string>();
 
     listen<{
       pcm_data: number[];
       sample_rate: number;
       duration_secs: number;
     }>("aliyun_recognize_request", async (event) => {
-      // 生成唯一ID防止重复处理
       const eventId = `${event.payload.pcm_data.length}_${event.payload.sample_rate}_${event.payload.duration_secs}`;
 
-      if (recognizeRequestHandled.has(eventId)) {
-        console.log("⚠️ [跳过重复] 识别请求已处理:", eventId);
-        return;
+      // 检查是否正在处理或已处理
+      if (processingRequests.has(eventId)) {
+        return; // 跳过重复请求
       }
+
+      if (recognizeRequestHandled.has(eventId)) {
+        return; // 跳过已处理
+      }
+
+      // 标记为正在处理
+      processingRequests.add(eventId);
       recognizeRequestHandled.add(eventId);
 
-      console.log("🎯🎯🎯 [收到阿里云识别请求!!!]");
-      console.log(
-        "🎯 [收到阿里云识别请求]",
+      console.log("🎯 [收到识别请求]",
         `${event.payload.pcm_data.length} 字节, ${event.payload.sample_rate}Hz, ${event.payload.duration_secs.toFixed(1)}s`,
       );
 
@@ -265,12 +257,10 @@ export const VoiceChatPanel: React.FC = () => {
 
         if (!aliyunAccessKey || !aliyunAccessSecret || !aliyunAppKey) {
           console.error("❌ 阿里云配置不完整");
-          alert("请先在设置中配置阿里云 Access Key 和 AppKey");
-          recognizeRequestHandled.delete(eventId); // 失败时清除标记
+          processingRequests.delete(eventId);
+          recognizeRequestHandled.delete(eventId);
           return;
         }
-
-        console.log("🚀 [开始调用阿里云识别]");
 
         // 调用阿里云一句话识别
         const result = await invoke<string>("aliyun_one_sentence_recognize", {
@@ -284,10 +274,9 @@ export const VoiceChatPanel: React.FC = () => {
 
         console.log("✅ [识别结果]", result);
 
-        // 不再添加到本地列表,由自定义事件触发 AIAssistant 统一处理
+        // 触发自定义事件,传递给 AIAssistant 处理
         if (result && result.trim()) {
-          // 🎯 触发自定义事件: 语音识别完成 (传递识别文字)
-          console.log("📢 [触发事件] voice_recognition_completed:", result);
+          console.log("📢 [触发语音识别完成事件]");
           window.dispatchEvent(
             new CustomEvent("voice_recognition_completed", {
               detail: { text: result },
@@ -295,69 +284,61 @@ export const VoiceChatPanel: React.FC = () => {
           );
         }
 
-        // 成功后清除标记(允许下次相同长度的音频)
+        // 处理完成后移除正在处理标记
+        processingRequests.delete(eventId);
+
+        // 5秒后清除已处理标记(允许下次相同长度的音频)
         setTimeout(() => recognizeRequestHandled.delete(eventId), 5000);
       } catch (error) {
-        console.error("❌ [阿里云识别失败]", error);
-        alert(`语音识别失败: ${error}`);
-        recognizeRequestHandled.delete(eventId); // 失败时清除标记
+        console.error(" ❌ [阿里云识别失败]", error);
+        processingRequests.delete(eventId);
+        recognizeRequestHandled.delete(eventId);
       }
-    }).then((unlisten) => {
-      console.log("✅✅✅ [已注册] aliyun_recognize_request 监听器 !!!");
-      unlistenList.push(unlisten);
-    });
+    }).then((unlisten) => unlistenList.push(unlisten));
 
     // 阿里云 ASR 文本事件
+    const processedAsrEvents = new Set<string>();
+    
     listen<string>("aliyun_asr_event", (event) => {
-      console.log("🌐 [阿里云 ASR 原始事件]", event.payload);
       try {
         const data = JSON.parse(event.payload);
-        // 处理不同类型的 ASR 事件
+        
+        const eventKey = `${data.header?.task_id}_${data.header?.message_id}_${data.header?.name}`;
+        
+        if (processedAsrEvents.has(eventKey)) {
+          return;
+        }
+        processedAsrEvents.add(eventKey);
+        
+        if (processedAsrEvents.size > 100) {
+          const iter = processedAsrEvents.values();
+          const firstKey = iter.next().value;
+          if (firstKey) {
+            processedAsrEvents.delete(firstKey);
+          }
+        }
+        
+        // 只记录关键事件,忽略中间结果
         if (data.header) {
           const msgName = data.header.name;
-          console.log("📡 [ASR 事件类型]", msgName);
 
-          if (msgName === "TranscriptionStarted") {
-            // 会话开始
-            console.log("🚀 [会话开始]", data.payload);
-          } else if (msgName === "TranscriptionResultChanged") {
-            // 中间识别结果
+          if (msgName === "RecognitionCompleted") {
+            // 一句话识别完成 - 最终结果
             const text = data.payload?.result;
             if (text) {
-              console.log("📝 [中间结果]", text);
+              console.log("✅ [识别完成]", text);
             }
-          } else if (msgName === "RecognitionResultChanged") {
-            // 一句话识别的中间结果
-            const text = data.payload?.result;
-            if (text) {
-              console.log("📝 [一句话识别中间结果]", text);
-            }
-          } else if (msgName === "RecognitionCompleted") {
-            // 一句话识别完成 - 不要在这里添加结果，因为已经在 aliyun_recognize_request 中添加了
-            const text = data.payload?.result;
-            if (text) {
-              console.log(
-                "✅ [一句话识别完成]",
-                text,
-                "（不添加到列表，避免重复）",
-              );
-            }
+          } else if (msgName === "TaskFailed") {
+            // 任务失败
+            console.error("❌ [识别失败]", data.header.status_text);
           } else if (msgName === "SentenceEnd") {
-            // 句子结束(最终识别结果) - 仅用于流式识别
+            // 流式识别最终结果
             const text = data.payload?.result;
             if (text) {
-              console.log("✅ [流式识别最终结果]", text);
-              // 注意: 一句话识别不会触发这个事件，只在流式识别时才会添加
-              // setTranscriptions((prev) => [...prev, text]);
+              console.log("✅ [流式识别完成]", text);
             }
-          } else if (msgName === "SentenceBegin") {
-            console.log("🎤 [句子开始]", data.payload);
-          } else if (msgName === "TranscriptionCompleted") {
-            console.log("🏁 [会话完成]");
-          } else {
-            // 其他事件(如错误)
-            console.log(`📡 [${msgName}]`, data);
           }
+          // 其他中间事件（RecognitionResultChanged等）不再记录日志
         }
       } catch (error) {
         console.error("解析阿里云 ASR 事件失败:", error);

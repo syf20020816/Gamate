@@ -10,14 +10,13 @@ import {
   Switch,
   message,
 } from "antd";
-import { Database, Zap, MessageCircle, PlayCircle, Camera, Mic } from "lucide-react";
+import { Database, Zap, MessageCircle, Camera, Mic } from "lucide-react";
 import { motion } from "framer-motion";
 import { invoke } from "@tauri-apps/api/core";
-import { useUserStore } from "../../stores/userStore";
-import { getGameById } from "../../data/games";
+import { getGameById } from "../../services/configService";
 import { useSkillLibraryStore } from "../../stores/skillLibraryStore";
 import { useAIAssistantStore } from "../../stores/aiAssistantStore";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import "./styles.scss";
 
 const { Sider } = Layout;
@@ -28,15 +27,41 @@ interface RightPanelProps {
 }
 
 const RightPanel: React.FC<RightPanelProps> = ({ onMenuChange }) => {
-  const { user } = useUserStore();
   const { downloadedLibraries } = useSkillLibraryStore();
   const { setCurrentGame, sendMessage } = useAIAssistantStore();
-  const selectedGames =
-    user?.config.selectedGames.map((id) => getGameById(id)).filter(Boolean) ||
-    [];
-
+  
+  const [selectedGames, setSelectedGames] = useState<any[]>([]);
+  const [availableGames, setAvailableGames] = useState<any[]>([]);
   const [aiSelectedGame, setAiSelectedGame] = useState<string>("");
   const [useScreenshot, setUseScreenshot] = useState(true); // 截图开关
+
+  // ✅ 从后端加载用户选择的游戏
+  useEffect(() => {
+    const loadSelectedGames = async () => {
+      try {
+        const settings = await invoke<any>('get_app_settings');
+        const selectedGameIds = settings.user?.selected_games || [];
+        
+        const games = await Promise.all(
+          selectedGameIds.map((id: string) => getGameById(id))
+        );
+        const validGames = games.filter(Boolean);
+        setSelectedGames(validGames);
+      } catch (error) {
+        console.error('加载游戏配置失败:', error);
+      }
+    };
+    loadSelectedGames();
+  }, []);
+
+  // ✅ 过滤出有技能库的游戏
+  useEffect(() => {
+    const gamesWithSkills = [...new Set(downloadedLibraries.map((lib) => lib.gameId))];
+    const available = selectedGames.filter((game) =>
+      gamesWithSkills.includes(game.id)
+    );
+    setAvailableGames(available);
+  }, [selectedGames, downloadedLibraries]);
 
   // 系统统计数据
   const systemStats = {
@@ -45,14 +70,6 @@ const RightPanel: React.FC<RightPanelProps> = ({ onMenuChange }) => {
     recognitionRate: 89,
     uptime: "0h 0m",
   };
-
-  // 获取已下载技能库的游戏列表
-  const gamesWithSkills = [
-    ...new Set(downloadedLibraries.map((lib) => lib.gameId)),
-  ];
-  const availableGames = selectedGames.filter((game) =>
-    gamesWithSkills.includes(game!.id),
-  );
 
   // AI 模型名称(可以从配置中读取)
   const aiModelName = "Qwen 2.5 VL 7B";

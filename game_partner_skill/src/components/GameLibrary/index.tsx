@@ -31,7 +31,10 @@ import { useSkillLibraryStore } from "../../stores/skillLibraryStore";
 import { GameType, GameTypeLabels, SkillStatus } from "../../types/game";
 import type { Game, GameSkillConfig } from "../../types/game";
 import type { DownloadedSkillLibrary } from "../../types/skillLibrary";
-import { getGames, getSkillConfigsByGameId } from "../../services/configService";
+import {
+  getGames,
+  getSkillConfigsByGameId,
+} from "../../services/configService";
 import "./styles.scss";
 
 const { Title, Text, Paragraph } = Typography;
@@ -56,11 +59,11 @@ const GameLibrary: React.FC = () => {
     const loadSelectedGames = async () => {
       try {
         const { invoke } = await import("@tauri-apps/api/core");
-        const settings = await invoke<any>('get_app_settings');
+        const settings = await invoke<any>("get_app_settings");
         const selected = settings?.user?.selected_games || [];
         setSelectedGameIds(selected);
       } catch (error) {
-        console.error('加载选中游戏失败:', error);
+        console.error("加载选中游戏失败:", error);
       }
     };
     loadSelectedGames();
@@ -74,8 +77,8 @@ const GameLibrary: React.FC = () => {
         const loadedGames = await getGames();
         setGames(loadedGames);
       } catch (error) {
-        console.error('加载游戏列表失败:', error);
-        message.error('加载游戏列表失败');
+        console.error("加载游戏列表失败:", error);
+        message.error("加载游戏列表失败");
       } finally {
         setLoading(false);
       }
@@ -94,8 +97,8 @@ const GameLibrary: React.FC = () => {
         const configs = await getSkillConfigsByGameId(selectedGame.id);
         setSkillConfigs(configs);
       } catch (error) {
-        console.error('加载技能配置失败:', error);
-        message.error('加载技能配置失败');
+        console.error("加载技能配置失败:", error);
+        message.error("加载技能配置失败");
       }
     };
     loadSkillConfigs();
@@ -105,25 +108,25 @@ const GameLibrary: React.FC = () => {
   const handleSyncLibraries = async () => {
     try {
       setSyncing(true);
-      message.loading({ content: '正在检测已下载的技能库...', key: 'sync' });
-      
+      message.loading({ content: "正在检测已下载的技能库...", key: "sync" });
+
       const { invoke } = await import("@tauri-apps/api/core");
-      const updatedGameIds = await invoke<string[]>('sync_libraries_to_config');
-      
+      const updatedGameIds = await invoke<string[]>("sync_libraries_to_config");
+
       setSelectedGameIds(updatedGameIds);
-      
+
       if (updatedGameIds.length > selectedGameIds.length) {
         const newCount = updatedGameIds.length - selectedGameIds.length;
-        message.success({ 
-          content: `检测完成！发现 ${newCount} 个新游戏已添加到配置`, 
-          key: 'sync' 
+        message.success({
+          content: `检测完成！发现 ${newCount} 个新游戏已添加到配置`,
+          key: "sync",
         });
       } else {
-        message.success({ content: '检测完成，配置已是最新', key: 'sync' });
+        message.success({ content: "检测完成，配置已是最新", key: "sync" });
       }
     } catch (error) {
-      console.error('同步失败:', error);
-      message.error({ content: `同步失败: ${error}`, key: 'sync' });
+      console.error("同步失败:", error);
+      message.error({ content: `同步失败: ${error}`, key: "sync" });
     } finally {
       setSyncing(false);
     }
@@ -211,16 +214,16 @@ const GameLibrary: React.FC = () => {
       };
 
       addDownloadedLibrary(library);
-      
+
       // 保存到后端配置
       const { invoke: invoke2 } = await import("@tauri-apps/api/core");
-      const settings = await invoke2<any>('get_app_settings');
+      const settings = await invoke2<any>("get_app_settings");
       if (!settings.user.selected_games.includes(selectedGame.id)) {
         settings.user.selected_games.push(selectedGame.id);
-        await invoke2('save_app_settings', { settings });
+        await invoke2("save_app_settings", { settings });
         setSelectedGameIds([...selectedGameIds, selectedGame.id]);
       }
-      
+
       addSelectedGame(selectedGame.id); // 同步到 userStore (向后兼容)
 
       message.success(
@@ -251,17 +254,17 @@ const GameLibrary: React.FC = () => {
       onOk: async () => {
         try {
           const { invoke } = await import("@tauri-apps/api/core");
-          const settings = await invoke<any>('get_app_settings');
+          const settings = await invoke<any>("get_app_settings");
           settings.user.selected_games = settings.user.selected_games.filter(
-            (id: string) => id !== gameId
+            (id: string) => id !== gameId,
           );
-          await invoke('save_app_settings', { settings });
+          await invoke("save_app_settings", { settings });
           setSelectedGameIds(settings.user.selected_games);
           removeSelectedGame(gameId); // 同步到 userStore
           message.success("已移除游戏");
         } catch (error) {
-          console.error('移除游戏失败:', error);
-          message.error('移除游戏失败');
+          console.error("移除游戏失败:", error);
+          message.error("移除游戏失败");
         }
       },
     });
@@ -311,22 +314,13 @@ const GameLibrary: React.FC = () => {
         transition={{ duration: 0.3 }}
       >
         <div className="library-header">
-          <div>
+          <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
             <Title level={3}>游戏库</Title>
-            <Paragraph type="secondary">
+            <Paragraph type="secondary" style={{margin: 0}}>
               选择你要玩的游戏，系统将自动下载对应的Wiki技能库
             </Paragraph>
           </div>
           <Space>
-            <Tooltip title="检测已下载的技能库并同步到配置">
-              <Button 
-                icon={<RefreshCw size={18} />}
-                onClick={handleSyncLibraries}
-                loading={syncing}
-              >
-                检测同步
-              </Button>
-            </Tooltip>
             <Badge count={selectedGameIds.length} showZero>
               <Button type="primary" icon={<CheckCircle size={18} />}>
                 我的游戏
@@ -336,30 +330,50 @@ const GameLibrary: React.FC = () => {
         </div>
 
         {/* 搜索和过滤 */}
-        <Card className="filter-card">
-          <Space size="middle" style={{ width: "100%" }}>
-            <Input
-              placeholder="搜索游戏名称..."
-              prefix={<Search size={16} />}
-              value={searchText}
-              onChange={(e) => setSearchText(e.target.value)}
-              style={{ width: 300 }}
-              allowClear
-            />
-            <Select
-              value={filterType}
-              onChange={setFilterType}
-              style={{ width: 150 }}
-              suffixIcon={<Filter size={16} />}
+        <Card
+          styles={{
+            root: {
+              margin: "16px 0",
+            },
+            body: {
+              display: "flex",
+              gap: "16px",
+              alignItems: "center",
+              justifyContent: "space-between",
+            }
+          }}
+        >
+          <Input
+            placeholder="搜索游戏名称..."
+            prefix={<Search size={16} />}
+            value={searchText}
+            onChange={(e) => setSearchText(e.target.value)}
+            style={{ width: 300 }}
+            allowClear
+          />
+          <Select
+            value={filterType}
+            onChange={setFilterType}
+            style={{ width: 150 }}
+            suffixIcon={<Filter size={16} />}
+          >
+            <Select.Option value="all">全部类型</Select.Option>
+            {Object.entries(GameTypeLabels).map(([key, label]) => (
+              <Select.Option key={key} value={key}>
+                {label}
+              </Select.Option>
+            ))}
+          </Select>
+          <Tooltip title="检测已下载的技能库并同步到配置">
+            <Button
+              style={{ flex: 1 }}
+              icon={<RefreshCw size={18} />}
+              onClick={handleSyncLibraries}
+              loading={syncing}
             >
-              <Select.Option value="all">全部类型</Select.Option>
-              {Object.entries(GameTypeLabels).map(([key, label]) => (
-                <Select.Option key={key} value={key}>
-                  {label}
-                </Select.Option>
-              ))}
-            </Select>
-          </Space>
+              检测同步
+            </Button>
+          </Tooltip>
         </Card>
 
         {/* 游戏卡片列表 */}
@@ -380,86 +394,86 @@ const GameLibrary: React.FC = () => {
                     transition={{ delay: index * 0.05 }}
                   >
                     <Card
-                    hoverable
-                    className={`game-card ${isAdded ? "game-card-added" : ""}`}
-                    cover={
-                      <div className="game-banner">
-                        <div className="game-banner-placeholder">
-                          <img
-                            src={game.banner}
-                            alt={game.icon || game.name[0]}
-                          />
-                        </div>
-                        {isAdded && (
-                          <div className="added-overlay">
-                            <CheckCircle size={48} />
+                      hoverable
+                      className={`game-card ${isAdded ? "game-card-added" : ""}`}
+                      cover={
+                        <div className="game-banner">
+                          <div className="game-banner-placeholder">
+                            <img
+                              src={game.banner}
+                              alt={game.icon || game.name[0]}
+                            />
                           </div>
+                          {isAdded && (
+                            <div className="added-overlay">
+                              <CheckCircle size={48} />
+                            </div>
+                          )}
+                        </div>
+                      }
+                    >
+                      <Card.Meta
+                        title={
+                          <Space
+                            style={{
+                              width: "100%",
+                              justifyContent: "space-between",
+                            }}
+                          >
+                            <span>{game.name}</span>
+                            <Tag color="blue">
+                              {GameTypeLabels[game.category]}
+                            </Tag>
+                          </Space>
+                        }
+                        description={
+                          <div className="game-description">
+                            <Paragraph
+                              ellipsis={{ rows: 2 }}
+                              type="secondary"
+                              style={{ marginBottom: 8 }}
+                            >
+                              {game.description}
+                            </Paragraph>
+                            <Space size={4} wrap>
+                              {game.tags.slice(0, 3).map((tag) => (
+                                <Tag key={tag} style={{ margin: 0 }}>
+                                  {tag}
+                                </Tag>
+                              ))}
+                            </Space>
+                          </div>
+                        }
+                      />
+
+                      <div className="game-footer">
+                        <Space size="small">
+                          <Text type="secondary" style={{ fontSize: 12 }}>
+                            技能库可用
+                          </Text>
+                        </Space>
+                        {!isAdded ? (
+                          <Button
+                            type="primary"
+                            icon={<Plus size={16} />}
+                            onClick={() => handleAddGame(game)}
+                          >
+                            添加
+                          </Button>
+                        ) : (
+                          <Button
+                            danger
+                            onClick={() => handleRemoveGame(game.id)}
+                          >
+                            移除
+                          </Button>
                         )}
                       </div>
-                    }
-                  >
-                    <Card.Meta
-                      title={
-                        <Space
-                          style={{
-                            width: "100%",
-                            justifyContent: "space-between",
-                          }}
-                        >
-                          <span>{game.name}</span>
-                          <Tag color="blue">
-                            {GameTypeLabels[game.category]}
-                          </Tag>
-                        </Space>
-                      }
-                      description={
-                        <div className="game-description">
-                          <Paragraph
-                            ellipsis={{ rows: 2 }}
-                            type="secondary"
-                            style={{ marginBottom: 8 }}
-                          >
-                            {game.description}
-                          </Paragraph>
-                          <Space size={4} wrap>
-                            {game.tags.slice(0, 3).map((tag) => (
-                              <Tag key={tag} style={{ margin: 0 }}>
-                                {tag}
-                              </Tag>
-                            ))}
-                          </Space>
-                        </div>
-                      }
-                    />
-
-                    <div className="game-footer">
-                      <Space size="small">
-                        <Text type="secondary" style={{ fontSize: 12 }}>
-                          技能库可用
-                        </Text>
-                      </Space>
-                      {!isAdded ? (
-                        <Button
-                          type="primary"
-                          icon={<Plus size={16} />}
-                          onClick={() => handleAddGame(game)}
-                        >
-                          添加
-                        </Button>
-                      ) : (
-                        <Button
-                          danger
-                          onClick={() => handleRemoveGame(game.id)}
-                        >
-                          移除
-                        </Button>
-                      )}
-                    </div>
-                  </Card>
-                </motion.div>
-              </div>
-            );
-          })}
+                    </Card>
+                  </motion.div>
+                </div>
+              );
+            })}
           </Flex>
         )}
       </motion.div>

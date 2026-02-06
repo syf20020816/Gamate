@@ -16,6 +16,8 @@ use tokio_tungstenite::tungstenite::Message;
 use tokio_tungstenite::connect_async;
 use url::Url;
 use tauri::{AppHandle, Emitter};
+use std::collections::HashSet;
+use std::sync::Arc;
 
 type HmacSha1 = Hmac<Sha1>;
 
@@ -60,6 +62,23 @@ static TOKEN_CACHE: OnceCell<Mutex<Option<CachedToken>>> = OnceCell::new();
 
 fn token_cache() -> &'static Mutex<Option<CachedToken>> {
     TOKEN_CACHE.get_or_init(|| Mutex::new(None))
+}
+
+// 用于去重的请求缓存 (存储音频数据的哈希)
+static RECOGNIZE_REQUEST_CACHE: OnceCell<Arc<Mutex<HashSet<String>>>> = OnceCell::new();
+
+fn recognize_request_cache() -> &'static Arc<Mutex<HashSet<String>>> {
+    RECOGNIZE_REQUEST_CACHE.get_or_init(|| Arc::new(Mutex::new(HashSet::new())))
+}
+
+// 计算音频数据的简单哈希ID
+fn compute_audio_hash(pcm_data: &[u8]) -> String {
+    use std::collections::hash_map::DefaultHasher;
+    use std::hash::{Hash, Hasher};
+    
+    let mut hasher = DefaultHasher::new();
+    pcm_data.hash(&mut hasher);
+    format!("{:x}", hasher.finish())
 }
 
 fn percent_encode_str(s: &str) -> String {
@@ -289,6 +308,41 @@ pub async fn aliyun_one_sentence_recognize(
     if pcm_data.is_empty() {
         return Err("音频数据为空".to_string());
     }
+    
+    // 计算音频数据哈希用于去重
+    let audio_hash = compute_audio_hash(&pcm_data);
+    
+    // 检查是否为重复请求
+    {
+        let cache = recognize_request_cache();
+        let mut request_set = cache.lock().unwrap();
+        
+        if request_set.contains(&audio_hash) {
+            log::warn!("⚠️ 跳过重复的识别请求 (音频哈希: {})", audio_hash);
+            return Err("重复的识别请求".to_string());
+        }
+        
+        // 添加到缓存
+        request_set.insert(audio_hash.clone());
+        
+        // 限制缓存大小,防止内存泄漏
+        if request_set.len() > 100 {
+            // 清理一半的旧条目
+            let keys_to_remove: Vec<String> = request_set.iter().take(50).cloned().collect();
+            for key in keys_to_remove {
+                request_set.remove(&key);
+            }
+        }
+    }
+    
+    // 设置定时清理(5秒后移除,允许下次识别相同音频)
+    let cache_clone = recognize_request_cache().clone();
+    let hash_clone = audio_hash.clone();
+    tokio::spawn(async move {
+        tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
+        let mut request_set = cache_clone.lock().unwrap();
+        request_set.remove(&hash_clone);
+    });
     
     if pcm_data.len() < 3200 {
         log::warn!("⚠️ 音频数据较小: {} 字节", pcm_data.len());

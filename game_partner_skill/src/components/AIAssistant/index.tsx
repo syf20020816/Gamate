@@ -8,6 +8,7 @@ import {
   Tag,
   Select,
   Tabs,
+  Switch,
 } from "antd";
 import { SendOutlined, ClearOutlined } from "@ant-design/icons";
 import {
@@ -18,7 +19,7 @@ import { motion } from "framer-motion";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { useAIAssistantStore } from "../../stores/aiAssistantStore";
-import { getGameById } from "../../data/games";
+import { getGameById } from "../../services/configService";
 import { VoiceChatPanel } from "../VoiceChatPanel";
 import { ConversationArea } from "../ConversationArea";
 import "./index.css";
@@ -71,6 +72,7 @@ const AIAssistant: React.FC = () => {
 
   const [inputValue, setInputValue] = useState("");
   const [useScreenshot, setUseScreenshot] = useState(true);
+  const [hudVisible, setHudVisible] = useState(false); // HUD 可见性状态
   const voiceListenerRegistered = useRef(false); // 防止重复注册语音识别监听器
 
   // ✅ 从后端扫描已下载的技能库
@@ -97,14 +99,17 @@ const AIAssistant: React.FC = () => {
         const gamesWithSkills = [...new Set(downloadedLibraries.map((lib) => lib.gameId))];
         
         // 过滤出既被选择又有技能库的游戏
-        const games = selectedGameIds
-          .filter((id: string) => gamesWithSkills.includes(id))
-          .map((id: string) => getGameById(id))
-          .filter(Boolean);
+        const filteredIds = selectedGameIds.filter((id: string) => gamesWithSkills.includes(id));
         
-        setAvailableGames(games);
+        // ✅ 使用 Promise.all 等待所有异步调用完成
+        const games = await Promise.all(
+          filteredIds.map((id: string) => getGameById(id))
+        );
+        const validGames = games.filter(Boolean);
         
-        console.log('✅ [AIAssistant] 加载可用游戏:', games.map((g: any) => g?.name));
+        setAvailableGames(validGames);
+        
+        console.log('✅ [AIAssistant] 加载可用游戏:', validGames.map((g: any) => g?.name));
       } catch (error) {
         console.error('加载游戏配置失败:', error);
       }
@@ -423,6 +428,38 @@ const AIAssistant: React.FC = () => {
 
   const [tabKey, setTabKey] = useState("audio");
 
+  // 检查 HUD 窗口可见性
+  useEffect(() => {
+    const checkHudVisibility = async () => {
+      try {
+        const visible = await invoke<boolean>('is_hud_window_visible');
+        setHudVisible(visible);
+      } catch (error) {
+        console.error('检查 HUD 可见性失败:', error);
+      }
+    };
+    checkHudVisibility();
+  }, []);
+
+  // 切换 HUD 窗口
+  const handleToggleHud = async (checked: boolean) => {
+    try {
+      if (checked) {
+        await invoke("open_hud_window");
+        setHudVisible(true);
+        antdMessage.success("HUD 浮窗已打开");
+      } else {
+        await invoke("close_hud_window");
+        setHudVisible(false);
+        antdMessage.info("HUD 浮窗已关闭");
+      }
+    } catch (error) {
+      antdMessage.error(`HUD 操作失败: ${error}`);
+      // 恢复状态
+      setHudVisible(!checked);
+    }
+  };
+
   return (
     <div className="ai-assistant-page">
       <div className="conversation-header">
@@ -441,6 +478,15 @@ const AIAssistant: React.FC = () => {
             </Select.Option>
           ))}
         </Select>
+        <div style={{ marginLeft: 16, display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ fontSize: 14 }}>HUD 浮窗:</span>
+          <Switch
+            checked={hudVisible}
+            onChange={handleToggleHud}
+            checkedChildren="显示"
+            unCheckedChildren="关闭"
+          />
+        </div>
       </div>
       <Tabs
         activeKey={tabKey}

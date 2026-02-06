@@ -1,14 +1,27 @@
-import {
-  Game,
-  GameType,
-  GameSkillConfig,
-  SkillSource,
-  SkillStatus,
-} from "../types/game";
+/**
+ * ⚠️ 已废弃：这些是硬编码的假数据
+ * 
+ * 现在所有游戏数据都应该从后端 `games.toml` 加载
+ * 请使用 `src/services/configService.ts` 中的函数:
+ * - getGames(): Promise<Game[]>
+ * - getGameById(id: string): Promise<Game | undefined>
+ * - getSkillConfigs(): Promise<GameSkillConfig[]>
+ * - getSkillConfigsByGameId(gameId: string): Promise<GameSkillConfig[]>
+ * 
+ * 这个文件仅保留作为数据结构参考，不应该在代码中导入使用。
+ */
+
+// 类型导入保留用于文档注释
+// import { Game, GameType, GameSkillConfig, SkillSource, SkillStatus } from "../types/game";
+
+/*
+// ============================================================
+// 以下是已废弃的硬编码数据，仅供参考
+// ============================================================
 
 /**
- * 预定义游戏列表
- */
+ * 预定义游戏列表 (已废弃)
+ * /
 export const GAMES: Game[] = [
   {
     id: "phasmophobia",
@@ -53,8 +66,8 @@ export const GAMES: Game[] = [
 ];
 
 /**
- * 预定义游戏技能配置
- */
+ * 预定义游戏技能配置 (已废弃)
+ * /
 export const GAME_SKILL_CONFIGS: GameSkillConfig[] = [
   {
     id: "phasmophobia-skill-1",
@@ -112,22 +125,26 @@ export const GAME_SKILL_CONFIGS: GameSkillConfig[] = [
 ];
 
 /**
- * 根据游戏ID获取游戏信息
- */
+ * 根据游戏ID获取游戏信息 (已废弃)
+ * 请使用: import { getGameById } from '../../services/configService'
+ * /
 export const getGameById = (id: string): Game | undefined => {
   return GAMES.find((game) => game.id === id);
 };
 
 /**
- * 根据游戏ID获取技能配置列表
- */
+ * 根据游戏ID获取技能配置列表 (已废弃)
+ * 请使用: import { getSkillConfigsByGameId } from '../../services/configService'
+ * /
 export const getSkillConfigsByGameId = (gameId: string): GameSkillConfig[] => {
   return GAME_SKILL_CONFIGS.filter((config) => config.gameId === gameId);
 };
 
 /**
- * 根据游戏类型获取游戏列表
- */
+ * 根据游戏类型获取游戏列表 (已废弃)
+ * /
 export const getGamesByType = (type: GameType): Game[] => {
   return GAMES.filter((game) => game.category === type);
 };
+
+*/

@@ -109,11 +109,23 @@ const SettingsPanel: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [windows, setWindows] = useState<WindowInfo[]>([]);
+  const [hudPreviewVisible, setHudPreviewVisible] = useState(false); // HUD 预览状态
 
   useEffect(() => {
     loadSettings();
     loadWindows();
+    checkHudPreview();
   }, []);
+
+  // 检查 HUD 预览窗口是否打开
+  const checkHudPreview = async () => {
+    try {
+      const visible = await invoke<boolean>('is_hud_window_visible');
+      setHudPreviewVisible(visible);
+    } catch (error) {
+      console.error('检查 HUD 可见性失败:', error);
+    }
+  };
 
   const loadWindows = async () => {
     try {
@@ -407,33 +419,31 @@ const SettingsPanel: React.FC = () => {
                 </Form.Item>
 
                 <Form.Item label="HUD 位置预览">
-                  <Space>
-                    <Button
-                      icon={<PictureOutlined />}
-                      onClick={async () => {
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ fontSize: 14 }}>预览窗口:</span>
+                    <Switch
+                      checked={hudPreviewVisible}
+                      onChange={async (checked) => {
                         try {
-                          await invoke("open_hud_window");
-                          message.success("HUD 浮窗已打开,您可以拖动调整位置");
+                          if (checked) {
+                            await invoke("open_hud_window");
+                            setHudPreviewVisible(true);
+                            message.success("HUD 浮窗已打开,您可以拖动调整位置,位置会自动保存");
+                          } else {
+                            await invoke("close_hud_window");
+                            setHudPreviewVisible(false);
+                            message.info("HUD 浮窗已关闭");
+                          }
                         } catch (error) {
-                          message.error(`打开HUD浮窗失败: ${error}`);
+                          message.error(`HUD 操作失败: ${error}`);
+                          // 恢复状态
+                          setHudPreviewVisible(!checked);
                         }
                       }}
-                    >
-                      预览位置
-                    </Button>
-                    <Button
-                      onClick={async () => {
-                        try {
-                          await invoke("close_hud_window");
-                          message.info("HUD 浮窗已关闭");
-                        } catch (error) {
-                          message.error(`关闭HUD浮窗失败: ${error}`);
-                        }
-                      }}
-                    >
-                      关闭预览
-                    </Button>
-                  </Space>
+                      checkedChildren="显示"
+                      unCheckedChildren="关闭"
+                    />
+                  </div>
                 </Form.Item>
 
                 <Alert
@@ -444,7 +454,7 @@ const SettingsPanel: React.FC = () => {
                         <strong>HUD 浮窗模式</strong>: 控制最小化时是否保持 HUD 显示
                       </li>
                       <li>
-                        <strong>预览位置</strong>: 打开 HUD 浮窗进行位置调整,可拖动到合适位置
+                        <strong>预览位置</strong>: 打开 HUD 浮窗进行位置调整,拖动后会自动保存位置
                       </li>
                       <li>
                         <strong>主窗口关闭</strong>: 点击关闭按钮会最小化到托盘,右键托盘图标可退出应用

@@ -13,7 +13,9 @@ import {
 import { Activity, Zap, Clock, Gamepad2, ArrowRight } from "lucide-react";
 import { motion } from "framer-motion";
 import { useUserStore } from "../../stores/userStore";
-import { getGameById } from "../../data/games";
+import { getGameById } from "../../services/configService";
+import { useState, useEffect } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import "./styles.scss";
 
 const { Title, Paragraph, Text } = Typography;
@@ -24,9 +26,27 @@ interface HomeProps {
 
 const Home: React.FC<HomeProps> = ({ onNavigate }) => {
   const { user } = useUserStore();
-  const selectedGames =
-    user?.config.selectedGames.map((id) => getGameById(id)).filter(Boolean) ||
-    [];
+  const [selectedGames, setSelectedGames] = useState<any[]>([]);
+  
+  // ✅ 从后端加载用户选择的游戏
+  useEffect(() => {
+    const loadSelectedGames = async () => {
+      try {
+        const settings = await invoke<any>('get_app_settings');
+        const selectedGameIds = settings.user?.selected_games || [];
+        
+        const games = await Promise.all(
+          selectedGameIds.map((id: string) => getGameById(id))
+        );
+        const validGames = games.filter(Boolean);
+        setSelectedGames(validGames);
+      } catch (error) {
+        console.error('加载游戏配置失败:', error);
+      }
+    };
+    loadSelectedGames();
+  }, []);
+  
   const valueStyle: React.CSSProperties = {
     fontSize: 18,
     fontWeight: "bold",
@@ -133,7 +153,7 @@ const Home: React.FC<HomeProps> = ({ onNavigate }) => {
               {selectedGames.length > 0 ? (
                 <List
                   dataSource={selectedGames}
-                  renderItem={(game) => (
+                  renderItem={(game: any) => (
                     <List.Item>
                       <List.Item.Meta
                         avatar={
@@ -151,7 +171,7 @@ const Home: React.FC<HomeProps> = ({ onNavigate }) => {
                         description={
                           <Space>
                             <Tag>{game!.category}</Tag>
-                            {game!.tags.slice(0, 2).map((tag) => (
+                            {game.tags.slice(0, 2).map((tag: string) => (
                               <Tag key={tag} color="blue">
                                 {tag}
                               </Tag>

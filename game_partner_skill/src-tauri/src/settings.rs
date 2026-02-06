@@ -52,6 +52,16 @@ pub struct GeneralSettings {
     /// HUD 浮窗模式 (默认开启)
     #[serde(default = "default_hud_mode")]
     pub hud_mode: bool,
+    /// HUD 窗口位置
+    #[serde(default)]
+    pub hud_position: Option<HudPosition>,
+}
+
+/// HUD 窗口位置
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HudPosition {
+    pub x: f64,
+    pub y: f64,
 }
 
 fn default_hud_mode() -> bool {
@@ -258,6 +268,7 @@ impl Default for AppSettings {
                 language: "zh-CN".to_string(),
                 theme: "auto".to_string(),
                 hud_mode: default_hud_mode(),
+                hud_position: None,
             },
             user: UserSettings::default(),
             skill_library: SkillLibrarySettings {

@@ -54,31 +54,45 @@ const SkillDatabase: React.FC = () => {
   const [validating, setValidating] = useState(false);
   const [loading, setLoading] = useState(true);
   const [gameCache, setGameCache] = useState<Map<string, Game>>(new Map());
-  const [downloadedLibraries, setDownloadedLibraries] = useState<DownloadedSkillLibrary[]>([]);
+  const [downloadedLibraries, setDownloadedLibraries] = useState<
+    DownloadedSkillLibrary[]
+  >([]);
 
   // 从后端加载配置
   useEffect(() => {
     const loadConfig = async () => {
       try {
-        const settings = await invoke<any>('get_app_settings');
-        
+        const settings = await invoke<any>("get_app_settings");
+
         // 后端返回的是 snake_case，前端需要 camelCase
         const skillLibConfig: SkillLibraryConfig = {
-          storageBasePath: settings.skillLibrary?.storageBasePath || settings.skill_library?.storage_base_path || './data/skills',
-          maxVersionsToKeep: settings.skillLibrary?.maxVersionsToKeep || settings.skill_library?.max_versions_to_keep || 3,
-          autoUpdate: settings.skillLibrary?.autoUpdate ?? settings.skill_library?.auto_update ?? false,
-          updateCheckInterval: settings.skillLibrary?.updateCheckInterval || settings.skill_library?.update_check_interval || 24,
+          storageBasePath:
+            settings.skillLibrary?.storageBasePath ||
+            settings.skill_library?.storage_base_path ||
+            "./data/skills",
+          maxVersionsToKeep:
+            settings.skillLibrary?.maxVersionsToKeep ||
+            settings.skill_library?.max_versions_to_keep ||
+            3,
+          autoUpdate:
+            settings.skillLibrary?.autoUpdate ??
+            settings.skill_library?.auto_update ??
+            false,
+          updateCheckInterval:
+            settings.skillLibrary?.updateCheckInterval ||
+            settings.skill_library?.update_check_interval ||
+            24,
         };
-        
+
         setConfig(skillLibConfig);
         setLoading(false);
       } catch (error) {
-        console.error('❌ 加载配置失败:', error);
+        console.error("❌ 加载配置失败:", error);
         message.error(`加载配置失败: ${error}`);
         setLoading(false);
       }
     };
-    
+
     loadConfig();
   }, []);
 
@@ -86,14 +100,14 @@ const SkillDatabase: React.FC = () => {
   useEffect(() => {
     const scanLibraries = async () => {
       try {
-        const libraries = await invoke<any[]>('scan_downloaded_libraries');
+        const libraries = await invoke<any[]>("scan_downloaded_libraries");
         setDownloadedLibraries(libraries);
       } catch (error) {
-        console.error('❌ 扫描技能库失败:', error);
+        console.error("❌ 扫描技能库失败:", error);
         message.error(`扫描技能库失败: ${error}`);
       }
     };
-    
+
     scanLibraries();
   }, []);
 
@@ -101,8 +115,10 @@ const SkillDatabase: React.FC = () => {
   useEffect(() => {
     const loadGameCache = async () => {
       const cache = new Map<string, Game>();
-      const uniqueGameIds = Array.from(new Set(downloadedLibraries.map(lib => lib.gameId)));
-      
+      const uniqueGameIds = Array.from(
+        new Set(downloadedLibraries.map((lib) => lib.gameId)),
+      );
+
       for (const gameId of uniqueGameIds) {
         try {
           const game = await getGameById(gameId);
@@ -113,10 +129,10 @@ const SkillDatabase: React.FC = () => {
           console.error(`加载游戏 ${gameId} 失败:`, error);
         }
       }
-      
+
       setGameCache(cache);
     };
-    
+
     if (downloadedLibraries.length > 0) {
       loadGameCache();
     }
@@ -125,40 +141,45 @@ const SkillDatabase: React.FC = () => {
   // 手动验证并清理无效记录
   const handleValidateLibraries = async () => {
     if (downloadedLibraries.length === 0) {
-      message.info('暂无技能库记录');
+      message.info("暂无技能库记录");
       return;
     }
 
     setValidating(true);
-    message.loading({ content: '正在验证技能库...', key: 'validate' });
-    
+    message.loading({ content: "正在验证技能库...", key: "validate" });
+
     let invalidCount = 0;
 
     for (const library of downloadedLibraries) {
       try {
-        const isValid = await invoke<boolean>('validate_skill_library', {
+        const isValid = await invoke<boolean>("validate_skill_library", {
           storagePath: library.storagePath,
         });
 
         if (!isValid) {
-          console.warn(`清理无效记录: ${library.gameName} - ${library.storagePath}`);
+          console.warn(
+            `清理无效记录: ${library.gameName} - ${library.storagePath}`,
+          );
           invalidCount++;
         }
       } catch (error) {
-        console.error('验证失败:', error);
+        console.error("验证失败:", error);
       }
     }
 
     // 重新扫描
-    const libraries = await invoke<any[]>('scan_downloaded_libraries');
+    const libraries = await invoke<any[]>("scan_downloaded_libraries");
     setDownloadedLibraries(libraries);
 
     setValidating(false);
 
     if (invalidCount > 0) {
-      message.success({ content: `已清理 ${invalidCount} 个无效记录`, key: 'validate' });
+      message.success({
+        content: `已清理 ${invalidCount} 个无效记录`,
+        key: "validate",
+      });
     } else {
-      message.success({ content: '所有技能库都有效', key: 'validate' });
+      message.success({ content: "所有技能库都有效", key: "validate" });
     }
   };
 
@@ -187,17 +208,18 @@ const SkillDatabase: React.FC = () => {
   const handleConfigSave = async () => {
     try {
       const values = await form.validateFields();
-      
+
       // 获取完整的应用配置
-      const settings = await invoke<any>('get_app_settings');
-      
+      const settings = await invoke<any>("get_app_settings");
+
       // 后端使用 snake_case
       if (settings.skill_library) {
         // 后端返回 snake_case
         settings.skill_library.storage_base_path = values.storageBasePath;
         settings.skill_library.max_versions_to_keep = values.maxVersionsToKeep;
         settings.skill_library.auto_update = values.autoUpdate;
-        settings.skill_library.update_check_interval = values.updateCheckInterval;
+        settings.skill_library.update_check_interval =
+          values.updateCheckInterval;
       } else if (settings.skillLibrary) {
         // 前端使用 camelCase（Tauri 自动转换）
         settings.skillLibrary.storageBasePath = values.storageBasePath;
@@ -205,10 +227,10 @@ const SkillDatabase: React.FC = () => {
         settings.skillLibrary.autoUpdate = values.autoUpdate;
         settings.skillLibrary.updateCheckInterval = values.updateCheckInterval;
       }
-      
+
       // 保存到后端
-      await invoke('save_app_settings', { settings });
-      
+      await invoke("save_app_settings", { settings });
+
       // 更新本地状态
       setConfig({
         storageBasePath: values.storageBasePath,
@@ -216,11 +238,11 @@ const SkillDatabase: React.FC = () => {
         autoUpdate: values.autoUpdate,
         updateCheckInterval: values.updateCheckInterval,
       });
-      
+
       message.success("配置已保存");
       setConfigModalVisible(false);
     } catch (error) {
-      console.error('❌ 保存配置失败:', error);
+      console.error("❌ 保存配置失败:", error);
       message.error(`保存配置失败: ${error}`);
     }
   };
@@ -236,18 +258,18 @@ const SkillDatabase: React.FC = () => {
         try {
           message.loading({ content: "正在更新技能库...", key: "update" });
           const newTimestamp = Math.floor(Date.now() / 1000);
-          
-          await invoke('update_skill_library', { 
+
+          await invoke("update_skill_library", {
             gameId: library.gameId,
             skillConfigId: library.skillConfigId,
-            timestamp: newTimestamp 
+            timestamp: newTimestamp,
           });
-          
+
           message.success({ content: "技能库更新成功", key: "update" });
-          
+
           // TODO: 刷新技能库列表
         } catch (error) {
-          console.error('更新失败:', error);
+          console.error("更新失败:", error);
           message.error({ content: `更新失败: ${error}`, key: "update" });
         }
       },
@@ -265,17 +287,19 @@ const SkillDatabase: React.FC = () => {
       onOk: async () => {
         try {
           message.loading({ content: "正在删除...", key: "delete" });
-          
+
           // 调用 Tauri 后端删除文件
-          await invoke('delete_skill_library', { storagePath: library.storagePath });
-          
+          await invoke("delete_skill_library", {
+            storagePath: library.storagePath,
+          });
+
           // 重新扫描
-          const libraries = await invoke<any[]>('scan_downloaded_libraries');
+          const libraries = await invoke<any[]>("scan_downloaded_libraries");
           setDownloadedLibraries(libraries);
-          
+
           message.success({ content: "已删除技能库", key: "delete" });
         } catch (error) {
-          console.error('删除失败:', error);
+          console.error("删除失败:", error);
           message.error({ content: `删除失败: ${error}`, key: "delete" });
         }
       },
@@ -291,10 +315,10 @@ const SkillDatabase: React.FC = () => {
   // 打开存储目录
   const handleOpenFolder = async (path: string) => {
     try {
-      await invoke('open_folder', { path });
+      await invoke("open_folder", { path });
       message.success(`已打开目录`);
     } catch (error) {
-      console.error('打开目录失败:', error);
+      console.error("打开目录失败:", error);
       message.error(`打开目录失败: ${error}`);
     }
   };
@@ -307,33 +331,41 @@ const SkillDatabase: React.FC = () => {
         multiple: false,
         title: "选择存储目录",
       });
-      
-      if (selectedPath && typeof selectedPath === 'string') {
-        form.setFieldValue('storageBasePath', selectedPath);
-        message.success('已选择目录');
+
+      if (selectedPath && typeof selectedPath === "string") {
+        form.setFieldValue("storageBasePath", selectedPath);
+        message.success("已选择目录");
       }
     } catch (error) {
-      console.error('选择目录失败:', error);
+      console.error("选择目录失败:", error);
       message.error(`选择目录失败: ${error}`);
     }
   };
 
   // 按游戏分组
-  const groupedLibraries = downloadedLibraries.reduce((acc, lib) => {
-    if (!acc[lib.gameId]) {
-      acc[lib.gameId] = [];
-    }
-    acc[lib.gameId].push(lib);
-    return acc;
-  }, {} as Record<string, DownloadedSkillLibrary[]>);
+  const groupedLibraries = downloadedLibraries.reduce(
+    (acc, lib) => {
+      if (!acc[lib.gameId]) {
+        acc[lib.gameId] = [];
+      }
+      acc[lib.gameId].push(lib);
+      return acc;
+    },
+    {} as Record<string, DownloadedSkillLibrary[]>,
+  );
 
   // 对每个游戏的版本按时间戳降序排序
   Object.keys(groupedLibraries).forEach((gameId) => {
     groupedLibraries[gameId].sort((a, b) => b.timestamp - a.timestamp);
   });
 
-  const totalSize = downloadedLibraries.reduce((sum, lib) => sum + lib.storageSize, 0);
-  const activeLibraries = downloadedLibraries.filter((lib) => lib.status === "active");
+  const totalSize = downloadedLibraries.reduce(
+    (sum, lib) => sum + lib.storageSize,
+    0,
+  );
+  const activeLibraries = downloadedLibraries.filter(
+    (lib) => lib.status === "active",
+  );
 
   // 如果配置还在加载中
   if (loading || !config) {
@@ -355,9 +387,9 @@ const SkillDatabase: React.FC = () => {
       >
         {/* 头部 */}
         <div className="database-header">
-          <div>
+          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
             <Title level={3}>技能库管理</Title>
-            <Paragraph type="secondary">
+            <Paragraph type="secondary" style={{ margin: 0 }}>
               管理已下载的游戏技能库，支持多版本保存和快速切换
             </Paragraph>
           </div>
@@ -385,7 +417,9 @@ const SkillDatabase: React.FC = () => {
             <Tooltip title="打开存储目录">
               <Button
                 icon={<FolderOpen size={18} />}
-                onClick={() => config && handleOpenFolder(config.storageBasePath)}
+                onClick={() =>
+                  config && handleOpenFolder(config.storageBasePath)
+                }
               >
                 打开目录
               </Button>
@@ -469,7 +503,11 @@ const SkillDatabase: React.FC = () => {
                     </Space>
                   }
                 >
-                  <Space direction="vertical" size="middle" style={{ width: "100%" }}>
+                  <Space
+                    direction="vertical"
+                    size="middle"
+                    style={{ width: "100%" }}
+                  >
                     {libraries.map((library, index) => (
                       <motion.div
                         key={library.id}
@@ -483,7 +521,11 @@ const SkillDatabase: React.FC = () => {
                         >
                           <Row gutter={16} align="middle">
                             <Col flex="auto">
-                              <Space direction="vertical" size={4} style={{ width: "100%" }}>
+                              <Space
+                                direction="vertical"
+                                size={4}
+                                style={{ width: "100%" }}
+                              >
                                 <Space>
                                   {library.status === "active" && (
                                     <Badge status="success" text="活跃版本" />
@@ -502,7 +544,10 @@ const SkillDatabase: React.FC = () => {
                                   <Tooltip title="下载时间">
                                     <Space size={4}>
                                       <Calendar size={14} />
-                                      <Text type="secondary" style={{ fontSize: 12 }}>
+                                      <Text
+                                        type="secondary"
+                                        style={{ fontSize: 12 }}
+                                      >
                                         {formatTimestamp(library.timestamp)}
                                       </Text>
                                     </Space>
@@ -511,7 +556,10 @@ const SkillDatabase: React.FC = () => {
                                   <Tooltip title="存储大小">
                                     <Space size={4}>
                                       <HardDrive size={14} />
-                                      <Text type="secondary" style={{ fontSize: 12 }}>
+                                      <Text
+                                        type="secondary"
+                                        style={{ fontSize: 12 }}
+                                      >
                                         {formatSize(library.storageSize)}
                                       </Text>
                                     </Space>
@@ -520,8 +568,12 @@ const SkillDatabase: React.FC = () => {
                                   <Tooltip title="条目数">
                                     <Space size={4}>
                                       <Database size={14} />
-                                      <Text type="secondary" style={{ fontSize: 12 }}>
-                                        {library.statistics.totalEntries.toLocaleString()} 条目
+                                      <Text
+                                        type="secondary"
+                                        style={{ fontSize: 12 }}
+                                      >
+                                        {library.statistics.totalEntries.toLocaleString()}{" "}
+                                        条目
                                       </Text>
                                     </Space>
                                   </Tooltip>
@@ -532,7 +584,9 @@ const SkillDatabase: React.FC = () => {
                                       <Text
                                         type="secondary"
                                         style={{ fontSize: 12, maxWidth: 200 }}
-                                        ellipsis={{ tooltip: library.storagePath }}
+                                        ellipsis={{
+                                          tooltip: library.storagePath,
+                                        }}
                                       >
                                         {library.storagePath}
                                       </Text>
@@ -562,7 +616,9 @@ const SkillDatabase: React.FC = () => {
                                       size="small"
                                       type="primary"
                                       icon={<RefreshCw size={16} />}
-                                      onClick={() => handleUpdateLibrary(library)}
+                                      onClick={() =>
+                                        handleUpdateLibrary(library)
+                                      }
                                     >
                                       更新
                                     </Button>
@@ -573,7 +629,9 @@ const SkillDatabase: React.FC = () => {
                                   <Button
                                     size="small"
                                     icon={<FolderOpen size={16} />}
-                                    onClick={() => handleOpenFolder(library.storagePath)}
+                                    onClick={() =>
+                                      handleOpenFolder(library.storagePath)
+                                    }
                                   />
                                 </Tooltip>
 
@@ -583,7 +641,10 @@ const SkillDatabase: React.FC = () => {
                                     danger
                                     icon={<Trash2 size={16} />}
                                     onClick={() => handleDeleteLibrary(library)}
-                                    disabled={library.status === "active" && libraries.length === 1}
+                                    disabled={
+                                      library.status === "active" &&
+                                      libraries.length === 1
+                                    }
                                   />
                                 </Tooltip>
                               </Space>
@@ -668,7 +729,7 @@ const SkillDatabase: React.FC = () => {
             label="更新检查间隔"
             name="updateCheckInterval"
             rules={[{ required: true, message: "请选择检查间隔" }]}
-            dependencies={['autoUpdate']}
+            dependencies={["autoUpdate"]}
           >
             <Select>
               <Select.Option value={6}>每 6 小时</Select.Option>
@@ -684,7 +745,10 @@ const SkillDatabase: React.FC = () => {
         <Space direction="vertical" size="small" style={{ width: "100%" }}>
           <Text strong>存储空间概览</Text>
           <Progress
-            percent={Math.min((totalSize / (5 * 1024 * 1024 * 1024)) * 100, 100)}
+            percent={Math.min(
+              (totalSize / (5 * 1024 * 1024 * 1024)) * 100,
+              100,
+            )}
             format={() => `${formatSize(totalSize)} / 5 GB`}
           />
           <Text type="secondary" style={{ fontSize: 12 }}>

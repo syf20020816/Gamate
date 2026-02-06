@@ -1,8 +1,11 @@
 // HUD 浮窗组件 - 游戏内显示的小型状态指示器
 import React, { useState, useEffect } from "react";
-import { Card } from "antd";
+import { Card, Select, Button, message as antdMessage } from "antd";
+import { PlayCircleOutlined, PauseCircleOutlined } from "@ant-design/icons";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { invoke } from "@tauri-apps/api/core";
+import { getGameById } from "../../services/configService";
 import "./HudOverlay.scss";
 
 interface HudState {
@@ -17,6 +20,54 @@ export const HudOverlay: React.FC = () => {
     aiStatus: "待机中",
     statusColor: "#666",
   });
+
+  const [availableGames, setAvailableGames] = useState<any[]>([]);
+  const [selectedGame, setSelectedGame] = useState<string>("");
+  const [downloadedLibraries, setDownloadedLibraries] = useState<any[]>([]);
+
+  // ✅ 从后端加载已下载的技能库
+  useEffect(() => {
+    const loadLibraries = async () => {
+      try {
+        const libraries = await invoke<any[]>('scan_downloaded_libraries');
+        setDownloadedLibraries(libraries);
+      } catch (error) {
+        console.error('扫描技能库失败:', error);
+      }
+    };
+    loadLibraries();
+  }, []);
+
+  // ✅ 从后端加载用户选择的游戏并过滤出有技能库的
+  useEffect(() => {
+    const loadAvailableGames = async () => {
+      try {
+        const settings = await invoke<any>('get_app_settings');
+        const selectedGameIds = settings.user?.selected_games || [];
+        
+        // 获取有技能库的游戏 ID
+        const gamesWithSkills = [...new Set(downloadedLibraries.map((lib) => lib.gameId))];
+        
+        // 过滤出既被选择又有技能库的游戏
+        const filteredIds = selectedGameIds.filter((id: string) => gamesWithSkills.includes(id));
+        
+        const games = await Promise.all(
+          filteredIds.map((id: string) => getGameById(id))
+        );
+        const validGames = games.filter(Boolean);
+        
+        setAvailableGames(validGames);
+        
+        console.log('✅ [HUD] 加载可用游戏:', validGames.map((g: any) => g?.name));
+      } catch (error) {
+        console.error('加载游戏配置失败:', error);
+      }
+    };
+    
+    if (downloadedLibraries.length > 0) {
+      loadAvailableGames();
+    }
+  }, [downloadedLibraries]);
 
   useEffect(() => {
     // 监听语音识别事件
@@ -91,6 +142,29 @@ export const HudOverlay: React.FC = () => {
     };
   }, []);
 
+  // 开始/停止对话
+  const handleToggleConversation = async () => {
+    if (!selectedGame) {
+      antdMessage.warning("请先选择游戏");
+      return;
+    }
+
+    try {
+      if (state.isListening) {
+        // 停止对话
+        await invoke("stop_voice_listener");
+        antdMessage.info("已停止语音监听");
+      } else {
+        // 开始对话
+        await invoke("start_voice_listener", { gameId: selectedGame });
+        antdMessage.success("语音监听已启动");
+      }
+    } catch (error) {
+      console.error("切换对话状态失败:", error);
+      antdMessage.error(`操作失败: ${error}`);
+    }
+  };
+
   // 双击最小化
   const handleDoubleClick = async () => {
     try {
@@ -104,7 +178,6 @@ export const HudOverlay: React.FC = () => {
   return (
     <div 
       className="hud-overlay-container"
-      onDoubleClick={handleDoubleClick}
     >
       <Card className="hud-card" bordered={false}>
         <div className="hud-content">
@@ -127,9 +200,40 @@ export const HudOverlay: React.FC = () => {
           </div>
         </div>
 
+        {/* 游戏选择 */}
+        <div className="hud-game-selector" style={{ marginTop: 8 }}>
+          <Select
+            value={selectedGame}
+            onChange={setSelectedGame}
+            placeholder="选择游戏"
+            style={{ width: "100%" }}
+            disabled={state.isListening}
+          >
+            {availableGames.map((game: any) => (
+              <Select.Option key={game.id} value={game.id}>
+                {game.name}
+              </Select.Option>
+            ))}
+          </Select>
+        </div>
+
+        {/* 开始/停止按钮 */}
+        <div className="hud-controls" style={{ marginTop: 8 }}>
+          <Button
+            type={state.isListening ? "default" : "primary"}
+            icon={state.isListening ? <PauseCircleOutlined /> : <PlayCircleOutlined />}
+            onClick={handleToggleConversation}
+            block
+            danger={state.isListening}
+            disabled={!selectedGame && !state.isListening}
+          >
+            {state.isListening ? "停止对话" : "开始对话"}
+          </Button>
+        </div>
+
         {/* 提示文字 */}
-        <div className="hud-hint">
-          双击最小化 · 拖动调整位置
+        <div className="hud-hint" onDoubleClick={handleDoubleClick}>
+          双击此处最小化 · 拖动调整位置
         </div>
       </Card>
     </div>

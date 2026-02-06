@@ -7,14 +7,14 @@
   justify-content: flex-start;
   user-select: none;
   -webkit-app-region: drag; // 启用拖拽区域
-
+  margin: 0;
   .hud-card {
-    background: rgba(0, 0, 0, 0.7);
+    background: rgba(0, 0, 0, 0.65);
     backdrop-filter: blur(10px);
     border-radius: 12px;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
-    padding: 12px 16px;
-    min-width: 280px;
+    padding: 0px 8px;
+    min-width: 320px;
     width: 100%;
     transition: all 0.2s ease;
 
@@ -26,7 +26,7 @@
   .hud-content {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 8px;
   }
 
   // 状态指示灯
@@ -67,14 +67,88 @@
     }
   }
 
+  // 游戏选择器
+  .hud-game-selector {
+    -webkit-app-region: no-drag; // 禁用拖拽,允许交互
+
+    :global {
+      .ant-select {
+        .ant-select-selector {
+          background: rgba(255, 255, 255, 0.1) !important;
+          border-color: rgba(255, 255, 255, 0.2) !important;
+          color: #fff !important;
+
+          &:hover {
+            background: rgba(255, 255, 255, 0.15) !important;
+            border-color: rgba(255, 255, 255, 0.3) !important;
+          }
+        }
+
+        .ant-select-arrow {
+          color: rgba(255, 255, 255, 0.65);
+        }
+
+        &.ant-select-disabled {
+          .ant-select-selector {
+            background: rgba(255, 255, 255, 0.05) !important;
+            color: rgba(255, 255, 255, 0.3) !important;
+          }
+        }
+      }
+    }
+  }
+
+  // 控制按钮
+  .hud-controls {
+    -webkit-app-region: no-drag; // 禁用拖拽,允许交互
+
+    :global {
+      .ant-btn {
+        &.ant-btn-primary {
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          border: none;
+          
+          &:hover:not(:disabled) {
+            background: linear-gradient(135deg, #7a8eff 0%, #8b5fc4 100%);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+          }
+        }
+
+        &.ant-btn-default.ant-btn-dangerous {
+          background: rgba(255, 77, 79, 0.2);
+          border-color: rgba(255, 77, 79, 0.5);
+          color: #ff4d4f;
+
+          &:hover:not(:disabled) {
+            background: rgba(255, 77, 79, 0.3);
+            border-color: rgba(255, 77, 79, 0.7);
+            transform: translateY(-1px);
+          }
+        }
+
+        &:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
+        }
+      }
+    }
+  }
+
   // 提示文字
   .hud-hint {
-    margin-top: 8px;
-    padding-top: 8px;
+    margin-top: 12px;
+    padding-top: 12px;
     border-top: 1px solid rgba(255, 255, 255, 0.1);
     font-size: 11px;
     color: rgba(255, 255, 255, 0.45);
     text-align: center;
+    cursor: pointer;
+    transition: color 0.2s ease;
+
+    &:hover {
+      color: rgba(255, 255, 255, 0.65);
+    }
   }
 
   // 脉冲动画
@@ -97,7 +171,7 @@
 
   // 悬停效果
   &:hover .hud-card {
-    background: rgba(0, 0, 0, 0.9);
+    background: rgba(0, 0, 0, 0.92);
     box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
   }
 }

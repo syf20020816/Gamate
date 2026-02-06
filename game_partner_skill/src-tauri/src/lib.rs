@@ -137,6 +137,7 @@ pub fn run() {
             open_hud_window,
             close_hud_window,
             toggle_hud_window,
+            is_hud_window_visible,
             // 技能库管理命令
             scan_downloaded_libraries,
             sync_libraries_to_config,
