@@ -16,6 +16,9 @@ interface SimulationStore {
   // 运行控制
   startSimulation: () => void;
   stopSimulation: () => void;
+  
+  // 加载配置
+  loadConfig: (savedConfig: any) => void;
 }
 
 export const useSimulationStore = create<SimulationStore>((set) => ({
@@ -76,5 +79,25 @@ export const useSimulationStore = create<SimulationStore>((set) => ({
   
   stopSimulation: () => set((state) => ({
     config: { ...state.config, isRunning: false },
+  })),
+  
+  loadConfig: (savedConfig) => set((state) => ({
+    config: {
+      ...state.config,
+      livestream: {
+        onlineUsers: savedConfig.livestream.onlineUsers,
+        roomName: savedConfig.livestream.roomName,
+        roomDescription: savedConfig.livestream.roomDescription,
+        danmakuFrequency: savedConfig.livestream.danmakuFrequency,
+        giftFrequency: savedConfig.livestream.giftFrequency,
+        allowMic: savedConfig.livestream.allowMic,
+      },
+      employees: savedConfig.employees.map((emp: any) => ({
+        id: emp.id,
+        personality: emp.personality,
+        interactionFrequency: emp.interactionFrequency,
+        nickname: emp.nickname,
+      })),
+    },
   })),
 }));

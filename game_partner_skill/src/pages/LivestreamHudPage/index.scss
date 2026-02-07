@@ -2,12 +2,14 @@
   height: 100vh;
   display: flex;
   flex-direction: column;
-  padding: 16px;
-  background: #141414;
+  padding: 8px;
+  background: #1414148b;
+  -webkit-app-region: drag; // 启用窗口拖动
+  user-select: none; // 禁止文本选择
   
   .header-card {
     margin-bottom: 16px;
-    
+    background-color: transparent;
     .header-row {
       display: flex;
       align-items: center;
@@ -36,20 +38,23 @@
       margin-top: 12px;
       display: flex;
       align-items: center;
+      -webkit-app-region: no-drag; // 允许 Select 交互
     }
   }
   
   .main-content {
+    background-color: transparent;
     flex: 1;
     display: flex;
     gap: 16px;
     overflow: hidden;
-    
+    -webkit-app-region: no-drag; // 允许聊天区域和员工列表交互
+    padding: 0;
     .chat-card {
       flex: 1;
       display: flex;
       flex-direction: column;
-      
+      background-color: transparent;
       .ant-card-body {
         flex: 1;
         overflow: hidden;
@@ -58,8 +63,8 @@
     }
     
     .employees-card {
-      width: 300px;
-      
+      width: 120px;
+      background-color: transparent;
       .employees-list {
         max-height: 100%;
         overflow-y: auto;
@@ -97,5 +102,6 @@
   .footer-controls {
     margin-top: 16px;
     text-align: center;
+    -webkit-app-region: no-drag; // 允许按钮交互
   }
 }

@@ -10,6 +10,7 @@ pub mod tts_commands;
 pub mod audio_commands;
 pub mod hud_commands;
 pub mod skill_library_commands;
+pub mod simulation_commands;
 
 pub use wiki_commands::*;
 pub use config_commands::*;
@@ -23,3 +24,4 @@ pub use tts_commands::*;
 pub use audio_commands::*;
 pub use hud_commands::*;
 pub use skill_library_commands::*;
+pub use simulation_commands::*;

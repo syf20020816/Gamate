@@ -22,6 +22,9 @@ pub struct AppSettings {
     /// TTS 语音播报设置
     #[serde(default)]
     pub tts: TtsSettings,
+    /// 模拟场景设置
+    #[serde(default)]
+    pub simulation: SimulationSettings,
 }
 
 /// 用户设置
@@ -272,6 +275,7 @@ impl Default for AppSettings {
                 theme: "auto".to_string(),
                 hud_mode: default_hud_mode(),
                 hud_position: None,
+                livestream_hud_position: None,
             },
             user: UserSettings::default(),
             skill_library: SkillLibrarySettings {
@@ -313,6 +317,7 @@ impl Default for AppSettings {
             },
             screenshot: ScreenshotSettings::default(),
             tts: TtsSettings::default(),
+            simulation: SimulationSettings::default(),
         }
     }
 }
@@ -449,4 +454,70 @@ impl AppSettings {
         log::info!("✅ 保存配置成功: {:?}", path);
         Ok(())
     }
+}
+
+/// 模拟场景设置
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub struct SimulationSettings {
+    /// 直播间配置
+    #[serde(default)]
+    pub livestream: LivestreamConfig,
+    /// AI 员工列表
+    #[serde(default)]
+    pub employees: Vec<AIEmployeeConfig>,
+}
+
+impl Default for SimulationSettings {
+    fn default() -> Self {
+        Self {
+            livestream: LivestreamConfig::default(),
+            employees: Vec::new(),
+        }
+    }
+}
+
+/// 直播间配置
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub struct LivestreamConfig {
+    /// 在线人数
+    pub online_users: u32,
+    /// 直播间名称
+    pub room_name: String,
+    /// 直播间描述
+    pub room_description: String,
+    /// 弹幕频率 (high, medium, low)
+    pub danmaku_frequency: String,
+    /// 礼物频率 (high, medium, low)
+    pub gift_frequency: String,
+    /// 是否可上麦
+    pub allow_mic: bool,
+}
+
+impl Default for LivestreamConfig {
+    fn default() -> Self {
+        Self {
+            online_users: 1000,
+            room_name: "游戏陪玩直播间".to_string(),
+            room_description: "欢迎来到直播间！一起开心玩游戏~".to_string(),
+            danmaku_frequency: "medium".to_string(),
+            gift_frequency: "medium".to_string(),
+            allow_mic: true,
+        }
+    }
+}
+
+/// AI 员工配置
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub struct AIEmployeeConfig {
+    /// 员工 ID
+    pub id: String,
+    /// AI 性格 (sunnyou_male, funny_female, kobe, sweet_girl, trump)
+    pub personality: String,
+    /// 互动频率 (high, medium, low)
+    pub interaction_frequency: String,
+    /// AI 昵称
+    pub nickname: String,
 }

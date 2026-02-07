@@ -181,12 +181,12 @@ pub async fn open_livestream_hud_window(app: AppHandle) -> Result<(), String> {
     .position(pos_x, pos_y)          // 使用保存的位置
     .inner_size(400.0, 600.0)        // 更大的窗口
     .min_inner_size(400.0, 600.0)    // 最小尺寸
-    .resizable(false)                 
-    .decorations(false)              
-    .transparent(true)             
-    .always_on_top(true)          
-    .skip_taskbar(false)            
-    .focused(true)                  
+    .resizable(false)                // 禁止调整大小
+    .decorations(false)              // 无边框
+    .transparent(true)               // 透明背景
+    .always_on_top(true)             // 置顶
+    .skip_taskbar(false)             // 显示在任务栏
+    .focused(true)                   // 自动聚焦
     .build()
     .map_err(|e| format!("创建直播间 HUD 窗口失败: {}", e))?;
 

@@ -146,6 +146,9 @@ pub fn run() {
             // 技能库管理命令
             scan_downloaded_libraries,
             sync_libraries_to_config,
+            // 模拟场景命令
+            save_simulation_config,
+            load_simulation_config,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
