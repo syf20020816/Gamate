@@ -11,6 +11,7 @@ pub mod audio_commands;
 pub mod hud_commands;
 pub mod skill_library_commands;
 pub mod simulation_commands;
+pub mod simulation_engine_commands; // 新增模拟引擎命令
 
 pub use wiki_commands::*;
 pub use config_commands::*;
@@ -25,3 +26,4 @@ pub use audio_commands::*;
 pub use hud_commands::*;
 pub use skill_library_commands::*;
 pub use simulation_commands::*;
+pub use simulation_engine_commands::*; // 导出模拟引擎命令

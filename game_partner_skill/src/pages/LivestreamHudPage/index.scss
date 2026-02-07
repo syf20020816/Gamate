@@ -6,7 +6,7 @@
   background: #1414148b;
   -webkit-app-region: drag; // 启用窗口拖动
   user-select: none; // 禁止文本选择
-  
+
   .header-card {
     margin-bottom: 16px;
     background-color: transparent;
@@ -15,12 +15,12 @@
       align-items: center;
       justify-content: space-between;
       margin-bottom: 8px;
-      
+
       .livestream-info {
         display: flex;
         align-items: center;
         gap: 12px;
-        
+
         h2 {
           margin: 0;
           font-size: 20px;
@@ -28,12 +28,12 @@
         }
       }
     }
-    
+
     .livestream-desc {
       margin: 8px 0;
       color: #999;
     }
-    
+
     .game-select-row {
       margin-top: 12px;
       display: flex;
@@ -41,12 +41,11 @@
       -webkit-app-region: no-drag; // 允许 Select 交互
     }
   }
-  
+
   .main-content {
     background-color: transparent;
     flex: 1;
     display: flex;
-    gap: 16px;
     overflow: hidden;
     -webkit-app-region: no-drag; // 允许聊天区域和员工列表交互
     padding: 0;
@@ -55,50 +54,51 @@
       display: flex;
       flex-direction: column;
       background-color: transparent;
+      border-radius: 8px 0 0 8px;
       .ant-card-body {
         flex: 1;
         overflow: hidden;
         padding: 0;
       }
     }
-    
+
     .employees-card {
-      width: 120px;
+      width: 140px;
       background-color: transparent;
+      border-radius: 0 8px 8px 0;
       .employees-list {
         max-height: 100%;
         overflow-y: auto;
-        
+
         .employee-item {
           display: flex;
           align-items: center;
+          flex-wrap: wrap;
           justify-content: space-between;
-          padding: 12px;
+          padding: 4px;
           border-bottom: 1px solid #303030;
           transition: all 0.3s;
-          
-          &:last-child {
-            border-bottom: none;
-          }
-          
+          flex-direction: row;
+       
           &.on-mic {
             background: rgba(82, 196, 26, 0.1);
           }
-          
+
           &:hover {
             background: rgba(255, 255, 255, 0.05);
           }
-          
+
           .employee-info {
             display: flex;
-            flex-direction: column;
             gap: 4px;
+            align-items: center;
+            flex-direction: row;
           }
         }
       }
     }
   }
-  
+
   .footer-controls {
     margin-top: 16px;
     text-align: center;

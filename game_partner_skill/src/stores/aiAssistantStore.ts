@@ -7,6 +7,8 @@ export interface Message {
   timestamp: number;
   screenshot?: string; // Base64 encoded screenshot
   wikiReferences?: WikiReference[];
+  aiPersonality?: string; // AI 角色性格
+  nickname?: string; // AI 昵称
 }
 
 export interface WikiReference {
@@ -32,6 +34,7 @@ export interface AIAssistantState {
   // 动作
   sendMessage: (content: string, screenshot?: string) => void;
   receiveAIResponse: (content: string, wikiRefs?: WikiReference[]) => void;
+  addMessage: (message: Partial<Message> & Pick<Message, 'role' | 'content'>) => void; // 新增:直接添加消息
   updateContext: (screenshot?: string, gameState?: Record<string, any>) => void;
   setCurrentGame: (gameId: string | null) => void;
   setThinking: (thinking: boolean) => void;
@@ -78,6 +81,19 @@ export const useAIAssistantStore = create<AIAssistantState>((set) => ({
       messages: [...state.messages, newMessage],
       isThinking: false,
       lastWikiSearch: wikiRefs || [],
+    }));
+  },
+
+  // 直接添加消息 (用于模拟场景)
+  addMessage: (message) => {
+    const newMessage: Message = {
+      id: `${message.role}-${Date.now()}-${Math.random()}`,
+      timestamp: Date.now(),
+      ...message,
+    } as Message;
+
+    set((state) => ({
+      messages: [...state.messages, newMessage],
     }));
   },
 

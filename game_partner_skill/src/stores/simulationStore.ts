@@ -81,8 +81,12 @@ export const useSimulationStore = create<SimulationStore>((set) => ({
     config: { ...state.config, isRunning: false },
   })),
   
-  loadConfig: (savedConfig) => set((state) => ({
-    config: {
+  loadConfig: (savedConfig) => set((state) => {
+    console.log("===== Store loadConfig 被调用 =====");
+    console.log("传入的 savedConfig:", savedConfig);
+    console.log("savedConfig.employees:", savedConfig.employees);
+    
+    const newConfig = {
       ...state.config,
       livestream: {
         onlineUsers: savedConfig.livestream.onlineUsers,
@@ -98,6 +102,12 @@ export const useSimulationStore = create<SimulationStore>((set) => ({
         interactionFrequency: emp.interactionFrequency,
         nickname: emp.nickname,
       })),
-    },
-  })),
+    };
+    
+    console.log("新的 config:", newConfig);
+    console.log("新的 employees 数量:", newConfig.employees.length);
+    console.log("===================================");
+    
+    return { config: newConfig };
+  }),
 }));

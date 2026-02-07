@@ -20,6 +20,7 @@ interface ConversationAreaProps {
   isThinking: boolean;
   currentGame: string | null;
   onDeleteMessage: (id: string) => void;
+  itemStyle?: React.CSSProperties;
 }
 
 // 清理 Markdown 标记，用于 TTS 播报
@@ -33,18 +34,18 @@ const cleanMarkdownForTTS = (text: string): string => {
 
   // 否则进行常规 Markdown 清理
   return text
-    .replace(/\*\*(.+?)\*\*/g, '$1')      // 移除加粗 **text**
-    .replace(/\*(.+?)\*/g, '$1')          // 移除斜体 *text*
-    .replace(/`(.+?)`/g, '$1')            // 移除代码标记 `code`
-    .replace(/~~(.+?)~~/g, '$1')          // 移除删除线 ~~text~~
-    .replace(/#{1,6}\s+/g, '')            // 移除标题标记 # ## ###
-    .replace(/\[(.+?)\]\(.+?\)/g, '$1')   // 移除链接 [text](url) -> text
-    .replace(/!\[.+?\]\(.+?\)/g, '')      // 移除图片
-    .replace(/^\s*[-*+]\s+/gm, '')        // 移除列表标记
-    .replace(/^\s*\d+\.\s+/gm, '')        // 移除数字列表
-    .replace(/\n{3,}/g, '\n\n')           // 多个换行合并
-    .replace(/```[\s\S]*?```/g, '')       // 移除代码块
-    .replace(/`/g, '')                    // 移除单个反引号
+    .replace(/\*\*(.+?)\*\*/g, "$1") // 移除加粗 **text**
+    .replace(/\*(.+?)\*/g, "$1") // 移除斜体 *text*
+    .replace(/`(.+?)`/g, "$1") // 移除代码标记 `code`
+    .replace(/~~(.+?)~~/g, "$1") // 移除删除线 ~~text~~
+    .replace(/#{1,6}\s+/g, "") // 移除标题标记 # ## ###
+    .replace(/\[(.+?)\]\(.+?\)/g, "$1") // 移除链接 [text](url) -> text
+    .replace(/!\[.+?\]\(.+?\)/g, "") // 移除图片
+    .replace(/^\s*[-*+]\s+/gm, "") // 移除列表标记
+    .replace(/^\s*\d+\.\s+/gm, "") // 移除数字列表
+    .replace(/\n{3,}/g, "\n\n") // 多个换行合并
+    .replace(/```[\s\S]*?```/g, "") // 移除代码块
+    .replace(/`/g, "") // 移除单个反引号
     .trim();
 };
 
@@ -53,9 +54,12 @@ export const ConversationArea: React.FC<ConversationAreaProps> = ({
   isThinking,
   currentGame,
   onDeleteMessage,
+  itemStyle,
 }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const [speakingMessageId, setSpeakingMessageId] = React.useState<string | null>(null);
+  const [speakingMessageId, setSpeakingMessageId] = React.useState<
+    string | null
+  >(null);
 
   // 自动滚动到底部
   const scrollToBottom = () => {
@@ -78,7 +82,10 @@ export const ConversationArea: React.FC<ConversationAreaProps> = ({
         exit={{ opacity: 0, y: -20 }}
         transition={{ duration: 0.3 }}
         className={`message-item ${isUser ? "user-message" : "ai-message"}`}
-        style={{ backgroundColor: "#1e1e1e" }}
+        style={{
+          backgroundColor: "#1e1e1e",
+          ...itemStyle,
+        }}
       >
         <div className="message-header">
           <span className="message-role">{isUser ? "玩家" : "AI 助手"}</span>
@@ -90,7 +97,7 @@ export const ConversationArea: React.FC<ConversationAreaProps> = ({
             <Button
               type="text"
               size="small"
-              icon={<NotificationOutlined/>}
+              icon={<NotificationOutlined />}
               onClick={async () => {
                 try {
                   // 如果当前正在播报这条消息,则停止
@@ -120,23 +127,22 @@ export const ConversationArea: React.FC<ConversationAreaProps> = ({
                   await invoke("set_tts_volume", {
                     volume: ttsSettings.volume || 0.8,
                   });
-                  
+
                   // 设置当前播报的消息ID
                   setSpeakingMessageId(msg.id);
-                  
+
                   await invoke("speak_text", {
                     text: cleanText,
                     interrupt: true,
                   });
-                  
+
                   antdMessage.success("开始播报");
-                  
+
                   // 播报完成后清除状态 (简单估算:每个字100ms)
                   const estimatedDuration = cleanText.length * 100;
                   setTimeout(() => {
                     setSpeakingMessageId(null);
                   }, estimatedDuration);
-                  
                 } catch (error) {
                   setSpeakingMessageId(null);
                   antdMessage.error(`播报失败: ${error}`);

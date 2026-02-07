@@ -73,6 +73,12 @@ pub async fn save_simulation_config(
 pub async fn load_simulation_config(_app: AppHandle) -> Result<SimulationConfigPayload, String> {
     let settings = AppSettings::load().map_err(|e| e.to_string())?;
     
+    println!("===== 后端加载配置 =====");
+    println!("员工数量: {}", settings.simulation.employees.len());
+    for emp in &settings.simulation.employees {
+        println!("员工: {} ({})", emp.nickname, emp.personality);
+    }
+    
     let config = SimulationConfigPayload {
         livestream: LivestreamConfigPayload {
             online_users: settings.simulation.livestream.online_users,
@@ -92,6 +98,8 @@ pub async fn load_simulation_config(_app: AppHandle) -> Result<SimulationConfigP
         }).collect(),
     };
     
+    println!("返回的配置员工数量: {}", config.employees.len());
+    println!("========================");
     println!("✅ 模拟场景配置已加载");
     Ok(config)
 }

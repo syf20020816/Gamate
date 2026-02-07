@@ -80,6 +80,9 @@ cpal = "0.15"           # 跨平台音频 I/O
 hound = "3.5"           # WAV 文件读写
 rubato = "0.15"         # 音频重采样
 
+# 随机数生成
+rand = "0.8"
+
 # Windows Speech Recognition (STT)
 [target.'cfg(windows)'.dependencies]
 windows = { version = "0.58", features = [

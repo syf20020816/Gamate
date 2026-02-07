@@ -11,6 +11,7 @@ mod tts;
 mod audio;
 mod aliyun_voice_service;
 mod tray;
+mod simulation; // 新增模拟系统
 pub mod vector_db;
 
 use commands::*;
@@ -53,6 +54,9 @@ pub fn run() {
 
     // 初始化音频状态
     let audio_state = audio_commands::AudioState::new();
+    
+    // 初始化模拟状态
+    let simulation_state = simulation_engine_commands::SimulationState::new();
 
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
@@ -60,6 +64,7 @@ pub fn run() {
         .manage(game_config) // 将配置注入到应用状态
         .manage(screenshot_state) // 注入截图状态
         .manage(audio_state) // 注入音频状态
+        .manage(simulation_state) // 注入模拟状态
         .setup(|app| {
             // 创建系统托盘
             tray::create_tray(app.handle())?;
@@ -149,6 +154,11 @@ pub fn run() {
             // 模拟场景命令
             save_simulation_config,
             load_simulation_config,
+            // 模拟引擎命令
+            start_livestream_simulation,
+            stop_livestream_simulation,
+            is_simulation_running,
+            streamer_speak,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
