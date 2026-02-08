@@ -5,6 +5,7 @@
 pub mod engine;
 pub mod events;
 pub mod memory;
+pub mod ai_analyzer;
 
 pub use engine::SimulationEngine;
 pub use events::{SimulationEvent, EventType};

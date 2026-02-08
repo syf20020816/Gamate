@@ -59,6 +59,11 @@ impl MemoryManager {
             .unwrap_or_default()
     }
 
+    /// 🔥 获取对话历史（用于 AI 分析）
+    pub fn get_conversation_history(&self, employee_id: &str) -> Vec<Message> {
+        self.get_history(employee_id)
+    }
+
     /// 构建 LLM Prompt (包含历史对话)
     pub fn build_context(&self, employee_id: &str) -> String {
         let history = self.get_history(employee_id);

@@ -10,6 +10,9 @@ use tauri::{AppHandle, Emitter};
 
 use super::events::{SimulationEvent, EventType, frequency_to_interval, gift_frequency_to_params};
 use super::memory::MemoryManager;
+use super::ai_analyzer::{
+    AIAnalyzer, AIAnalysisRequest, EmployeeContext, ConversationMessage
+};
 use crate::settings::AppSettings;
 
 /// AI 员工配置
@@ -28,6 +31,7 @@ pub struct SimulationEngine {
     is_running: Arc<Mutex<bool>>,
     pub employees: Vec<EmployeeConfig>,
     gift_frequency: String,
+    pub ai_analyzer: Option<AIAnalyzer>,
 }
 
 impl SimulationEngine {
@@ -38,6 +42,7 @@ impl SimulationEngine {
             is_running: Arc::new(Mutex::new(false)),
             employees: Vec::new(),
             gift_frequency: "medium".to_string(),
+            ai_analyzer: None,
         }
     }
 
@@ -59,6 +64,19 @@ impl SimulationEngine {
             .collect();
 
         self.gift_frequency = settings.simulation.livestream.gift_frequency.clone();
+
+        // 🔥 初始化 AI 分析器（使用多模态模型配置）
+        let multimodal_config = &settings.ai_models.multimodal;
+        let api_endpoint = multimodal_config.api_base.clone();
+        let api_key = multimodal_config.api_key.clone().unwrap_or_default();
+        let model = multimodal_config.model_name.clone();
+        
+        if !api_endpoint.is_empty() && !api_key.is_empty() {
+            self.ai_analyzer = Some(AIAnalyzer::new(api_endpoint, api_key, model));
+            println!("✅ AI 分析器已初始化: {}", multimodal_config.model_name);
+        } else {
+            println!("⚠️ 多模态 AI 未配置，将使用传统模板模式");
+        }
 
         Ok(())
     }
@@ -329,6 +347,122 @@ impl SimulationEngine {
                 // 生成回复
                 Self::send_danmaku(&app, &emp, &memory).await;
             });
+        }
+    }
+
+    /// 🔥 处理智能截图事件（AI 驱动的互动）
+    pub async fn on_smart_capture_completed(
+        &self,
+        speech_text: &str,
+        screenshot_before: &str,
+        screenshot_after: &str,
+    ) {
+        println!("🎬 处理智能截图事件");
+        println!("  语音: {}", speech_text);
+        
+        // 如果没有配置 AI，回退到传统模式
+        let Some(ai_analyzer) = &self.ai_analyzer else {
+            println!("⚠️ AI 未配置，使用传统模式");
+            self.on_streamer_speak(speech_text).await;
+            return;
+        };
+
+        // 构建每个员工的上下文
+        let employee_contexts: Vec<EmployeeContext> = self.employees
+            .iter()
+            .map(|emp| {
+                let history = self.memory.get_conversation_history(&emp.id);
+                EmployeeContext {
+                    id: emp.id.clone(),
+                    nickname: emp.nickname.clone(),
+                    personality: emp.personality.clone(),
+                    conversation_history: history
+                        .into_iter()
+                        .map(|msg| ConversationMessage {
+                            role: msg.role,
+                            content: msg.content,
+                        })
+                        .collect(),
+                }
+            })
+            .collect();
+
+        // 构建 AI 分析请求
+        let request = AIAnalysisRequest {
+            streamer_speech: speech_text.to_string(),
+            screenshot_before: screenshot_before.to_string(),
+            screenshot_after: screenshot_after.to_string(),
+            employees: employee_contexts,
+        };
+
+        // 调用 AI 分析
+        match ai_analyzer.analyze(request).await {
+            Ok(response) => {
+                println!("✅ AI 分析成功，生成 {} 个行为", response.actions.len());
+                
+                // 保存主播的话到所有员工的记忆
+                for emp in &self.employees {
+                    self.memory.add_message(&emp.id, "user", speech_text);
+                }
+
+                // 执行 AI 决策的行为
+                for action in response.actions {
+                    // 查找对应的员工
+                    let Some(employee) = self.employees.iter().find(|e| e.id == action.employee) else {
+                        println!("⚠️ 未找到员工: {}", action.employee);
+                        continue;
+                    };
+
+                    // 随机延迟 0.5-2 秒（让互动更自然）
+                    let delay = 500 + (rand::random::<u64>() % 1500);
+                    
+                    let app = self.app.clone();
+                    let emp = employee.clone();
+                    let memory = self.memory.clone();
+                    let content = action.content.clone();
+                    let send_gift = action.gift;
+                    let gift_name = action.gift_name.clone();
+                    let gift_count = action.gift_count.unwrap_or(1);
+
+                    tauri::async_runtime::spawn(async move {
+                        sleep(Duration::from_millis(delay)).await;
+                        
+                        // 发送弹幕
+                        memory.add_message(&emp.id, "assistant", &content);
+                        
+                        let event = SimulationEvent::new(EventType::Danmaku {
+                            employee_id: emp.id.clone(),
+                            nickname: emp.nickname.clone(),
+                            message: content.clone(),
+                            personality: emp.personality.clone(),
+                        });
+
+                        let _ = app.emit("simulation_event", event);
+                        println!("💬 [{}] {}", emp.nickname, content);
+
+                        // 如果需要送礼物
+                        if send_gift {
+                            sleep(Duration::from_millis(500)).await;
+                            
+                            let gift = gift_name.unwrap_or("🚀火箭".to_string());
+                            let event = SimulationEvent::new(EventType::Gift {
+                                employee_id: emp.id.clone(),
+                                nickname: emp.nickname.clone(),
+                                gift_name: gift.clone(),
+                                count: gift_count,
+                            });
+
+                            let _ = app.emit("simulation_event", event);
+                            println!("🎁 [{}] 送出 {} x{}", emp.nickname, gift, gift_count);
+                        }
+                    });
+                }
+            }
+            Err(e) => {
+                println!("❌ AI 分析失败: {}", e);
+                // 回退到传统模式
+                self.on_streamer_speak(speech_text).await;
+            }
         }
     }
 }

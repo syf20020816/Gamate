@@ -12,6 +12,8 @@ pub mod hud_commands;
 pub mod skill_library_commands;
 pub mod simulation_commands;
 pub mod simulation_engine_commands; // 新增模拟引擎命令
+pub mod smart_capture_commands;    // 新增智能截图命令
+pub mod ai_analysis_commands;      // 新增 AI 分析命令
 
 pub use wiki_commands::*;
 pub use config_commands::*;
@@ -27,3 +29,6 @@ pub use hud_commands::*;
 pub use skill_library_commands::*;
 pub use simulation_commands::*;
 pub use simulation_engine_commands::*; // 导出模拟引擎命令
+pub use smart_capture_commands::*;
+pub use ai_analysis_commands::*;
+pub use smart_capture_commands::*;     // 导出智能截图命令

@@ -12,6 +12,7 @@ mod audio;
 mod aliyun_voice_service;
 mod tray;
 mod simulation; // 新增模拟系统
+mod livestream; // 新增直播间功能
 pub mod vector_db;
 
 use commands::*;
@@ -57,6 +58,7 @@ pub fn run() {
     
     // 初始化模拟状态
     let simulation_state = simulation_engine_commands::SimulationState::new();
+    let smart_capture_state = smart_capture_commands::SmartCaptureState::new();
 
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
@@ -65,6 +67,7 @@ pub fn run() {
         .manage(screenshot_state) // 注入截图状态
         .manage(audio_state) // 注入音频状态
         .manage(simulation_state) // 注入模拟状态
+        .manage(smart_capture_state) // 注入智能截图状态
         .setup(|app| {
             // 创建系统托盘
             tray::create_tray(app.handle())?;
@@ -159,6 +162,12 @@ pub fn run() {
             stop_livestream_simulation,
             is_simulation_running,
             streamer_speak,
+            // 智能截图命令
+            start_smart_capture,
+            stop_smart_capture,
+            get_smart_capture_status,
+            // AI 分析命令
+            trigger_ai_analysis,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
