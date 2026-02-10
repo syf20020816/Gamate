@@ -84,5 +84,17 @@
         margin-top: 4px;
       }
     }
+
+    .panel-footer {
+      padding-top: 16px;
+      border-top: 1px solid rgba(255, 255, 255, 0.05);
+
+      .ant-btn-text {
+        &:hover {
+          color: rgba(255, 255, 255, 0.85) !important;
+          background: rgba(255, 255, 255, 0.05);
+        }
+      }
+    }
   }
 }

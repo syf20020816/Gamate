@@ -5,6 +5,8 @@ import Logs from "../Logs";
 import SettingsPanel from "../Settings";
 import WikiKnowledgeBase from "../WikiKnowledgeBase";
 import AIAssistant from "../AIAssistant";
+import UserAgreement from "../UserAgreement";
+import PrivacyPolicy from "../PrivacyPolicy";
 import "./styles.scss";
 
 interface MainContentProps {
@@ -29,6 +31,10 @@ const MainContent: React.FC<MainContentProps> = ({ selectedMenu, onMenuChange })
         return <Logs />;
       case "settings":
         return <SettingsPanel />;
+      case "user-agreement":
+        return <UserAgreement />;
+      case "privacy-policy":
+        return <PrivacyPolicy />;
       default:
         return <Home onNavigate={onMenuChange} />;
     }

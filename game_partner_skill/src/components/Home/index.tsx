@@ -2,17 +2,22 @@ import {
   Card,
   Row,
   Col,
-  Statistic,
   Typography,
   Space,
   Button,
   Tag,
-  Avatar,
-  List,
+  Steps,
+  Alert,
 } from "antd";
-import { Activity, Zap, Clock, Gamepad2, ArrowRight } from "lucide-react";
+import {
+  MessageCircle,
+  Brain,
+  Sparkles,
+  CheckCircle,
+  Circle,
+  ArrowRight,
+} from "lucide-react";
 import { motion } from "framer-motion";
-import { useUserStore } from "../../stores/userStore";
 import { getGameById } from "../../services/configService";
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
@@ -25,42 +30,117 @@ interface HomeProps {
 }
 
 const Home: React.FC<HomeProps> = ({ onNavigate }) => {
-  const { user } = useUserStore();
   const [selectedGames, setSelectedGames] = useState<any[]>([]);
-  
+  const [downloadedLibraries, setDownloadedLibraries] = useState<any[]>([]);
+  const [hasSkillLibrary, setHasSkillLibrary] = useState(false);
+  const [isVectorDBReady, setIsVectorDBReady] = useState(false);
+  const [isLLMReady, setIsLLMReady] = useState(false);
+
   // 从后端加载用户选择的游戏
   useEffect(() => {
     const loadSelectedGames = async () => {
       try {
-        const settings = await invoke<any>('get_app_settings');
+        const settings = await invoke<any>("get_app_settings");
         const selectedGameIds = settings.user?.selected_games || [];
-        
+
         const games = await Promise.all(
-          selectedGameIds.map((id: string) => getGameById(id))
+          selectedGameIds.map((id: string) => getGameById(id)),
         );
         const validGames = games.filter(Boolean);
         setSelectedGames(validGames);
       } catch (error) {
-        console.error('加载游戏配置失败:', error);
+        console.error("加载游戏配置失败:", error);
       }
     };
     loadSelectedGames();
   }, []);
-  
-  const valueStyle: React.CSSProperties = {
-    fontSize: 18,
-    fontWeight: "bold",
-    height: "36px",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "flex-start",
-    gap: "4px",
+
+  // 加载已下载的技能库
+  useEffect(() => {
+    const loadLibraries = async () => {
+      try {
+        const libraries = await invoke<any[]>("scan_downloaded_libraries");
+        setDownloadedLibraries(libraries);
+        setHasSkillLibrary(libraries.length > 0);
+      } catch (error) {
+        console.error("扫描技能库失败:", error);
+      }
+    };
+    loadLibraries();
+  }, []);
+
+  // 检查系统状态（与 RightPanel 同步）
+  useEffect(() => {
+    const checkSystemStatus = async () => {
+      try {
+        // 检查向量库是否就绪
+        const hasVectorDB = downloadedLibraries.length > 0;
+        setIsVectorDBReady(hasVectorDB);
+
+        // 检查 LLM 是否配置
+        const settings = await invoke<any>("get_app_settings");
+        const hasAPIKey =
+          settings.ai_models?.multimodal?.api_key ||
+          settings.ai_models?.multimodal?.provider === "local";
+        setIsLLMReady(!!hasAPIKey);
+      } catch (error) {
+        console.error("检查系统状态失败:", error);
+      }
+    };
+
+    checkSystemStatus();
+  }, [downloadedLibraries]);
+
+  // 计算当前步骤
+  const getCurrentStep = () => {
+    if (selectedGames.length === 0) return 0;
+    if (!hasSkillLibrary) return 1;
+    return 2;
   };
-  const prefixStyle: React.CSSProperties = {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
+
+  // 获取下一步操作
+  const getNextStepAction = () => {
+    const step = getCurrentStep();
+    switch (step) {
+      case 0:
+        return (
+          <Button
+            type="primary"
+            block
+            size="large"
+            onClick={() => onNavigate?.("game-library")}
+          >
+            前往游戏库
+          </Button>
+        );
+      case 1:
+        return (
+          <Button
+            type="primary"
+            block
+            size="large"
+            onClick={() => onNavigate?.("skill-database")}
+          >
+            前往技能库
+          </Button>
+        );
+      case 2:
+        return (
+          <Button
+            type="primary"
+            block
+            size="large"
+            onClick={() => onNavigate?.("ai-assistant")}
+          >
+            开始 AI 对话
+          </Button>
+        );
+      default:
+        return null;
+    }
   };
+
+  const allStepsCompleted = getCurrentStep() >= 2;
 
   return (
     <div className="home-page">
@@ -69,199 +149,388 @@ const Home: React.FC<HomeProps> = ({ onNavigate }) => {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3 }}
       >
-        <div className="welcome-section">
-          <Title level={2}>欢迎回来, {user?.profile.username}!</Title>
-          <Paragraph type="secondary">
-            智能游戏伴侣,让每一次游戏都不再孤单
+        {/* 欢迎区域 (Hero Section) */}
+        <div className="hero-section">
+          <Title
+            level={1}
+            style={{ display: "flex", alignItems: "center", gap: 12 }}
+          >
+            Gamate
+          </Title>
+          <Paragraph
+            style={{
+              marginBottom: 16,
+            }}
+          >
+            AI 驱动的智能游戏陪玩助手
           </Paragraph>
-          {user?.profile.isPremium && (
-            <Tag color="gold" style={{ marginTop: 8 }}>
-              Premium 用户
-            </Tag>
-          )}
+
+          {/* 核心特性卡片 */}
+          <Row gutter={16} style={{ marginBottom: 16 }}>
+            <Col span={8}>
+              <Card size="small" style={{ textAlign: "center" }}>
+                <MessageCircle
+                  size={32}
+                  style={{ color: "#1890ff", marginBottom: 12 }}
+                />
+                <Title level={5}>语音对话</Title>
+                <Text type="secondary" style={{ fontSize: 12 }}>
+                  实时语音交互，如同真人陪玩
+                </Text>
+              </Card>
+            </Col>
+            <Col span={8}>
+              <Card size="small" style={{ textAlign: "center" }}>
+                <Brain
+                  size={32}
+                  style={{ color: "#52c41a", marginBottom: 12 }}
+                />
+                <Title level={5}>智能分析</Title>
+                <Text type="secondary" style={{ fontSize: 12 }}>
+                  截图+RAG，精准游戏指导
+                </Text>
+              </Card>
+            </Col>
+            <Col span={8}>
+              <Card size="small" style={{ textAlign: "center" }}>
+                <Sparkles
+                  size={32}
+                  style={{ color: "#722ed1", marginBottom: 12 }}
+                />
+                <Title level={5}>直播模拟</Title>
+                <Text type="secondary" style={{ fontSize: 12 }}>
+                  AI 虚拟观众，练习互动
+                </Text>
+              </Card>
+            </Col>
+          </Row>
         </div>
 
-        <Row gutter={[8, 8]} style={{ marginTop: 32 }}>
-          <Col span={6}>
-            <Card>
-              <Statistic
-                title="已配置游戏"
-                value={selectedGames.length}
-                prefix={<Gamepad2 size={20} />}
-                styles={{
-                  content: { color: "#3f8600", ...valueStyle },
-                  prefix: prefixStyle,
-                }}
+        {/* 主要内容区域 */}
+        <Row gutter={16}>
+          {/* 快速开始 */}
+          <Col span={12}>
+            <Card title="快速开始" style={{ height: "100%" }}>
+              <Steps
+                current={getCurrentStep()}
+                direction="vertical"
+                size="small"
+                items={[
+                  {
+                    title: "添加游戏",
+                    description: "从游戏库中选择你要玩的游戏",
+                    status: selectedGames.length > 0 ? "finish" : "process",
+                    icon:
+                      selectedGames.length > 0 ? (
+                        <CheckCircle size={16} color="#52c41a" />
+                      ) : (
+                        <Circle size={16} />
+                      ),
+                  },
+                  {
+                    title: "下载技能库",
+                    description: "下载游戏 Wiki 知识库",
+                    status: hasSkillLibrary
+                      ? "finish"
+                      : selectedGames.length > 0
+                        ? "process"
+                        : "wait",
+                    icon: hasSkillLibrary ? (
+                      <CheckCircle size={16} color="#52c41a" />
+                    ) : (
+                      <Circle size={16} />
+                    ),
+                  },
+                  {
+                    title: "开始对话",
+                    description: "启动 AI 陪玩助手，开始游戏",
+                    status: allStepsCompleted
+                      ? "finish"
+                      : hasSkillLibrary
+                        ? "process"
+                        : "wait",
+                    icon: allStepsCompleted ? (
+                      <CheckCircle size={16} color="#52c41a" />
+                    ) : (
+                      <Circle size={16} />
+                    ),
+                  },
+                ]}
               />
-            </Card>
-          </Col>
-          <Col span={6}>
-            <Card>
-              <Statistic
-                title="识别次数"
-                value={0}
-                prefix={<Activity size={20} />}
-                styles={{
-                  content: { color: "#1890ff", ...valueStyle },
-                  prefix: prefixStyle,
-                }}
-              />
-            </Card>
-          </Col>
-          <Col span={6}>
-            <Card>
-              <Statistic
-                title="提示生成"
-                value={0}
-                prefix={<Zap size={20} />}
-                styles={{
-                  content: { color: "#722ed1", ...valueStyle },
-                  prefix: prefixStyle,
-                }}
-              />
-            </Card>
-          </Col>
-          <Col span={6}>
-            <Card>
-              <Statistic
-                title="运行时长"
-                value="0h 0m"
-                prefix={<Clock size={20} />}
-                styles={{
-                  content: { color: "#fff", ...valueStyle },
-                  prefix: prefixStyle,
-                }}
-              />
-            </Card>
-          </Col>
-        </Row>
-
-        <Row gutter={16} style={{ marginTop: 16 }}>
-          <Col span={24}>
-            <Card
-              title="我的游戏"
-              extra={
-                <Button
-                  type="link"
-                  icon={<ArrowRight size={16} />}
-                  onClick={() => onNavigate?.("game-library")}
-                >
-                  管理游戏
-                </Button>
-              }
-            >
-              {selectedGames.length > 0 ? (
-                <List
-                  dataSource={selectedGames}
-                  renderItem={(game: any) => (
-                    <List.Item>
-                      <List.Item.Meta
-                        avatar={
-                          <Avatar
-                            size={48}
-                            style={{
-                              background:
-                                "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-                            }}
-                          >
-                            {game!.name[0]}
-                          </Avatar>
-                        }
-                        title={game!.name}
-                        description={
-                          <Space>
-                            <Tag>{game!.category}</Tag>
-                            {game.tags.slice(0, 2).map((tag: string) => (
-                              <Tag key={tag} color="blue">
-                                {tag}
-                              </Tag>
-                            ))}
-                          </Space>
-                        }
-                      />
-                    </List.Item>
-                  )}
+              {!allStepsCompleted && (
+                <div style={{ marginTop: 16 }}>{getNextStepAction()}</div>
+              )}
+              {allStepsCompleted && (
+                <Alert
+                  type="success"
+                  message="一切就绪！"
+                  description="你可以开始使用 AI 陪玩助手了"
+                  style={{ marginTop: 16 }}
+                  action={
+                    <Button
+                      type="primary"
+                      onClick={() => onNavigate?.("ai-assistant")}
+                    >
+                      立即开始
+                    </Button>
+                  }
                 />
-              ) : (
-                <div style={{ textAlign: "center", padding: "40px 0" }}>
-                  <Gamepad2
-                    size={48}
-                    style={{ color: "rgba(255,255,255,0.2)", marginBottom: 16 }}
-                  />
-                  <Paragraph type="secondary">还没有添加游戏</Paragraph>
-                  <Button
-                    type="primary"
-                    onClick={() => onNavigate?.("game-library")}
-                  >
-                    前往游戏库
-                  </Button>
-                </div>
               )}
             </Card>
           </Col>
 
-          <Col span={12} style={{ marginTop: 16 }}>
-            <Card title="快速开始">
+          {/* 使用状态 */}
+          <Col span={12}>
+            <Card title="使用状态" style={{ height: "100%" }}>
               <Space
                 direction="vertical"
                 size="middle"
                 style={{ width: "100%" }}
               >
-                <Button
-                  block
-                  size="large"
-                  type="primary"
-                  icon={<Gamepad2 size={18} />}
-                  onClick={() => onNavigate?.("game-library")}
-                >
-                  添加游戏
-                </Button>
-                <Button
-                  block
-                  size="large"
-                  icon={<Activity size={18} />}
-                  onClick={() => onNavigate?.("screen-capture")}
-                  disabled={selectedGames.length === 0}
-                >
-                  开始识别
-                </Button>
-                <Button
-                  block
-                  size="large"
-                  icon={<Zap size={18} />}
-                  onClick={() => onNavigate?.("skill-database")}
-                >
-                  管理技能库
-                </Button>
-              </Space>
-            </Card>
-          </Col>
-          <Col span={12} style={{ marginTop: 16 }}>
-            <Card title="游戏分类">
-              <Space
-                direction="vertical"
-                size="small"
-                style={{ width: "100%" }}
-              >
-                {user?.config.gameCategories.map((cat) => (
+                {/* 系统状态区 */}
+                <div>
+                  <Text
+                    type="secondary"
+                    style={{ fontSize: 13, display: "block", marginBottom: 8 }}
+                  >
+                    系统状态
+                  </Text>
+                  <Space
+                    direction="vertical"
+                    size="small"
+                    style={{ width: "100%" }}
+                  >
+                    <div className="stat-item">
+                      <Space
+                        style={{
+                          width: "100%",
+                          justifyContent: "space-between",
+                        }}
+                      >
+                        <Text type="secondary">已配置游戏</Text>
+                        <Text strong>{selectedGames.length} 个</Text>
+                      </Space>
+                    </div>
+
+                    <div className="stat-item">
+                      <Space
+                        style={{
+                          width: "100%",
+                          justifyContent: "space-between",
+                        }}
+                      >
+                        <Text type="secondary">已下载技能库</Text>
+                        <Text strong>{downloadedLibraries.length} 个</Text>
+                      </Space>
+                    </div>
+
+                    <div className="stat-item">
+                      <Space
+                        style={{
+                          width: "100%",
+                          justifyContent: "space-between",
+                        }}
+                      >
+                        <Text type="secondary">向量库</Text>
+                        <Tag color={isVectorDBReady ? "green" : "red"}>
+                          {isVectorDBReady ? "就绪" : "未就绪"}
+                        </Tag>
+                      </Space>
+                    </div>
+
+                    <div className="stat-item">
+                      <Space
+                        style={{
+                          width: "100%",
+                          justifyContent: "space-between",
+                        }}
+                      >
+                        <Text type="secondary">多模态 AI</Text>
+                        <Tag color={isLLMReady ? "green" : "orange"}>
+                          {isLLMReady ? "就绪" : "未配置"}
+                        </Tag>
+                      </Space>
+                    </div>
+                  </Space>
+                </div>
+
+                {/* 技能库概况区 */}
+                {downloadedLibraries.length > 0 && (
                   <div
-                    key={cat.id}
                     style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      padding: "8px 12px",
-                      background: "rgba(255,255,255,0.02)",
-                      borderRadius: 6,
+                      paddingTop: 12,
+                      borderTop: "1px solid rgba(255,255,255,0.1)",
                     }}
                   >
-                    <Text>{cat.name}</Text>
-                    <Tag color={cat.color}>{cat.gameIds.length}</Tag>
+                    <Text
+                      type="secondary"
+                      style={{
+                        fontSize: 13,
+                        display: "block",
+                        marginBottom: 8,
+                      }}
+                    >
+                      技能库概况
+                    </Text>
+                    <Space
+                      direction="vertical"
+                      size="small"
+                      style={{ width: "100%" }}
+                    >
+                      <div className="stat-item">
+                        <Space
+                          style={{
+                            width: "100%",
+                            justifyContent: "space-between",
+                          }}
+                        >
+                          <Text type="secondary">已下载游戏</Text>
+                          <Text strong>
+                            {
+                              new Set(
+                                downloadedLibraries.map(
+                                  (lib: any) => lib.gameId,
+                                ),
+                              ).size
+                            }{" "}
+                            个
+                          </Text>
+                        </Space>
+                      </div>
+
+                      <div className="stat-item">
+                        <Space
+                          style={{
+                            width: "100%",
+                            justifyContent: "space-between",
+                          }}
+                        >
+                          <Text type="secondary">技能库版本</Text>
+                          <Text strong>{downloadedLibraries.length} 个</Text>
+                        </Space>
+                      </div>
+
+                      <div className="stat-item">
+                        <Space
+                          style={{
+                            width: "100%",
+                            justifyContent: "space-between",
+                          }}
+                        >
+                          <Text type="secondary">活跃版本</Text>
+                          <Text strong>
+                            {
+                              downloadedLibraries.filter(
+                                (lib: any) => lib.status === "active",
+                              ).length
+                            }{" "}
+                            个
+                          </Text>
+                        </Space>
+                      </div>
+
+                      <div className="stat-item">
+                        <Space
+                          style={{
+                            width: "100%",
+                            justifyContent: "space-between",
+                          }}
+                        >
+                          <Text type="secondary">总存储大小</Text>
+                          <Text strong>
+                            {(() => {
+                              const totalBytes = downloadedLibraries.reduce(
+                                (sum: number, lib: any) =>
+                                  sum + (lib.storageSize || 0),
+                                0,
+                              );
+                              if (totalBytes === 0) return "0 B";
+                              const k = 1024;
+                              const sizes = ["B", "KB", "MB", "GB"];
+                              const i = Math.floor(
+                                Math.log(totalBytes) / Math.log(k),
+                              );
+                              return `${(totalBytes / Math.pow(k, i)).toFixed(1)} ${sizes[i]}`;
+                            })()}
+                          </Text>
+                        </Space>
+                      </div>
+                    </Space>
                   </div>
-                ))}
+                )}
               </Space>
             </Card>
           </Col>
         </Row>
+
+        {/* 我的游戏 */}
+        {selectedGames.length > 0 && (
+          <Row gutter={16} style={{ marginTop: 16 }}>
+            <Col span={24}>
+              <Card
+                title="我的游戏"
+                extra={
+                  <Button
+                    type="link"
+                    icon={<ArrowRight size={16} />}
+                    onClick={() => onNavigate?.("game-library")}
+                  >
+                    管理游戏
+                  </Button>
+                }
+              >
+                <Row gutter={16}>
+                  {selectedGames.map((game) => (
+                    <Col span={8} key={game!.id}>
+                      <Card
+                        hoverable
+                        size="small"
+                        styles={{
+                          body: { padding: 16 },
+                        }}
+                      >
+                        <div style={{ textAlign: "center" }}>
+                          <Title level={5} style={{ marginBottom: 8 }}>
+                            {game!.name}
+                          </Title>
+                          <Space direction="vertical" style={{ width: "100%" }}>
+                            <Space>
+                              <Tag>{game!.category}</Tag>
+                              {downloadedLibraries.some(
+                                (lib) => lib.gameId === game!.id,
+                              ) && <Tag color="green">已就绪</Tag>}
+                            </Space>
+                            <Button
+                              type="primary"
+                              block
+                              onClick={() => {
+                                onNavigate?.("ai-assistant");
+                                // 切换到该游戏
+                                setTimeout(async () => {
+                                  try {
+                                    const { emit } =
+                                      await import("@tauri-apps/api/event");
+                                    await emit("game-changed", {
+                                      gameId: game!.id,
+                                    });
+                                  } catch (error) {
+                                    console.error("切换游戏失败:", error);
+                                  }
+                                }, 100);
+                              }}
+                            >
+                              启动 AI 助手
+                            </Button>
+                          </Space>
+                        </div>
+                      </Card>
+                    </Col>
+                  ))}
+                </Row>
+              </Card>
+            </Col>
+          </Row>
+        )}
       </motion.div>
     </div>
   );

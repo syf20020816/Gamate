@@ -1,0 +1,48 @@
+.privacy-policy {
+  min-height: 100vh;
+
+  .ant-card {
+    background: rgba(255, 255, 255, 0.02);
+  }
+
+  section {
+    .ant-typography {
+      color: rgba(255, 255, 255, 0.85);
+    }
+
+    h4 {
+      color: #52c41a;
+      margin-top: 0;
+      display: flex;
+      align-items: center;
+    }
+
+    h5 {
+      color: #1890ff;
+      margin-top: 16px;
+    }
+
+    ul {
+      margin: 8px 0;
+      padding-left: 24px;
+      
+      li {
+        margin: 4px 0;
+        color: rgba(255, 255, 255, 0.85);
+      }
+    }
+  }
+
+  code {
+    background: rgba(255, 255, 255, 0.1);
+    padding: 2px 8px;
+    border-radius: 4px;
+    color: #52c41a;
+    font-size: 12px;
+  }
+
+  .ant-alert {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+}

@@ -9,26 +9,25 @@ pub async fn get_app_settings() -> Result<AppSettings, String> {
 /// 保存应用设置
 #[tauri::command]
 pub async fn save_app_settings(mut settings: AppSettings) -> Result<(), String> {
-    // 🔥 保护模拟场景配置：从现有配置中加载并合并
-    // 这样可以避免在设置页面保存其他配置时，覆盖掉模拟场景中的 AI 员工配置
+    // 保护模拟场景配置：从现有配置中加载并合并
+    // 这样可以避免在设置页面保存其他配置时，覆盖掉模拟场景中的 AI 员工配置和直播间配置
     if let Ok(existing_settings) = AppSettings::load() {
-        // 如果新配置中的 simulation.employees 为空，则保留现有的员工配置
-        if settings.simulation.employees.is_empty()
-            && !existing_settings.simulation.employees.is_empty()
-        {
-            log::info!(
-                "🔒 保护模拟场景配置：保留 {} 个 AI 员工",
-                existing_settings.simulation.employees.len()
-            );
-            settings.simulation.employees = existing_settings.simulation.employees;
-        }
+        // 检测是否为默认配置（前端未发送 simulation 字段时，Serde 会用 Default）
+        let is_default_simulation = 
+            settings.simulation.livestream.room_name == "游戏陪玩直播间"
+            && settings.simulation.livestream.online_users == 1000
+            && settings.simulation.employees.is_empty();
 
-        // 同样保护直播间配置（如果前端没有发送完整的直播间配置）
-        if settings.simulation.livestream.room_name.is_empty()
-            && !existing_settings.simulation.livestream.room_name.is_empty()
-        {
-            log::info!("🔒 保护直播间配置");
-            settings.simulation.livestream = existing_settings.simulation.livestream;
+        // 如果是默认配置，则完整保留现有的模拟场景配置
+        if is_default_simulation {
+            settings.simulation = existing_settings.simulation;
+        } else {
+            // 否则只保护员工配置（允许更新直播间配置）
+            if settings.simulation.employees.is_empty()
+                && !existing_settings.simulation.employees.is_empty()
+            {
+                settings.simulation.employees = existing_settings.simulation.employees;
+            }
         }
     }
 

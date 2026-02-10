@@ -71,6 +71,19 @@ const AIAssistant: React.FC = () => {
   const [useScreenshot, setUseScreenshot] = useState(true);
   const voiceListenerRegistered = useRef(false); // 防止重复注册语音识别监听器
 
+  // 监听从 RightPanel 发来的切换到模拟场景 Tab 的事件
+  useEffect(() => {
+    const handleSwitchToSimulation = () => {
+      setTabKey("simulation");
+    };
+
+    window.addEventListener("switch-to-simulation-tab", handleSwitchToSimulation);
+
+    return () => {
+      window.removeEventListener("switch-to-simulation-tab", handleSwitchToSimulation);
+    };
+  }, []);
+
   // 监听来自 HUD 的游戏切换事件
   useEffect(() => {
     const setupGameChangeListener = async () => {
