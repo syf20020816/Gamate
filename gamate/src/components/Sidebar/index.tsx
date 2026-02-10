@@ -5,7 +5,6 @@ import {
   Database,
   Settings,
   Home,
-  FileText,
   ChevronLeft,
   ChevronRight,
   BookOpen,

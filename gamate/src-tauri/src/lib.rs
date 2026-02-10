@@ -18,12 +18,6 @@ pub mod vector_db;
 use commands::*;
 use config::Config;
 
-// Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-#[tauri::command]
-fn greet(name: &str) -> String {
-    format!("Hello, {}! You've been greeted from Rust!", name)
-}
-
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // 初始化日志
@@ -32,21 +26,21 @@ pub fn run() {
     // 获取配置目录路径（可执行文件同级的 config 目录）
     let config_dir = settings::AppSettings::config_dir().expect("无法获取配置目录");
 
-    log::info!("📂 配置目录: {:?}", config_dir);
+    log::info!("配置目录: {:?}", config_dir);
 
     // 加载游戏配置文件 (config/games.toml)
     let games_config_path = config_dir.join("games.toml");
     let game_config = Config::from_toml_file(&games_config_path).expect("无法加载游戏配置文件");
 
-    log::info!("✅ 成功加载 {} 个游戏配置", game_config.games.len());
+    log::info!("成功加载 {} 个游戏配置", game_config.games.len());
 
     // 加载应用配置文件 (config/config.toml)
     let app_settings = settings::AppSettings::load().expect("无法加载应用配置");
 
-    log::info!("✅ 成功加载应用配置");
-    log::info!("   语言: {}", app_settings.general.language);
+    log::info!("成功加载应用配置");
+    log::info!("语言: {}", app_settings.general.language);
     log::info!(
-        "   技能库路径: {}",
+        "技能库路径: {}",
         app_settings.skill_library.storage_base_path
     );
 
@@ -83,7 +77,6 @@ pub fn run() {
             }
         })
         .invoke_handler(tauri::generate_handler![
-            greet,
             download_wiki,
             update_skill_library,
             open_folder,

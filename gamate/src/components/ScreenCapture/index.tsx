@@ -4,7 +4,6 @@ import {
   Button,
   Space,
   Typography,
-  Divider,
   Select,
   message,
   Slider,
@@ -14,11 +13,10 @@ import {
 import { Monitor, Play, Square, Download, RefreshCw, Zap } from "lucide-react";
 import { motion } from "framer-motion";
 import { invoke } from "@tauri-apps/api/core";
-import type { CaptureStrategy } from "../../types/ai";
 import "./styles.scss";
 import { InfoCircleOutlined } from "@ant-design/icons";
 
-const { Title, Text, Paragraph } = Typography;
+const { Title, Text } = Typography;
 
 interface CaptureArea {
   x: number;
@@ -291,10 +289,10 @@ const ScreenCapture: React.FC = () => {
         transition={{ duration: 0.3 }}
       >
         <Card className="control-panel">
-          <Space direction="vertical" style={{ width: "100%" }} >
+          <Space direction="vertical" style={{ width: "100%" }}>
             <div>
-              <h3 style={{fontSize: 22}}>屏幕识别设置</h3>
-              <div style={{color: "#8f8f8f", marginTop: 8}}>
+              <h3 style={{ fontSize: 22 }}>屏幕识别设置</h3>
+              <div style={{ color: "#8f8f8f", marginTop: 8 }}>
                 配置截屏模式和识别参数,实时捕获游戏画面
               </div>
             </div>

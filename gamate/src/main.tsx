@@ -3,8 +3,8 @@ import ReactDOM from "react-dom/client";
 import { ConfigProvider, theme } from "antd";
 import zhCN from "antd/locale/zh_CN";
 import App from "./App";
-import HudPage from "./pages/HudPage";
-import LivestreamHudPage from "./pages/LivestreamHudPage";
+import HudPage from "./components/HudPage";
+import LivestreamHudPage from "./components/LivestreamHudPage";
 import "./styles/global.scss";
 
 // 根据 URL 路径决定渲染哪个页面

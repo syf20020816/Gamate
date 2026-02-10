@@ -30,7 +30,7 @@ export const HudOverlay: React.FC = () => {
     statusColor: "#666",
   });
 
-  const [listenerState, setListenerState] = useState<ListenerState | null>(null);
+  // const [listenerState, setListenerState] = useState<ListenerState | null>(null);
   const [availableGames, setAvailableGames] = useState<any[]>([]);
   const [downloadedLibraries, setDownloadedLibraries] = useState<any[]>([]);
   
@@ -59,7 +59,7 @@ export const HudOverlay: React.FC = () => {
   const loadState = async () => {
     try {
       const backendState = await invoke<ListenerState>("get_listener_state");
-      setListenerState(backendState);
+      // setListenerState(backendState);
       
       // 同步 isListening 状态
       setState(prev => ({
