@@ -8,9 +8,7 @@ use windows::{
     core::HSTRING,
     Foundation::IAsyncOperation,
     Globalization::Language,
-    Media::SpeechRecognition::{
-        SpeechRecognitionResult, SpeechRecognizer, SpeechRecognizerState,
-    },
+    Media::SpeechRecognition::{SpeechRecognitionResult, SpeechRecognizer, SpeechRecognizerState},
     Storage::StorageFile,
 };
 
@@ -31,19 +29,19 @@ impl WindowsSttEngine {
             // 创建中文语音识别器
             let language = Language::CreateLanguage(&HSTRING::from("zh-CN"))?;
             let recognizer = SpeechRecognizer::Create(&language)?;
-            
+
             log::info!("🗣️ Windows STT 初始化成功 (语言: zh-CN)");
             self.recognizer = Some(recognizer);
         }
-        
+
         Ok(self.recognizer.as_ref().unwrap())
     }
 
     /// 从音频文件识别文字
-    /// 
+    ///
     /// # 参数
     /// - `audio_file_path`: WAV 文件路径
-    /// 
+    ///
     /// # 返回
     /// - 识别的文字
     pub async fn recognize_from_file(&mut self, audio_file_path: &str) -> Result<String> {
@@ -57,26 +55,29 @@ impl WindowsSttEngine {
 
         // 执行识别
         log::info!("🎤 开始识别音频文件: {}", audio_file_path);
-        
-        let result: SpeechRecognitionResult = recognizer.RecognizeAsync()?
-            .get()?;
-        
+
+        let result: SpeechRecognitionResult = recognizer.RecognizeAsync()?.get()?;
+
         // 获取识别文字
         let text = result.Text()?.to_string();
-        
+
         log::info!("✅ 识别结果: {}", text);
-        
+
         Ok(text)
     }
 
     /// 从音频数据识别文字 (内存流)
-    /// 
+    ///
     /// # 参数
     /// - `audio_data`: 音频数据 (f32 样本, 16kHz, 单声道)
-    /// 
+    ///
     /// # 返回
     /// - 识别的文字
-    pub async fn recognize_from_audio(&mut self, audio_data: &[f32], sample_rate: u32) -> Result<String> {
+    pub async fn recognize_from_audio(
+        &mut self,
+        audio_data: &[f32],
+        sample_rate: u32,
+    ) -> Result<String> {
         // 将 f32 音频数据转换为 i16 PCM
         let pcm_data: Vec<i16> = audio_data
             .iter()
@@ -143,10 +144,10 @@ mod tests {
     #[ignore] // 需要实际的音频文件,仅在手动测试时运行
     async fn test_recognize_from_file() {
         let mut engine = WindowsSttEngine::new().unwrap();
-        
+
         // 需要准备一个测试音频文件
         let test_file = "test_audio.wav";
-        
+
         match engine.recognize_from_file(test_file).await {
             Ok(text) => {
                 println!("识别结果: {}", text);

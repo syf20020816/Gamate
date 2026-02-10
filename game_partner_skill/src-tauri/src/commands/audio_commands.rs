@@ -109,7 +109,7 @@ pub async fn start_continuous_listening(
     listener
         .start_listening(move |event| {
             log::debug!("📡 监听器事件: {:?}", event);
-            
+
             // 发送事件到前端
             match &event {
                 ListenerEvent::VoiceTranscribed { text } => {
@@ -124,9 +124,17 @@ pub async fn start_continuous_listening(
                 ListenerEvent::AiResponseReady { response } => {
                     let _ = app_clone.emit("ai_response_ready", response.clone());
                 }
-                ListenerEvent::AliyunRecognizeRequest { pcm_data, sample_rate, duration_secs } => {
-                    log::info!("🎯 收到阿里云识别请求: {} 字节 PCM, {}Hz, {:.1}s",
-                              pcm_data.len(), sample_rate, duration_secs);
+                ListenerEvent::AliyunRecognizeRequest {
+                    pcm_data,
+                    sample_rate,
+                    duration_secs,
+                } => {
+                    log::info!(
+                        "🎯 收到阿里云识别请求: {} 字节 PCM, {}Hz, {:.1}s",
+                        pcm_data.len(),
+                        sample_rate,
+                        duration_secs
+                    );
                     // 发送事件到前端,前端会调用 aliyun_one_sentence_recognize 命令
                     let payload = serde_json::json!({
                         "pcm_data": pcm_data,
@@ -197,22 +205,22 @@ pub async fn get_listener_state(
 #[tauri::command]
 pub async fn test_microphone() -> Result<String, String> {
     use crate::audio::recorder::{AudioRecorder, RecorderConfig};
-    
+
     log::info!("🎤 测试麦克风...");
-    
+
     // 在 spawn_blocking 中运行,避免 Send 问题
     let result = tokio::task::spawn_blocking(|| {
         let config = RecorderConfig::default();
         let mut recorder = AudioRecorder::new(config).map_err(|e| e.to_string())?;
-        
+
         recorder.start_recording().map_err(|e| e.to_string())?;
-        
+
         // 睡眠 1 秒
         std::thread::sleep(std::time::Duration::from_secs(1));
-        
+
         let audio_data = recorder.take_audio_data();
         recorder.stop_recording().map_err(|e| e.to_string())?;
-        
+
         // 计算平均音量
         let rms: f32 = if !audio_data.is_empty() {
             let sum_squares: f32 = audio_data.iter().map(|&s| s * s).sum();
@@ -220,14 +228,16 @@ pub async fn test_microphone() -> Result<String, String> {
         } else {
             0.0
         };
-        
+
         Ok(format!(
             "麦克风测试成功!\n采集了 {} 个采样点\n平均音量: {:.4}",
             audio_data.len(),
             rms
         ))
-    }).await.map_err(|e| e.to_string())?;
-    
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+
     result
 }
 
@@ -238,7 +248,7 @@ pub async fn start_microphone_test(
     audio_state: State<'_, AudioState>,
 ) -> Result<String, String> {
     log::info!("🎤 开始麦克风测试 (10秒)...");
-    
+
     // 检查是否已在测试
     {
         let mut is_running = audio_state.test_running.lock().unwrap();
@@ -247,20 +257,20 @@ pub async fn start_microphone_test(
         }
         *is_running = true;
     }
-    
+
     // 重置测试数据
     {
         let mut test_data = audio_state.test_data.lock().unwrap();
         *test_data = MicTestData::default();
     }
-    
+
     let test_running = Arc::clone(&audio_state.test_running);
     let test_data = Arc::clone(&audio_state.test_data);
-    
+
     // 在spawn_blocking中创建recorder并运行测试
     tokio::task::spawn_blocking(move || {
         use crate::audio::recorder::{AudioRecorder, RecorderConfig};
-        
+
         let config = RecorderConfig::default();
         let mut recorder = match AudioRecorder::new(config) {
             Ok(r) => r,
@@ -271,22 +281,22 @@ pub async fn start_microphone_test(
                 return;
             }
         };
-        
+
         if let Err(e) = recorder.start_recording() {
             log::error!("启动录音失败: {}", e);
             let mut is_running = test_running.lock().unwrap();
             *is_running = false;
             return;
         }
-        
+
         let start_time = std::time::Instant::now();
         let max_duration = std::time::Duration::from_secs(10);
-        
+
         let mut total_samples = 0usize;
         let mut sum_volume = 0.0f32;
         let mut max_volume = 0.0f32;
         let mut volume_count = 0usize;
-        
+
         // 测试循环
         loop {
             // 检查是否应该停止
@@ -296,30 +306,30 @@ pub async fn start_microphone_test(
                     break;
                 }
             }
-            
+
             // 检查是否超时
             let elapsed = start_time.elapsed();
             if elapsed >= max_duration {
                 log::info!("⏱️ 麦克风测试达到10秒上限,自动停止");
                 let _ = app.emit("microphone_test_finished", ());
-                
+
                 let mut is_running = test_running.lock().unwrap();
                 *is_running = false;
                 break;
             }
-            
+
             // 获取音频数据并计算音量
             let audio_data = recorder.take_audio_data();
             let samples = audio_data.len();
             total_samples += samples;
-            
+
             let rms: f32 = if !audio_data.is_empty() {
                 let sum_squares: f32 = audio_data.iter().map(|&s| s * s).sum();
                 (sum_squares / audio_data.len() as f32).sqrt()
             } else {
                 0.0
             };
-            
+
             if rms > 0.0 {
                 sum_volume += rms;
                 volume_count += 1;
@@ -327,21 +337,24 @@ pub async fn start_microphone_test(
                     max_volume = rms;
                 }
             }
-            
+
             // 发送更新事件
-            let _ = app.emit("microphone_test_update", serde_json::json!({
-                "volume": rms,
-                "duration_secs": elapsed.as_secs_f32(),
-                "samples": samples,
-            }));
-            
+            let _ = app.emit(
+                "microphone_test_update",
+                serde_json::json!({
+                    "volume": rms,
+                    "duration_secs": elapsed.as_secs_f32(),
+                    "samples": samples,
+                }),
+            );
+
             // 等待100ms后继续
             std::thread::sleep(std::time::Duration::from_millis(100));
         }
-        
+
         // 停止录音
         let _ = recorder.stop_recording();
-        
+
         // 保存测试数据
         let final_duration = start_time.elapsed().as_secs_f32();
         let average_volume = if volume_count > 0 {
@@ -349,7 +362,7 @@ pub async fn start_microphone_test(
         } else {
             0.0
         };
-        
+
         {
             let mut data = test_data.lock().unwrap();
             data.duration_secs = final_duration;
@@ -358,7 +371,7 @@ pub async fn start_microphone_test(
             data.max_volume = max_volume;
         }
     });
-    
+
     Ok("麦克风测试已启动".to_string())
 }
 
@@ -385,38 +398,38 @@ pub async fn stop_microphone_test(
     audio_state: State<'_, AudioState>,
 ) -> Result<MicTestResult, String> {
     log::info!("⏹️ 停止麦克风测试");
-    
+
     // 检查并停止测试
     {
         let mut is_running = audio_state.test_running.lock().unwrap();
-        
+
         if !*is_running {
             return Err("没有正在进行的麦克风测试".to_string());
         }
-        
+
         *is_running = false;
     } // 锁释放
-    
+
     // 等待后台线程保存数据 (最多等待500ms)
     let mut data_ready = false;
     for _ in 0..5 {
         tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
-        
+
         let has_data = {
             let test_data = audio_state.test_data.lock().unwrap();
             test_data.duration_secs > 0.0 || test_data.total_samples > 0
         }; // 锁释放
-        
+
         if has_data {
             data_ready = true;
             break;
         }
     }
-    
+
     if !data_ready {
         log::warn!("⚠️ 等待测试数据超时");
     }
-    
+
     // 获取测试数据
     let result = {
         let test_data = audio_state.test_data.lock().unwrap();
@@ -427,9 +440,14 @@ pub async fn stop_microphone_test(
             max_volume: test_data.max_volume,
         }
     }; // 锁释放
-    
-    log::info!("📊 测试结果: 时长={:.1}s, 样本={}, 平均音量={:.4}, 最大音量={:.4}",
-              result.duration_secs, result.total_samples, result.average_volume, result.max_volume);
-    
+
+    log::info!(
+        "📊 测试结果: 时长={:.1}s, 样本={}, 平均音量={:.4}, 最大音量={:.4}",
+        result.duration_secs,
+        result.total_samples,
+        result.average_volume,
+        result.max_volume
+    );
+
     Ok(result)
 }

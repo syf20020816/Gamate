@@ -1,7 +1,7 @@
-use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
 use anyhow::Result;
+use serde::{Deserialize, Serialize};
 use std::env;
+use std::path::PathBuf;
 
 /// 应用设置
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -325,18 +325,19 @@ impl Default for AppSettings {
 impl AppSettings {
     /// 获取配置目录路径（可执行文件同级的 config 目录）
     pub fn config_dir() -> Result<PathBuf> {
-        let exe_path = env::current_exe()
-            .map_err(|e| anyhow::anyhow!("无法获取可执行文件路径: {}", e))?;
-        
-        let exe_dir = exe_path.parent()
+        let exe_path =
+            env::current_exe().map_err(|e| anyhow::anyhow!("无法获取可执行文件路径: {}", e))?;
+
+        let exe_dir = exe_path
+            .parent()
             .ok_or_else(|| anyhow::anyhow!("无法获取可执行文件目录"))?;
-        
+
         let config_dir = exe_dir.join("config");
         std::fs::create_dir_all(&config_dir)?;
-        
+
         Ok(config_dir)
     }
-    
+
     /// 获取配置文件路径
     fn config_path() -> Result<PathBuf> {
         let config_dir = Self::config_dir()?;
@@ -346,7 +347,7 @@ impl AppSettings {
     /// 加载设置
     pub fn load() -> Result<Self> {
         let path = Self::config_path()?;
-        
+
         if !path.exists() {
             log::info!("📝 配置文件不存在，创建默认配置: {:?}", path);
             let default_settings = Self::default();
@@ -355,43 +356,43 @@ impl AppSettings {
         }
 
         let content = std::fs::read_to_string(&path)?;
-        let mut settings: Self = toml::from_str(&content)
-            .map_err(|e| anyhow::anyhow!("解析配置文件失败: {}", e))?;
-        
+        let mut settings: Self =
+            toml::from_str(&content).map_err(|e| anyhow::anyhow!("解析配置文件失败: {}", e))?;
+
         log::info!("✅ 加载配置成功: {:?}", path);
-        
+
         // 🔍 加载后自动同步已下载的技能库
         if let Err(e) = settings.sync_downloaded_libraries() {
             log::warn!("⚠️ 自动同步技能库失败: {}", e);
         }
-        
+
         Ok(settings)
     }
-    
+
     /// 同步已下载的技能库到 selected_games
     fn sync_downloaded_libraries(&mut self) -> Result<()> {
         use std::collections::HashSet;
-        
+
         let base_path = PathBuf::from(&self.skill_library.storage_base_path);
-        
+
         if !base_path.exists() {
             log::info!("📂 技能库目录不存在，跳过自动同步");
             return Ok(());
         }
-        
+
         let mut detected_games: HashSet<String> = HashSet::new();
-        
+
         // 遍历游戏目录
         // 目录结构: E:\projects\gps_test\phasmophobia\1769626506\wiki_raw.jsonl
         if let Ok(entries) = std::fs::read_dir(&base_path) {
             for entry in entries.flatten() {
                 let game_id = entry.file_name().to_string_lossy().to_string();
                 let game_path = entry.path();
-                
+
                 if !game_path.is_dir() {
                     continue;
                 }
-                
+
                 // 检查是否有时间戳子目录且包含 wiki_raw.jsonl (大小 > 1KB)
                 if let Ok(sub_entries) = std::fs::read_dir(&game_path) {
                     for sub_entry in sub_entries.flatten() {
@@ -399,17 +400,25 @@ impl AppSettings {
                         if !sub_path.is_dir() {
                             continue;
                         }
-                        
+
                         let jsonl_path = sub_path.join("wiki_raw.jsonl");
                         if jsonl_path.exists() {
                             // 检查文件大小是否超过 1KB
                             if let Ok(metadata) = std::fs::metadata(&jsonl_path) {
                                 if metadata.len() > 1024 {
-                                    log::info!("✅ 检测到有效技能库: {} ({})", game_id, jsonl_path.display());
+                                    log::info!(
+                                        "✅ 检测到有效技能库: {} ({})",
+                                        game_id,
+                                        jsonl_path.display()
+                                    );
                                     detected_games.insert(game_id.clone());
                                     break;
                                 } else {
-                                    log::warn!("⚠️ 技能库文件过小 ({} bytes): {}", metadata.len(), jsonl_path.display());
+                                    log::warn!(
+                                        "⚠️ 技能库文件过小 ({} bytes): {}",
+                                        metadata.len(),
+                                        jsonl_path.display()
+                                    );
                                 }
                             }
                         }
@@ -417,40 +426,44 @@ impl AppSettings {
                 }
             }
         }
-        
+
         if detected_games.is_empty() {
             log::info!("📦 未检测到已下载的技能库");
             return Ok(());
         }
-        
+
         // 合并到 selected_games
-        let mut current_selected: HashSet<String> = self.user.selected_games.iter().cloned().collect();
+        let mut current_selected: HashSet<String> =
+            self.user.selected_games.iter().cloned().collect();
         let before_count = current_selected.len();
-        
+
         for game_id in detected_games {
             current_selected.insert(game_id);
         }
-        
+
         self.user.selected_games = current_selected.into_iter().collect();
         self.user.selected_games.sort();
-        
+
         let after_count = self.user.selected_games.len();
-        
+
         if after_count > before_count {
-            log::info!("✅ 自动同步: 检测到 {} 个新游戏，已添加到配置", after_count - before_count);
+            log::info!(
+                "✅ 自动同步: 检测到 {} 个新游戏，已添加到配置",
+                after_count - before_count
+            );
             self.save()?;
         }
-        
+
         Ok(())
     }
 
     /// 保存设置
     pub fn save(&self) -> Result<()> {
         let path = Self::config_path()?;
-        let content = toml::to_string_pretty(self)
-            .map_err(|e| anyhow::anyhow!("序列化配置失败: {}", e))?;
+        let content =
+            toml::to_string_pretty(self).map_err(|e| anyhow::anyhow!("序列化配置失败: {}", e))?;
         std::fs::write(&path, content)?;
-        
+
         log::info!("✅ 保存配置成功: {:?}", path);
         Ok(())
     }

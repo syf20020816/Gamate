@@ -59,16 +59,7 @@ export const SimulationPanel: React.FC = () => {
     const loadSavedConfig = async () => {
       try {
         const savedConfig = await invoke<any>("load_simulation_config");
-        console.log("===== 前端收到后端配置 =====");
-        console.log("savedConfig:", JSON.stringify(savedConfig, null, 2));
-        console.log("savedConfig.employees:", savedConfig.employees);
-        console.log("employees 数量:", savedConfig.employees?.length);
-        console.log("==========================");
-        
         loadConfig(savedConfig);
-        
-        console.log("✅ 已调用 loadConfig");
-        console.log("调用后的 store config:", config);
       } catch (error) {
         console.error("加载模拟场景配置失败:", error);
       }
@@ -97,16 +88,15 @@ export const SimulationPanel: React.FC = () => {
           })),
         },
       });
-      
-      // 🔥 发送事件通知其他窗口配置已更新
+
+      // 发送事件通知其他窗口配置已更新
       try {
         const { emit } = await import("@tauri-apps/api/event");
         await emit("simulation-config-updated", {});
-        console.log("✅ 已发送配置更新事件");
       } catch (error) {
-        console.error("❌ 发送配置更新事件失败:", error);
+        console.error("发送配置更新事件失败:", error);
       }
-      
+
       message.success("配置已保存");
     } catch (error) {
       message.error(`保存配置失败: ${error}`);

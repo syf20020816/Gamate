@@ -1,12 +1,12 @@
-﻿mod local_db;
 mod ai_search;
+mod local_db;
 
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
-pub use local_db::LocalVectorDB;
 pub use ai_search::{AIDirectSearch, SearchResult as AISearchResult};
+pub use local_db::LocalVectorDB;
 
 /// 向量数据库模式
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -112,28 +112,55 @@ impl VectorDB {
         log::info!(" 连接 Qdrant: {}", url);
         let client = reqwest::Client::new();
         let base_url = url.trim_end_matches('/').to_string();
-        let response = client.get(format!("{}/collections", base_url)).send().await?;
+        let response = client
+            .get(format!("{}/collections", base_url))
+            .send()
+            .await?;
         if !response.status().is_success() {
             anyhow::bail!("无法连接到 Qdrant: HTTP {}", response.status());
         }
         log::info!(" Qdrant 连接成功");
-        Ok(Self { client, base_url, collection_name: collection_name.to_string() })
+        Ok(Self {
+            client,
+            base_url,
+            collection_name: collection_name.to_string(),
+        })
     }
 
     pub async fn collection_exists(&self) -> Result<bool> {
-        let response = self.client.get(format!("{}/collections", self.base_url)).send().await?;
-        if !response.status().is_success() { return Ok(false); }
+        let response = self
+            .client
+            .get(format!("{}/collections", self.base_url))
+            .send()
+            .await?;
+        if !response.status().is_success() {
+            return Ok(false);
+        }
         let collections: CollectionsResponse = response.json().await?;
-        Ok(collections.result.collections.iter().any(|c| c.name == self.collection_name))
+        Ok(collections
+            .result
+            .collections
+            .iter()
+            .any(|c| c.name == self.collection_name))
     }
 
     pub async fn create_collection(&self, vector_size: u64) -> Result<()> {
         log::info!(" 创建集合: {}", self.collection_name);
         let request = CreateCollectionRequest {
-            vectors: VectorConfig { size: vector_size, distance: "Cosine".to_string() }
+            vectors: VectorConfig {
+                size: vector_size,
+                distance: "Cosine".to_string(),
+            },
         };
-        let response = self.client.put(format!("{}/collections/{}", self.base_url, self.collection_name))
-            .json(&request).send().await?;
+        let response = self
+            .client
+            .put(format!(
+                "{}/collections/{}",
+                self.base_url, self.collection_name
+            ))
+            .json(&request)
+            .send()
+            .await?;
         if !response.status().is_success() {
             anyhow::bail!("创建集合失败: {}", response.text().await?);
         }
@@ -143,7 +170,14 @@ impl VectorDB {
 
     pub async fn delete_collection(&self) -> Result<()> {
         log::info!("  删除集合: {}", self.collection_name);
-        let response = self.client.delete(format!("{}/collections/{}", self.base_url, self.collection_name)).send().await?;
+        let response = self
+            .client
+            .delete(format!(
+                "{}/collections/{}",
+                self.base_url, self.collection_name
+            ))
+            .send()
+            .await?;
         if !response.status().is_success() {
             anyhow::bail!("删除集合失败: {}", response.text().await?);
         }
@@ -151,14 +185,31 @@ impl VectorDB {
         Ok(())
     }
 
-    pub async fn upsert_points(&self, entries: Vec<(u64, Vec<f32>, serde_json::Value)>) -> Result<()> {
-        if entries.is_empty() { return Ok(()); }
-        let points: Vec<PointData> = entries.into_iter().map(|(id, vector, payload)| PointData {
-            id, vector, payload: payload.as_object().unwrap().clone()
-        }).collect();
+    pub async fn upsert_points(
+        &self,
+        entries: Vec<(u64, Vec<f32>, serde_json::Value)>,
+    ) -> Result<()> {
+        if entries.is_empty() {
+            return Ok(());
+        }
+        let points: Vec<PointData> = entries
+            .into_iter()
+            .map(|(id, vector, payload)| PointData {
+                id,
+                vector,
+                payload: payload.as_object().unwrap().clone(),
+            })
+            .collect();
         let request = UpsertRequest { points };
-        let response = self.client.put(format!("{}/collections/{}/points", self.base_url, self.collection_name))
-            .json(&request).send().await?;
+        let response = self
+            .client
+            .put(format!(
+                "{}/collections/{}/points",
+                self.base_url, self.collection_name
+            ))
+            .json(&request)
+            .send()
+            .await?;
         if !response.status().is_success() {
             anyhow::bail!("插入数据失败: {}", response.text().await?);
         }
@@ -166,26 +217,52 @@ impl VectorDB {
     }
 
     pub async fn search(&self, query_vector: Vec<f32>, limit: usize) -> Result<Vec<SearchResult>> {
-        let request = SearchRequest { vector: query_vector, limit, with_payload: true };
-        let response = self.client.post(format!("{}/collections/{}/points/search", self.base_url, self.collection_name))
-            .json(&request).send().await?;
+        let request = SearchRequest {
+            vector: query_vector,
+            limit,
+            with_payload: true,
+        };
+        let response = self
+            .client
+            .post(format!(
+                "{}/collections/{}/points/search",
+                self.base_url, self.collection_name
+            ))
+            .json(&request)
+            .send()
+            .await?;
         if !response.status().is_success() {
             anyhow::bail!("搜索失败: {}", response.text().await?);
         }
         let search_response: SearchResponse = response.json().await?;
-        let results = search_response.result.into_iter().map(|item| SearchResult {
-            score: item.score, payload: serde_json::to_value(item.payload).unwrap_or_default()
-        }).collect();
+        let results = search_response
+            .result
+            .into_iter()
+            .map(|item| SearchResult {
+                score: item.score,
+                payload: serde_json::to_value(item.payload).unwrap_or_default(),
+            })
+            .collect();
         Ok(results)
     }
 
     pub async fn get_collection_info(&self) -> Result<CollectionInfo> {
-        let response = self.client.get(format!("{}/collections/{}", self.base_url, self.collection_name)).send().await?;
+        let response = self
+            .client
+            .get(format!(
+                "{}/collections/{}",
+                self.base_url, self.collection_name
+            ))
+            .send()
+            .await?;
         if !response.status().is_success() {
             anyhow::bail!("获取集合信息失败: {}", response.text().await?);
         }
         let info: CollectionInfoResponse = response.json().await?;
         let points_count = info.result.points_count.unwrap_or(0);
-        Ok(CollectionInfo { vectors_count: points_count, points_count })
+        Ok(CollectionInfo {
+            vectors_count: points_count,
+            points_count,
+        })
     }
 }

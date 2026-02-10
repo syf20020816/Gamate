@@ -1,19 +1,17 @@
+use rand::Rng;
 /// 直播间模拟引擎
-/// 
+///
 /// 核心调度器,负责触发各种事件
-
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
-use tokio::time::{interval, sleep};
-use rand::Rng;
 use tauri::{AppHandle, Emitter};
+use tokio::time::{interval, sleep};
 
-use super::events::{SimulationEvent, EventType, frequency_to_interval, gift_frequency_to_params};
+use super::ai_analyzer::{AIAnalysisRequest, AIAnalyzer, ConversationMessage, EmployeeContext};
+use super::events::{frequency_to_interval, gift_frequency_to_params, EventType, SimulationEvent};
 use super::memory::MemoryManager;
-use super::ai_analyzer::{
-    AIAnalyzer, AIAnalysisRequest, EmployeeContext, ConversationMessage
-};
 use crate::settings::AppSettings;
+use crate::tts::TtsEngine;
 
 /// AI 员工配置
 #[derive(Debug, Clone)]
@@ -34,6 +32,8 @@ pub struct SimulationEngine {
     pub ai_analyzer: Option<AIAnalyzer>,
     /// 🔥 智能模式开关：true = 等待语音触发, false = 自动循环发送
     pub enable_smart_mode: bool,
+    /// 🔥 TTS 引擎（用于语音播报）
+    pub tts_engine: Option<Arc<TtsEngine>>,
 }
 
 impl SimulationEngine {
@@ -45,14 +45,15 @@ impl SimulationEngine {
             employees: Vec::new(),
             gift_frequency: "medium".to_string(),
             ai_analyzer: None,
-            enable_smart_mode: true,  // 🔥 默认启用智能模式
+            enable_smart_mode: true, // 🔥 默认启用智能模式
+            tts_engine: None,        // 🔥 TTS 引擎延迟初始化
         }
     }
 
     /// 加载配置
     pub fn load_config(&mut self) -> Result<(), String> {
         let settings = AppSettings::load().map_err(|e| e.to_string())?;
-        
+
         // 加载 AI 员工配置
         self.employees = settings
             .simulation
@@ -68,17 +69,31 @@ impl SimulationEngine {
 
         self.gift_frequency = settings.simulation.livestream.gift_frequency.clone();
 
-        // 🔥 初始化 AI 分析器（使用多模态模型配置）
+        // 初始化 AI 分析器（使用多模态模型配置）
         let multimodal_config = &settings.ai_models.multimodal;
         let api_endpoint = multimodal_config.api_base.clone();
         let api_key = multimodal_config.api_key.clone().unwrap_or_default();
         let model = multimodal_config.model_name.clone();
-        
+
         if !api_endpoint.is_empty() && !api_key.is_empty() {
             self.ai_analyzer = Some(AIAnalyzer::new(api_endpoint, api_key, model));
-            println!("✅ AI 分析器已初始化: {}", multimodal_config.model_name);
         } else {
             println!("⚠️ 多模态 AI 未配置，将使用传统模板模式");
+        }
+
+        // 初始化 TTS 引擎（如果启用）
+        if settings.tts.enabled {
+            match TtsEngine::new() {
+                Ok(tts) => {
+                    self.tts_engine = Some(Arc::new(tts));
+                   
+                }
+                Err(e) => {
+                    println!("TTS 初始化失败: {}，语音播报将被禁用", e);
+                }
+            }
+        } else {
+            println!("TTS 未启用");
         }
 
         Ok(())
@@ -96,20 +111,14 @@ impl SimulationEngine {
 
         // 清空所有记忆
         self.memory.clear_all();
-
-        println!("🎬 直播间模拟启动...");
-
         // 触发开播事件
         self.trigger_stream_start().await;
 
-        // 🔥 只有在非智能模式下才启动自动循环
+        // 只有在非智能模式下才启动自动循环
         if !self.enable_smart_mode {
-            println!("🤖 传统模式：启动自动弹幕循环");
             for employee in &self.employees {
                 self.spawn_employee_loop(employee.clone());
             }
-        } else {
-            println!("🤖 智能模式已启用，等待主播语音触发 AI 互动");
         }
 
         Ok(())
@@ -119,12 +128,11 @@ impl SimulationEngine {
     pub fn stop(&self) {
         let mut running = self.is_running.lock().unwrap();
         *running = false;
-        println!("🛑 直播间模拟停止");
     }
 
     /// 触发开播事件
     async fn trigger_stream_start(&self) {
-        println!("📢 触发开播事件");
+        println!("触发开播事件");
 
         // 20% 概率刷礼物
         if rand::random::<f64>() < 0.2 {
@@ -142,8 +150,9 @@ impl SimulationEngine {
 
             if rand::random::<f64>() < 0.5 {
                 if let Some(employee) = employees.first() {
-                    let greeting = Self::generate_greeting(&employee.personality, &employee.nickname);
-                    
+                    let greeting =
+                        Self::generate_greeting(&employee.personality, &employee.nickname);
+
                     // 保存到记忆
                     memory.add_message(&employee.id, "assistant", &greeting);
 
@@ -180,11 +189,13 @@ impl SimulationEngine {
 
         // 使用 tauri::async_runtime::spawn 替代 tokio::spawn
         tauri::async_runtime::spawn(async move {
-            let (min_interval, max_interval) = frequency_to_interval(&employee.interaction_frequency);
+            let (min_interval, max_interval) =
+                frequency_to_interval(&employee.interaction_frequency);
 
             while *is_running.lock().unwrap() {
                 // 随机等待一段时间 (使用 rand::random 避免 ThreadRng)
-                let wait_time = min_interval + (rand::random::<u64>() % (max_interval - min_interval + 1));
+                let wait_time =
+                    min_interval + (rand::random::<u64>() % (max_interval - min_interval + 1));
                 sleep(Duration::from_secs(wait_time)).await;
 
                 if !*is_running.lock().unwrap() {
@@ -207,8 +218,14 @@ impl SimulationEngine {
 
     /// 发送弹幕
     async fn send_danmaku(app: &AppHandle, employee: &EmployeeConfig, memory: &Arc<MemoryManager>) {
-        let message = Self::generate_danmaku(&employee.personality, &employee.nickname, memory, &employee.id).await;
-        
+        let message = Self::generate_danmaku(
+            &employee.personality,
+            &employee.nickname,
+            memory,
+            &employee.id,
+        )
+        .await;
+
         // 保存到记忆
         memory.add_message(&employee.id, "assistant", &message);
 
@@ -224,12 +241,17 @@ impl SimulationEngine {
     }
 
     /// 生成弹幕内容
-    async fn generate_danmaku(personality: &str, nickname: &str, memory: &Arc<MemoryManager>, employee_id: &str) -> String {
+    async fn generate_danmaku(
+        personality: &str,
+        nickname: &str,
+        memory: &Arc<MemoryManager>,
+        employee_id: &str,
+    ) -> String {
         // 这里可以调用 LLM 生成更智能的内容
         // 暂时使用模板生成
         let templates = Self::get_danmaku_templates(personality);
         let index = rand::random::<usize>() % templates.len();
-        
+
         templates[index].to_string()
     }
 
@@ -271,13 +293,7 @@ impl SimulationEngine {
                 "You're doing a fantastic job!",
                 "Make gaming great again!",
             ],
-            _ => vec![
-                "666",
-                "主播加油!",
-                "这波可以",
-                "nice!",
-                "支持主播!",
-            ],
+            _ => vec!["666", "主播加油!", "这波可以", "nice!", "支持主播!"],
         }
     }
 
@@ -330,7 +346,7 @@ impl SimulationEngine {
         // 随机选择1-3个员工回复
         let response_count = 1 + (rand::random::<usize>() % 3.min(self.employees.len()));
         let mut employees: Vec<_> = self.employees.clone();
-        
+
         // 打乱顺序 (Fisher-Yates shuffle)
         for i in (1..employees.len()).rev() {
             let j = rand::random::<usize>() % (i + 1);
@@ -340,7 +356,7 @@ impl SimulationEngine {
         for employee in employees.iter().take(response_count) {
             // 随机延迟 0.5-2 秒
             let delay = 500 + (rand::random::<u64>() % 1500);
-            
+
             let app = self.app.clone();
             let emp = employee.clone();
             let memory = self.memory.clone();
@@ -348,10 +364,10 @@ impl SimulationEngine {
 
             tauri::async_runtime::spawn(async move {
                 sleep(Duration::from_millis(delay)).await;
-                
+
                 // 保存主播的话到记忆
                 memory.add_message(&emp.id, "user", &msg);
-                
+
                 // 生成回复
                 Self::send_danmaku(&app, &emp, &memory).await;
             });
@@ -367,7 +383,7 @@ impl SimulationEngine {
     ) {
         println!("🎬 处理智能截图事件");
         println!("  语音: {}", speech_text);
-        
+
         // 如果没有配置 AI，回退到传统模式
         let Some(ai_analyzer) = &self.ai_analyzer else {
             println!("⚠️ AI 未配置，使用传统模式");
@@ -376,7 +392,8 @@ impl SimulationEngine {
         };
 
         // 构建每个员工的上下文
-        let employee_contexts: Vec<EmployeeContext> = self.employees
+        let employee_contexts: Vec<EmployeeContext> = self
+            .employees
             .iter()
             .map(|emp| {
                 let history = self.memory.get_conversation_history(&emp.id);
@@ -407,7 +424,7 @@ impl SimulationEngine {
         match ai_analyzer.analyze(request).await {
             Ok(response) => {
                 println!("✅ AI 分析成功，生成 {} 个行为", response.actions.len());
-                
+
                 // 保存主播的话到所有员工的记忆
                 for emp in &self.employees {
                     self.memory.add_message(&emp.id, "user", speech_text);
@@ -416,14 +433,15 @@ impl SimulationEngine {
                 // 执行 AI 决策的行为
                 for action in response.actions {
                     // 查找对应的员工
-                    let Some(employee) = self.employees.iter().find(|e| e.id == action.employee) else {
+                    let Some(employee) = self.employees.iter().find(|e| e.id == action.employee)
+                    else {
                         println!("⚠️ 未找到员工: {}", action.employee);
                         continue;
                     };
 
                     // 随机延迟 0.5-2 秒（让互动更自然）
                     let delay = 500 + (rand::random::<u64>() % 1500);
-                    
+
                     let app = self.app.clone();
                     let emp = employee.clone();
                     let memory = self.memory.clone();
@@ -434,10 +452,10 @@ impl SimulationEngine {
 
                     tauri::async_runtime::spawn(async move {
                         sleep(Duration::from_millis(delay)).await;
-                        
+
                         // 发送弹幕
                         memory.add_message(&emp.id, "assistant", &content);
-                        
+
                         let event = SimulationEvent::new(EventType::Danmaku {
                             employee_id: emp.id.clone(),
                             nickname: emp.nickname.clone(),
@@ -451,7 +469,7 @@ impl SimulationEngine {
                         // 如果需要送礼物
                         if send_gift {
                             sleep(Duration::from_millis(500)).await;
-                            
+
                             let gift = gift_name.unwrap_or("🚀火箭".to_string());
                             let event = SimulationEvent::new(EventType::Gift {
                                 employee_id: emp.id.clone(),

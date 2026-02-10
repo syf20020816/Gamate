@@ -1,9 +1,9 @@
 use crate::crawler::types::*;
 use crate::crawler::utils::*;
+use octocrab::models::repos::Content;
+use octocrab::Octocrab;
 use std::fs;
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
-use octocrab::Octocrab;
-use octocrab::models::repos::Content;
 
 pub struct GitHubCrawler {
     config: CrawlerConfig,
@@ -85,10 +85,7 @@ impl GitHubCrawler {
     /// 解析 GitHub URL
     fn parse_github_url(&self, url: &str) -> CrawlerResult2<(String, String)> {
         // 支持格式: https://github.com/owner/repo
-        let parts: Vec<&str> = url
-            .trim_end_matches('/')
-            .split('/')
-            .collect();
+        let parts: Vec<&str> = url.trim_end_matches('/').split('/').collect();
 
         if parts.len() < 5 || parts[2] != "github.com" {
             return Err(CrawlerError::InvalidUrl(
@@ -116,7 +113,7 @@ impl GitHubCrawler {
         // GitHub Wiki 通过 Git 克隆获取
         // 这里简化处理：使用 API 获取 Wiki 页面列表
         // 注意：GitHub API 不直接提供 Wiki 内容，需要通过 Git 克隆
-        
+
         log::warn!("GitHub Wiki 爬取需要 Git 克隆，当前简化为爬取文档文件");
         self.crawl_docs(owner, repo).await
     }
@@ -228,7 +225,12 @@ impl GitHubCrawler {
     }
 
     /// 爬取目录中的所有 Markdown 文件
-    async fn crawl_markdown_files(&mut self, owner: &str, repo: &str, path: &str) -> CrawlerResult2<()> {
+    async fn crawl_markdown_files(
+        &mut self,
+        owner: &str,
+        repo: &str,
+        path: &str,
+    ) -> CrawlerResult2<()> {
         let contents = self
             .client
             .repos(owner, repo)
@@ -249,18 +251,23 @@ impl GitHubCrawler {
 
     /// Base64 解码
     fn decode_base64(&self, content: &str) -> CrawlerResult2<String> {
-        use base64::{Engine as _, engine::general_purpose};
+        use base64::{engine::general_purpose, Engine as _};
         let cleaned = content.replace('\n', "").replace('\r', "");
         let bytes = general_purpose::STANDARD
             .decode(cleaned.as_bytes())
             .map_err(|e| CrawlerError::Other(format!("Base64 解码失败: {}", e)))?;
-        
-        String::from_utf8(bytes)
-            .map_err(|e| CrawlerError::Other(format!("UTF-8 解码失败: {}", e)))
+
+        String::from_utf8(bytes).map_err(|e| CrawlerError::Other(format!("UTF-8 解码失败: {}", e)))
     }
 
     /// 创建 Wiki 条目
-    fn create_entry(&self, title: &str, content: &str, url: &str, categories: Vec<String>) -> WikiEntry {
+    fn create_entry(
+        &self,
+        title: &str,
+        content: &str,
+        url: &str,
+        categories: Vec<String>,
+    ) -> WikiEntry {
         let hash = calculate_hash(content);
         let timestamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -293,8 +300,8 @@ impl GitHubCrawler {
 
         let mut file_content = String::new();
         for entry in &self.entries {
-            let json = serde_json::to_string(entry)
-                .map_err(|e| CrawlerError::Other(e.to_string()))?;
+            let json =
+                serde_json::to_string(entry).map_err(|e| CrawlerError::Other(e.to_string()))?;
             file_content.push_str(&json);
             file_content.push('\n');
             total_bytes += json.len() + 1;

@@ -121,7 +121,6 @@ export const ConversationArea: React.FC<ConversationAreaProps> = ({
 
                   // 清理 Markdown 标记 (会自动识别 [TTS_SIMPLE] 标记)
                   const cleanText = cleanMarkdownForTTS(msg.content);
-                  console.log("🧹 [TTS 清理后的文本]", cleanText);
 
                   await invoke("set_tts_rate", {
                     rate: ttsSettings.rate || 1.0,

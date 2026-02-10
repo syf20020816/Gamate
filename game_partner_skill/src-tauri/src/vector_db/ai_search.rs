@@ -22,27 +22,33 @@ impl AIDirectSearch {
     /// 加载 JSONL 文件
     pub fn load_wiki_entries(&self, game_id: &str) -> Result<Vec<WikiEntry>> {
         let jsonl_path = self.storage_path.join(format!("{}.jsonl", game_id));
-        
+
         log::info!("🔍 AI 直接搜索: 尝试加载文件 {:?}", jsonl_path);
-        
+
         if !jsonl_path.exists() {
             log::warn!("⚠️ JSONL 文件不存在: {:?}", jsonl_path);
             return Ok(Vec::new());
         }
 
         let content = std::fs::read_to_string(&jsonl_path)?;
-        log::info!("📄 文件大小: {} 字节, 行数: {}", content.len(), content.lines().count());
-        
+        log::info!(
+            "📄 文件大小: {} 字节, 行数: {}",
+            content.len(),
+            content.lines().count()
+        );
+
         let entries: Vec<WikiEntry> = content
             .lines()
             .filter(|line| !line.trim().is_empty())
-            .filter_map(|line| {
-                match serde_json::from_str::<WikiEntry>(line) {
-                    Ok(entry) => Some(entry),
-                    Err(e) => {
-                        log::debug!("解析 JSON 行失败: {}, 内容: {}", e, &line[..line.len().min(100)]);
-                        None
-                    }
+            .filter_map(|line| match serde_json::from_str::<WikiEntry>(line) {
+                Ok(entry) => Some(entry),
+                Err(e) => {
+                    log::debug!(
+                        "解析 JSON 行失败: {}, 内容: {}",
+                        e,
+                        &line[..line.len().min(100)]
+                    );
+                    None
                 }
             })
             .collect();
@@ -55,17 +61,17 @@ impl AIDirectSearch {
     /// 注意：这是一个简化实现，真正的 AI 检索需要调用 LLM
     pub fn search(&self, query: &str, game_id: &str, limit: usize) -> Result<Vec<SearchResult>> {
         let entries = self.load_wiki_entries(game_id)?;
-        
+
         if entries.is_empty() {
             log::warn!("⚠️ 没有可搜索的条目");
             return Ok(Vec::new());
         }
 
         log::info!("🔍 开始搜索: query='{}', 条目数={}", query, entries.len());
-        
+
         let query_lower = query.to_lowercase();
         let query_words: Vec<&str> = query_lower.split_whitespace().collect();
-        
+
         log::debug!("查询词: {:?}", query_words);
 
         // 计算每个条目的相关性分数
@@ -145,7 +151,7 @@ fn calculate_relevance_score(entry: &WikiEntry, query_lower: &str, query_words: 
     // 归一化到 0.0-1.0
     if max_possible_score > 0.0 {
         let normalized_score = (score / max_possible_score).min(1.0);
-        
+
         // 4. 标题越短，相关性越高（轻微加分，最多 +10%）
         if normalized_score > 0.0 {
             let title_len_penalty = (entry.title.len() as f32 / 100.0).min(1.0);

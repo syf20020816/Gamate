@@ -1,26 +1,25 @@
-/// AI 分析服务
-/// 
-/// 接收主播语音 + 双截图 + 员工对话历史，返回智能化的弹幕回复
-
-use serde::{Deserialize, Serialize};
-use anyhow::Result;
-use std::sync::Arc;
 use crate::llm::OpenAIClient;
 use crate::settings::ModelConfig;
-use base64::{Engine as _, engine::general_purpose};
+use anyhow::Result;
+use base64::{engine::general_purpose, Engine as _};
+/// AI 分析服务
+///
+/// 接收主播语音 + 双截图 + 员工对话历史，返回智能化的弹幕回复
+use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 
 /// AI 分析请求
 #[derive(Debug, Clone, Serialize)]
 pub struct AIAnalysisRequest {
     /// 主播说的话（语音识别结果）
     pub streamer_speech: String,
-    
+
     /// 开始说话时的截图（Base64）
     pub screenshot_before: String,
-    
+
     /// 结束说话时的截图（Base64）
     pub screenshot_after: String,
-    
+
     /// 员工列表及其对话历史
     pub employees: Vec<EmployeeContext>,
 }
@@ -30,13 +29,13 @@ pub struct AIAnalysisRequest {
 pub struct EmployeeContext {
     /// 员工 ID
     pub id: String,
-    
+
     /// 员工昵称
     pub nickname: String,
-    
+
     /// 员工性格
     pub personality: String,
-    
+
     /// 对话历史（最近 10 条）
     pub conversation_history: Vec<ConversationMessage>,
 }
@@ -44,7 +43,7 @@ pub struct EmployeeContext {
 /// 对话消息
 #[derive(Debug, Clone, Serialize)]
 pub struct ConversationMessage {
-    pub role: String,  // "user" (主播) 或 "assistant" (员工)
+    pub role: String, // "user" (主播) 或 "assistant" (员工)
     pub content: String,
 }
 
@@ -59,17 +58,17 @@ pub struct AIAnalysisResponse {
 pub struct EmployeeAction {
     /// 员工 ID
     pub employee: String,
-    
+
     /// 要发送的弹幕内容
     pub content: String,
-    
+
     /// 是否发送礼物
     pub gift: bool,
-    
+
     /// 礼物名称（如果 gift = true）
     #[serde(default)]
     pub gift_name: Option<String>,
-    
+
     /// 礼物数量（如果 gift = true）
     #[serde(default)]
     pub gift_count: Option<u32>,
@@ -94,9 +93,9 @@ impl AIAnalyzer {
             temperature: 0.8,
             max_tokens: 2000,
         };
-        
+
         let client = OpenAIClient::new(config).expect("创建 OpenAI 客户端失败");
-        
+
         Self {
             client: Arc::new(client),
             model,
@@ -104,72 +103,44 @@ impl AIAnalyzer {
     }
 
     /// 分析主播语音和游戏状态，生成员工互动决策
-    pub async fn analyze(
-        &self,
-        request: AIAnalysisRequest,
-    ) -> Result<AIAnalysisResponse, String> {
-        println!("🤖 开始 AI 分析...");
-        println!("  主播说话: {}", request.streamer_speech);
-        println!("  员工数量: {}", request.employees.len());
-
-        // 🧹 清理和验证 base64 图片，过滤掉空截图
+    pub async fn analyze(&self, request: AIAnalysisRequest) -> Result<AIAnalysisResponse, String> {
+        // 清理和验证 base64 图片，过滤掉空截图
         let mut images = Vec::new();
-        
+
         // 处理第一张截图
         if !request.screenshot_before.is_empty() {
-            match Self::sanitize_base64_image(&request.screenshot_before) {
-                Ok(clean_img) => {
-                    images.push(clean_img);
-                    println!("✅ 前截图有效，已添加");
-                }
-                Err(e) => {
-                    println!("⚠️ 前截图无效，已跳过: {}", e);
-                }
+            if let Ok(clean_img) = Self::sanitize_base64_image(&request.screenshot_before) {
+                images.push(clean_img);
             }
-        } else {
-            println!("⚠️ 前截图为空，已跳过");
         }
-        
+
         // 处理第二张截图
         if !request.screenshot_after.is_empty() {
-            match Self::sanitize_base64_image(&request.screenshot_after) {
-                Ok(clean_img) => {
-                    images.push(clean_img);
-                    println!("✅ 后截图有效，已添加");
-                }
-                Err(e) => {
-                    println!("⚠️ 后截图无效，已跳过: {}", e);
-                }
+            if let Ok(clean_img) = Self::sanitize_base64_image(&request.screenshot_after) {
+                images.push(clean_img);
             }
-        } else {
-            println!("⚠️ 后截图为空，已跳过");
         }
-        
-        println!("📊 有效截图数量: {}/2", images.len());
 
         // 构建提示词
         let user_prompt = self.build_prompt(&request, images.len());
         let system_prompt = "你是一个直播间互动分析专家。根据主播的语音和游戏画面变化，为每个AI员工生成自然、有趣、符合其性格的弹幕回复。\n\n你必须严格按照以下JSON格式返回，不要包含任何其他文字：\n{\n  \"actions\": [\n    {\n      \"employee\": \"员工ID\",\n      \"content\": \"弹幕内容\",\n      \"gift\": false\n    }\n  ]\n}";
 
         // 调用 OpenAI Multi-Vision API
-        let ai_response = self.client
+        let ai_response = self
+            .client
             .chat_with_multi_vision(system_prompt, &user_prompt, &images)
             .await
             .map_err(|e| format!("AI API 调用失败: {}", e))?;
-
-        println!("✅ AI 返回: {}", ai_response);
 
         // 解析 JSON 响应
         let response: AIAnalysisResponse = serde_json::from_str(&ai_response)
             .map_err(|e| format!("解析 AI 响应 JSON 失败: {}\n原始响应: {}", e, ai_response))?;
 
-        println!("✅ AI 分析完成，生成 {} 个员工行为", response.actions.len());
-
         Ok(response)
     }
 
     /// 净化 base64 图片字符串
-    /// 
+    ///
     /// 功能:
     /// 1. 去除 data:image/...;base64, 前缀 (如果有)
     /// 2. 移除换行符和空白字符
@@ -177,42 +148,33 @@ impl AIAnalyzer {
     /// 4. 确保解码后的数据不为空
     fn sanitize_base64_image(s: &str) -> Result<String, String> {
         let mut cleaned = s.trim().to_string();
-        
+
         // 0. 检查原始字符串是否为空
         if cleaned.is_empty() {
             return Err("base64 字符串为空".to_string());
         }
-        
+
         // 1. 去除 data URL 前缀
         if let Some(comma_idx) = cleaned.find(',') {
-            // 先复制前缀用于日志，避免借用冲突
-            let prefix = cleaned[..comma_idx].to_string();
+            let prefix = &cleaned[..comma_idx];
             if prefix.starts_with("data:") && prefix.contains("base64") {
                 cleaned = cleaned[comma_idx + 1..].to_string();
-                println!("🧹 检测到 data URL 前缀，已移除: {}", prefix);
             }
         }
-        
+
         // 2. 移除所有换行符和空白字符
         cleaned.retain(|c| !c.is_whitespace());
-        
+
         // 3. 校验 base64 格式
         match general_purpose::STANDARD.decode(&cleaned) {
             Ok(decoded) => {
                 // 4. 检查解码后的数据是否为空
                 if decoded.is_empty() {
-                    println!("❌ base64 解码后数据为空");
                     return Err("base64 解码后数据为空".to_string());
                 }
-                
-                println!("✅ base64 图片校验成功 (解码后大小: {} bytes)", decoded.len());
                 Ok(cleaned)
             }
             Err(e) => {
-                println!("❌ base64 图片格式无效: {}", e);
-                println!("   原始字符串长度: {}", s.len());
-                println!("   清理后字符串长度: {}", cleaned.len());
-                println!("   前 50 字符: {}", &cleaned.chars().take(50).collect::<String>());
                 Err(format!("无效的 base64 图片格式: {}", e))
             }
         }
@@ -226,7 +188,7 @@ impl AIAnalyzer {
             2 => "- 图片1：主播开始说话时的游戏状态\n- 图片2：主播结束说话时的游戏状态\n请分析游戏画面中发生了什么变化（如角色移动、战斗、得分等）",
             _ => "- 多张游戏截图\n请分析游戏画面变化",
         };
-        
+
         let mut prompt = format!(
             "# 直播间互动分析任务\n\n\
             ## 主播语音识别结果\n\
@@ -234,8 +196,7 @@ impl AIAnalyzer {
             ## 游戏画面变化\n\
             {}\n\n\
             ## AI 员工信息\n",
-            request.streamer_speech,
-            screenshot_info
+            request.streamer_speech, screenshot_info
         );
 
         // 添加每个员工的信息
@@ -251,7 +212,11 @@ impl AIAnalyzer {
             if !employee.conversation_history.is_empty() {
                 prompt.push_str("**最近对话历史:**\n");
                 for msg in employee.conversation_history.iter().rev().take(5).rev() {
-                    let role_label = if msg.role == "user" { "主播" } else { &employee.nickname };
+                    let role_label = if msg.role == "user" {
+                        "主播"
+                    } else {
+                        &employee.nickname
+                    };
                     prompt.push_str(&format!("- {}: {}\n", role_label, msg.content));
                 }
             } else {
@@ -287,7 +252,7 @@ impl AIAnalyzer {
             - 礼物名称可选: 🚀火箭, 🌹鲜花, 666, 💎钻石\n\
             - 不要所有员工都回复，选择1-3个最相关的员工即可\n\
             - 参考员工的对话历史，避免重复相似的内容\n\n\
-            请直接返回 JSON，不要包含任何其他说明文字。"
+            请直接返回 JSON，不要包含任何其他说明文字。",
         );
 
         prompt
@@ -322,23 +287,21 @@ mod tests {
             streamer_speech: "哇，这波操作可以啊！".to_string(),
             screenshot_before: "base64_image_1".to_string(),
             screenshot_after: "base64_image_2".to_string(),
-            employees: vec![
-                EmployeeContext {
-                    id: "emp1".to_string(),
-                    nickname: "小明".to_string(),
-                    personality: "sunnyou_male".to_string(),
-                    conversation_history: vec![
-                        ConversationMessage {
-                            role: "user".to_string(),
-                            content: "开始游戏了".to_string(),
-                        },
-                        ConversationMessage {
-                            role: "assistant".to_string(),
-                            content: "冲冲冲！".to_string(),
-                        },
-                    ],
-                },
-            ],
+            employees: vec![EmployeeContext {
+                id: "emp1".to_string(),
+                nickname: "小明".to_string(),
+                personality: "sunnyou_male".to_string(),
+                conversation_history: vec![
+                    ConversationMessage {
+                        role: "user".to_string(),
+                        content: "开始游戏了".to_string(),
+                    },
+                    ConversationMessage {
+                        role: "assistant".to_string(),
+                        content: "冲冲冲！".to_string(),
+                    },
+                ],
+            }],
         };
 
         let prompt = analyzer.build_prompt(&request);

@@ -1,18 +1,18 @@
-mod crawler;
+mod aliyun_voice_service;
+mod audio;
 mod commands;
 mod config;
-mod screenshot;
+mod crawler;
 mod embeddings;
-mod settings;
-mod rag;
+mod livestream; // 新增直播间功能
 mod llm;
 mod personality;
-mod tts;
-mod audio;
-mod aliyun_voice_service;
-mod tray;
+mod rag;
+mod screenshot;
+mod settings;
 mod simulation; // 新增模拟系统
-mod livestream; // 新增直播间功能
+mod tray;
+mod tts;
 pub mod vector_db;
 
 use commands::*;
@@ -30,32 +30,32 @@ pub fn run() {
     env_logger::init();
 
     // 获取配置目录路径（可执行文件同级的 config 目录）
-    let config_dir = settings::AppSettings::config_dir()
-        .expect("无法获取配置目录");
-    
+    let config_dir = settings::AppSettings::config_dir().expect("无法获取配置目录");
+
     log::info!("📂 配置目录: {:?}", config_dir);
 
     // 加载游戏配置文件 (config/games.toml)
     let games_config_path = config_dir.join("games.toml");
-    let game_config = Config::from_toml_file(&games_config_path)
-        .expect("无法加载游戏配置文件");
-    
+    let game_config = Config::from_toml_file(&games_config_path).expect("无法加载游戏配置文件");
+
     log::info!("✅ 成功加载 {} 个游戏配置", game_config.games.len());
 
     // 加载应用配置文件 (config/config.toml)
-    let app_settings = settings::AppSettings::load()
-        .expect("无法加载应用配置");
-    
+    let app_settings = settings::AppSettings::load().expect("无法加载应用配置");
+
     log::info!("✅ 成功加载应用配置");
     log::info!("   语言: {}", app_settings.general.language);
-    log::info!("   技能库路径: {}", app_settings.skill_library.storage_base_path);
+    log::info!(
+        "   技能库路径: {}",
+        app_settings.skill_library.storage_base_path
+    );
 
     // 初始化截图状态
     let screenshot_state = ScreenshotState::default();
 
     // 初始化音频状态
     let audio_state = audio_commands::AudioState::new();
-    
+
     // 初始化模拟状态
     let simulation_state = simulation_engine_commands::SimulationState::new();
     let smart_capture_state = smart_capture_commands::SmartCaptureState::new();

@@ -72,31 +72,22 @@ export const LivestreamHudPage: React.FC = () => {
 
   const livestream = config.livestream!;
 
-  // 🔥 直接从后端加载配置（因为这是独立窗口，无法共享 store）
+  // 直接从后端加载配置（因为这是独立窗口，无法共享 store）
   useEffect(() => {
     const loadSimulationConfig = async () => {
       try {
-        console.log("===== LivestreamHudPage 加载配置 =====");
         const savedConfig = await invoke<any>("load_simulation_config");
-        console.log("后端返回配置:", JSON.stringify(savedConfig, null, 2));
-        console.log("员工数量:", savedConfig.employees?.length);
-
         loadConfig(savedConfig);
-
-        console.log("✅ 配置已加载到 store");
-        console.log("======================================");
       } catch (error) {
-        console.error("❌ 加载模拟场景配置失败:", error);
+        console.error("加载模拟场景配置失败:", error);
       }
     };
 
-    // 初始加载
     loadSimulationConfig();
 
-    // 🔥 监听配置更新事件
+    // 监听配置更新事件
     const setupConfigListener = async () => {
       const unlisten = await listen("simulation-config-updated", () => {
-        console.log("📢 收到配置更新事件，重新加载配置...");
         loadSimulationConfig();
       });
       return unlisten;
@@ -111,18 +102,6 @@ export const LivestreamHudPage: React.FC = () => {
       if (unlistenFn) unlistenFn();
     };
   }, [loadConfig]);
-
-  // 调试: 打印配置信息
-  useEffect(() => {
-    console.log("===== 直播间配置调试 =====");
-    console.log("完整配置:", JSON.stringify(config, null, 2));
-    console.log("员工数组:", config.employees);
-    console.log("员工数量:", config.employees.length);
-    if (config.employees.length > 0) {
-      console.log("第一个员工:", config.employees[0]);
-    }
-    console.log("==========================");
-  }, [config]);
 
   // 加载可用游戏列表
   useEffect(() => {
@@ -152,23 +131,17 @@ export const LivestreamHudPage: React.FC = () => {
 
   // 监听模拟事件
   useEffect(() => {
-    // 🔥 防止 React.StrictMode 重复注册（只在第一次时注册）
+    // 防止 React.StrictMode 重复注册（只在第一次时注册）
     if (eventListenerSetupRef.current) {
-      console.log("⚠️ 事件监听器已注册，跳过重复注册");
       return;
     }
     
     eventListenerSetupRef.current = true;
-    console.log("✅ 开始注册模拟事件监听器");
     
     const setupEventListener = async () => {
       const unlisten = await listen<SimulationEvent>(
         "simulation_event",
         (event) => {
-          console.log("===== 收到原始事件 =====");
-          console.log("完整 event 对象:", JSON.stringify(event, null, 2));
-          console.log("event.payload:", JSON.stringify(event.payload, null, 2));
-          console.log("======================");
           handleSimulationEvent(event.payload);
         },
       );
@@ -178,14 +151,13 @@ export const LivestreamHudPage: React.FC = () => {
     setupEventListener();
 
     return () => {
-      console.log("🧹 清理模拟事件监听器");
       if (eventListenerRef.current) {
         eventListenerRef.current();
         eventListenerRef.current = null;
       }
       eventListenerSetupRef.current = false;
     };
-  }, []); // 🔥 保持空依赖数组，只在组件挂载时注册一次
+  }, []); // 保持空依赖数组，只在组件挂载时注册一次
 
   // 🔥 监听智能截图事件
   useEffect(() => {
@@ -196,12 +168,10 @@ export const LivestreamHudPage: React.FC = () => {
 
       // 监听智能截图事件
       const unlistenCapture = await listen("smart_capture_event", (event: any) => {
-        console.log("📸 智能截图事件:", event.payload);
         const data = event.payload;
 
         switch (data.type) {
           case "SpeechStarted":
-            console.log("🎤 主播开始说话，已截图");
             message.info("检测到语音，已截图", 1);
             
             // 保存第一张截图
@@ -209,8 +179,6 @@ export const LivestreamHudPage: React.FC = () => {
             break;
 
           case "SpeechEndedWithScreenshot":
-            console.log("🎤 主播结束说话，已截图（等待识别）");
-            
             // 保存第二张截图
             currentScreenshotAfter = data.screenshot_end?.data || null;
             break;
@@ -235,24 +203,14 @@ export const LivestreamHudPage: React.FC = () => {
 
       // 监听阿里云识别请求（需要调用 ASR）
       const unlistenRecognize = await listen("livestream_recognize_request", async (event: any) => {
-        // 🔥 防止重复处理同一个识别请求
+        // 防止重复处理同一个识别请求
         if (isProcessingRecognitionRef.current) {
-          console.log("⚠️ 正在处理识别请求，跳过重复调用");
           return;
         }
         
         isProcessingRecognitionRef.current = true;
         
-        const { pcm_data, sample_rate, duration_secs } = event.payload;
-        
-        console.log("🎯 ===== 收到识别请求 =====");
-        console.log("  PCM 数据大小:", pcm_data.length);
-        console.log("  采样率:", sample_rate);
-        console.log("  时长:", duration_secs, "秒");
-        console.log("  截图数据状态:");
-        console.log("    - 前截图:", currentScreenshotBefore ? `${currentScreenshotBefore.length} 字节` : "未找到");
-        console.log("    - 后截图:", currentScreenshotAfter ? `${currentScreenshotAfter.length} 字节` : "未找到");
-        console.log("==============================");
+        const { pcm_data } = event.payload;
 
         try {
           // 从配置中获取阿里云凭证
@@ -260,7 +218,7 @@ export const LivestreamHudPage: React.FC = () => {
           const ttsConfig = settings.tts;
 
           if (!ttsConfig.aliyun_access_key || !ttsConfig.aliyun_access_secret || !ttsConfig.aliyun_appkey) {
-            console.error("❌ 阿里云凭证未配置");
+            console.error("阿里云凭证未配置");
             message.error("请先在设置中配置阿里云凭证", 3);
             return;
           }
@@ -275,28 +233,20 @@ export const LivestreamHudPage: React.FC = () => {
             region: "cn-shanghai",
           });
 
-          console.log("✅ 识别成功:", result);
           message.success(`识别: ${result}`, 3);
 
-          console.log("🔍 准备触发 AI 分析...");
-          console.log("  识别文本:", result);
-          console.log("  前截图存在:", !!currentScreenshotBefore);
-          console.log("  后截图存在:", !!currentScreenshotAfter);
-
-          // 🔥 容错处理：即使截图缺失也进行 AI 分析
+          // 容错处理：即使截图缺失也进行 AI 分析
           const hasBeforeScreenshot = !!currentScreenshotBefore;
           const hasAfterScreenshot = !!currentScreenshotAfter;
           const bothMissing = !hasBeforeScreenshot && !hasAfterScreenshot;
           
-          // 🔥 记录截图缺失情况
+          // 记录截图缺失情况
           if (bothMissing) {
             screenshotErrorCountRef.current += 1;
-            console.warn(`⚠️ 双截图都缺失（第 ${screenshotErrorCountRef.current} 次）`);
             
             // 连续2次双截图都缺失，停止直播
             if (screenshotErrorCountRef.current >= 2) {
               message.error("截图系统异常（连续2次双截图缺失），已自动停止直播", 5);
-              console.error("❌ 截图系统异常，停止直播");
               
               try {
                 await invoke("stop_livestream_simulation");
@@ -319,12 +269,7 @@ export const LivestreamHudPage: React.FC = () => {
           const beforeScreenshot = currentScreenshotBefore || "";
           const afterScreenshot = currentScreenshotAfter || "";
           
-          console.log("✅ 开始 AI 分析（允许部分截图缺失）");
-          if (!hasBeforeScreenshot) console.log("  ⚠️ 前截图缺失，使用空数据");
-          if (!hasAfterScreenshot) console.log("  ⚠️ 后截图缺失，使用空数据");
-          
           try {
-            console.log("📤 调用 trigger_ai_analysis 命令...");
             await invoke("trigger_ai_analysis", {
               request: {
                 speech_text: result,
@@ -332,10 +277,8 @@ export const LivestreamHudPage: React.FC = () => {
                 screenshot_after: afterScreenshot,
               },
             });
-            
-            console.log("✅ AI 分析命令调用成功");
           } catch (error) {
-            console.error("❌ AI 分析调用失败:", error);
+            console.error("AI 分析调用失败:", error);
             // 如果是因为直播已停止，不显示错误
             const errorMsg = String(error);
             if (!errorMsg.includes("已忽略此请求")) {
@@ -374,55 +317,34 @@ export const LivestreamHudPage: React.FC = () => {
     };
   }, []);
 
-  // 处理模拟事件
   // 处理模拟事件（使用 useCallback 稳定函数引用）
   const handleSimulationEvent = useCallback((event: SimulationEvent) => {
-    // 🔥 通过 timestamp 去重，防止同一个事件被处理多次
+    // 通过 timestamp 去重，防止同一个事件被处理多次
     if (processedEventTimestampsRef.current.has(event.timestamp)) {
-      console.log("⚠️ 跳过重复事件 (timestamp:", event.timestamp, ")");
       return;
     }
     
     processedEventTimestampsRef.current.add(event.timestamp);
     
-    // 🔥 保持最近 100 个 timestamp，避免内存泄漏
+    // 保持最近 100 个 timestamp，避免内存泄漏
     if (processedEventTimestampsRef.current.size > 100) {
       const oldestTimestamps = Array.from(processedEventTimestampsRef.current).slice(0, 50);
       oldestTimestamps.forEach(ts => processedEventTimestampsRef.current.delete(ts));
     }
-    
-    console.log("===== 处理模拟事件 =====");
-    console.log("完整 event 对象:", JSON.stringify(event, null, 2));
-    console.log("event.event_type:", event.event_type);
 
     const eventType = event.event_type;
-    console.log("eventType 对象:", JSON.stringify(eventType, null, 2));
-    console.log("eventType.type:", eventType.type);
 
     switch (eventType.type) {
-      case "danmaku": // 🔥 注意这里是小写
-        console.log("✅ 匹配到弹幕事件:", {
-          nickname: eventType.nickname,
-          message: eventType.message,
-          personality: eventType.personality,
-        });
-        // 添加弹幕消息到对话区
+      case "danmaku":
         addMessage({
           role: "assistant",
           content: eventType.message,
           aiPersonality: eventType.personality,
           nickname: eventType.nickname,
         });
-        console.log("✅ 弹幕消息已添加到 UI");
         break;
 
-      case "gift": // 🔥 注意这里是小写
-        console.log("处理礼物事件:", {
-          nickname: eventType.nickname,
-          giftName: eventType.gift_name, // 🔥 注意这里是 snake_case
-          count: eventType.count,
-        });
-        // 添加礼物消息到对话区
+      case "gift":
         addMessage({
           role: "system",
           content: `${eventType.nickname} 送出 ${eventType.gift_name} x${eventType.count}`,
@@ -431,26 +353,18 @@ export const LivestreamHudPage: React.FC = () => {
           `🎁 ${eventType.nickname} 送出 ${eventType.gift_name} x${eventType.count}`,
           2,
         );
-        console.log("礼物消息已添加");
         break;
 
-      case "greeting": // 🔥 注意这里是小写
-        console.log("处理打招呼事件:", {
-          nickname: eventType.nickname,
-          message: eventType.message,
-        });
-        // 添加打招呼消息
+      case "greeting":
         addMessage({
           role: "assistant",
           content: eventType.message,
           aiPersonality: "sunnyou_male",
           nickname: eventType.nickname,
         });
-        console.log("打招呼消息已添加");
         break;
     }
-    console.log("========================");
-  }, [addMessage]); // 依赖 addMessage
+  }, [addMessage]);
 
   // 监听游戏切换事件
   useEffect(() => {
@@ -530,18 +444,14 @@ export const LivestreamHudPage: React.FC = () => {
         setIsLivestreaming(true);
         message.success("直播已开始！AI 员工开始活跃...");
 
-        // 🔥 启动智能截图+语音识别
+        // 启动智能截图+语音识别
         try {
-          console.log("=== 准备启动智能截图系统 ===");
-          
           // 获取当前窗口列表，尝试找到游戏窗口
           let targetWindowId: number | undefined;
           try {
-            console.log("🔍 开始查找游戏窗口...");
             const windows = await invoke<any[]>("list_windows_command");
-            console.log(`📋 找到 ${windows.length} 个窗口`);
             
-            // 尝试找到包含游戏名称的窗口（可以根据实际情况调整）
+            // 尝试找到包含游戏名称的窗口
             const gameWindow = windows.find((w) => 
               w.title && (
                 w.title.toLowerCase().includes("game") ||
@@ -551,13 +461,9 @@ export const LivestreamHudPage: React.FC = () => {
             );
             if (gameWindow) {
               targetWindowId = gameWindow.id;
-              console.log("✅ 找到游戏窗口:", gameWindow.title, "ID:", targetWindowId);
-            } else {
-              console.log("⚠️ 未找到游戏窗口，将使用全屏截图");
-              console.log("所有窗口:", windows.map(w => w.title).join(", "));
             }
           } catch (e) {
-            console.warn("⚠️ 无法获取窗口列表:", e);
+            console.warn("无法获取窗口列表:", e);
           }
 
           const smartCaptureConfig = {
@@ -572,18 +478,12 @@ export const LivestreamHudPage: React.FC = () => {
             },
           };
 
-          console.log("📝 智能截图配置:", JSON.stringify(smartCaptureConfig, null, 2));
-          console.log("📤 调用 start_smart_capture 命令...");
-
-          const result = await invoke("start_smart_capture", { config: smartCaptureConfig });
+          await invoke("start_smart_capture", { config: smartCaptureConfig });
           
-          console.log("✅ start_smart_capture 返回:", result);
           setIsSmartCaptureRunning(true);
           message.success("智能截图已启动，开始监听语音...", 2);
-          console.log("=================================");
         } catch (error) {
-          console.error("❌ 启动智能截图失败:", error);
-          console.error("错误详情:", JSON.stringify(error, null, 2));
+          console.error("启动智能截图失败:", error);
           message.error(`智能截图启动失败: ${error}`, 3);
         }
       }

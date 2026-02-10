@@ -6,7 +6,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     env_logger::init();
 
     let url = "https://phasmophobia.fandom.com/wiki/";
-    
+
     println!("测试访问: {}", url);
 
     // 构建完整的 Headers
@@ -19,33 +19,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
     headers.insert(
         reqwest::header::ACCEPT_LANGUAGE,
-        "en-US,en;q=0.9,zh-CN;q=0.8,zh;q=0.7"
-            .parse()
-            .unwrap(),
+        "en-US,en;q=0.9,zh-CN;q=0.8,zh;q=0.7".parse().unwrap(),
     );
     headers.insert(
         reqwest::header::ACCEPT_ENCODING,
-        "gzip, deflate, br"
-            .parse()
-            .unwrap(),
+        "gzip, deflate, br".parse().unwrap(),
     );
-    headers.insert(
-        reqwest::header::DNT,
-        "1"
-            .parse()
-            .unwrap(),
-    );
-    headers.insert(
-        reqwest::header::CONNECTION,
-        "keep-alive"
-            .parse()
-            .unwrap(),
-    );
+    headers.insert(reqwest::header::DNT, "1".parse().unwrap());
+    headers.insert(reqwest::header::CONNECTION, "keep-alive".parse().unwrap());
     headers.insert(
         reqwest::header::UPGRADE_INSECURE_REQUESTS,
-        "1"
-            .parse()
-            .unwrap(),
+        "1".parse().unwrap(),
     );
 
     let client = Client::builder()
@@ -55,7 +39,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .build()?;
 
     println!("发送请求...");
-    
+
     match client.get(url).send().await {
         Ok(response) => {
             println!("✅ 状态码: {}", response.status());
@@ -63,7 +47,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             for (name, value) in response.headers() {
                 println!("  {}: {:?}", name, value);
             }
-            
+
             if response.status().is_success() {
                 let text = response.text().await?;
                 println!("\n📄 内容长度: {} 字节", text.len());
@@ -75,7 +59,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         Err(e) => {
             println!("❌ 请求失败: {}", e);
-            
+
             if e.is_timeout() {
                 println!("  原因: 超时");
             } else if e.is_connect() {

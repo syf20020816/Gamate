@@ -1,8 +1,8 @@
 use crate::settings::AppSettings;
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 use std::fs;
 use std::path::PathBuf;
-use std::collections::HashSet;
 
 /// 已下载的技能库记录
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -41,7 +41,7 @@ async fn scan_downloaded_libraries_impl() -> anyhow::Result<Vec<DownloadedLibrar
     // 1. 加载应用配置
     let settings = AppSettings::load()?;
     let base_path = PathBuf::from(&settings.skill_library.storage_base_path);
-    
+
     if !base_path.exists() {
         log::warn!("📂 技能库目录不存在: {:?}", base_path);
         return Ok(Vec::new());
@@ -84,7 +84,7 @@ async fn scan_downloaded_libraries_impl() -> anyhow::Result<Vec<DownloadedLibrar
         for (index, (timestamp, timestamp_path)) in timestamp_dirs.iter().enumerate() {
             // 检查 wiki_raw.jsonl 文件
             let jsonl_path = timestamp_path.join("wiki_raw.jsonl");
-            
+
             if !jsonl_path.exists() {
                 log::warn!("⚠️ 技能库目录缺少 wiki_raw.jsonl: {:?}", timestamp_path);
                 continue;
@@ -93,16 +93,23 @@ async fn scan_downloaded_libraries_impl() -> anyhow::Result<Vec<DownloadedLibrar
             // 读取文件统计
             let metadata = fs::metadata(&jsonl_path)?;
             let storage_size = metadata.len();
-            
+
             // 检查文件大小是否超过 1KB
             if storage_size <= 1024 {
-                log::warn!("⚠️ 技能库文件过小 ({} bytes): {:?}", storage_size, jsonl_path);
+                log::warn!(
+                    "⚠️ 技能库文件过小 ({} bytes): {:?}",
+                    storage_size,
+                    jsonl_path
+                );
                 continue;
             }
 
             // 统计条目数量
             let content = fs::read_to_string(&jsonl_path)?;
-            let total_entries = content.lines().filter(|line| !line.trim().is_empty()).count();
+            let total_entries = content
+                .lines()
+                .filter(|line| !line.trim().is_empty())
+                .count();
 
             // 确定状态 (第一个为 active，其他为 outdated)
             let status = if index == 0 { "active" } else { "outdated" };
@@ -149,7 +156,7 @@ fn get_game_name(game_id: &str) -> String {
 
 /// 格式化时间戳
 fn format_timestamp(timestamp: u64) -> String {
-    use chrono::{DateTime, Utc, TimeZone};
+    use chrono::{DateTime, TimeZone, Utc};
     let dt = Utc.timestamp_opt(timestamp as i64, 0).unwrap();
     dt.format("%Y-%m-%dT%H:%M:%S%.3fZ").to_string()
 }
@@ -166,32 +173,36 @@ pub async fn sync_libraries_to_config() -> Result<Vec<String>, String> {
 async fn sync_libraries_to_config_impl() -> anyhow::Result<Vec<String>> {
     // 1. 扫描已下载的技能库
     let libraries = scan_downloaded_libraries_impl().await?;
-    
+
     // 2. 提取唯一的游戏ID列表
     let mut game_ids: HashSet<String> = HashSet::new();
     for library in &libraries {
         game_ids.insert(library.game_id.clone());
     }
-    
+
     let game_ids_vec: Vec<String> = game_ids.into_iter().collect();
-    
+
     // 3. 加载当前配置
     let mut settings = AppSettings::load()?;
-    
+
     // 4. 更新 selected_games (合并已存在的 + 新检测到的)
-    let mut current_selected: HashSet<String> = settings.user.selected_games.iter().cloned().collect();
-    
+    let mut current_selected: HashSet<String> =
+        settings.user.selected_games.iter().cloned().collect();
+
     for game_id in &game_ids_vec {
         current_selected.insert(game_id.clone());
     }
-    
+
     settings.user.selected_games = current_selected.into_iter().collect();
     settings.user.selected_games.sort(); // 排序便于查看
-    
+
     // 5. 保存配置
     settings.save()?;
-    
-    log::info!("✅ 已同步 {} 个游戏到配置文件", settings.user.selected_games.len());
-    
+
+    log::info!(
+        "✅ 已同步 {} 个游戏到配置文件",
+        settings.user.selected_games.len()
+    );
+
     Ok(settings.user.selected_games)
 }

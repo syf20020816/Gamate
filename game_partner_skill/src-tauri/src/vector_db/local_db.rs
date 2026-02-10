@@ -1,7 +1,7 @@
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
 use std::collections::HashMap;
+use std::path::PathBuf;
 
 /// 本地文件型向量数据库（无需外部依赖）
 pub struct LocalVectorDB {
@@ -33,7 +33,8 @@ impl LocalVectorDB {
     }
 
     fn collection_file(&self) -> PathBuf {
-        self.storage_path.join(format!("{}.json", self.collection_name))
+        self.storage_path
+            .join(format!("{}.json", self.collection_name))
     }
 
     /// 检查集合是否存在
@@ -80,7 +81,14 @@ impl LocalVectorDB {
 
         // 更新或插入
         for (id, vector, payload) in entries {
-            map.insert(id, VectorEntry { id, vector, payload });
+            map.insert(
+                id,
+                VectorEntry {
+                    id,
+                    vector,
+                    payload,
+                },
+            );
         }
 
         // 转回 Vec 并保存

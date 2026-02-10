@@ -17,7 +17,6 @@ import {
   Modal,
 } from "antd";
 import {
-  SettingOutlined,
   GlobalOutlined,
   RobotOutlined,
   DatabaseOutlined,

@@ -28,7 +28,7 @@ const Home: React.FC<HomeProps> = ({ onNavigate }) => {
   const { user } = useUserStore();
   const [selectedGames, setSelectedGames] = useState<any[]>([]);
   
-  // ✅ 从后端加载用户选择的游戏
+  // 从后端加载用户选择的游戏
   useEffect(() => {
     const loadSelectedGames = async () => {
       try {

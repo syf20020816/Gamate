@@ -48,8 +48,8 @@ pub async fn download_wiki(params: DownloadWikiParams) -> Result<CrawlerResult, 
     // 根据源类型选择爬虫
     let result = match source_type {
         WikiSourceType::GitHub => {
-            let mut crawler = GitHubCrawler::new(config)
-                .map_err(|e| format!("创建 GitHub 爬虫失败: {}", e))?;
+            let mut crawler =
+                GitHubCrawler::new(config).map_err(|e| format!("创建 GitHub 爬虫失败: {}", e))?;
             crawler.crawl().await
         }
         WikiSourceType::FandomWiki | WikiSourceType::GamepediaWiki => {
@@ -133,8 +133,7 @@ pub async fn open_folder(path: String) -> Result<(), String> {
 pub async fn delete_skill_library(storage_path: String) -> Result<(), String> {
     // 检查路径是否存在
     if std::path::Path::new(&storage_path).exists() {
-        std::fs::remove_dir_all(&storage_path)
-            .map_err(|e| format!("删除文件失败: {}", e))?;
+        std::fs::remove_dir_all(&storage_path).map_err(|e| format!("删除文件失败: {}", e))?;
         log::info!("✅ 已删除技能库文件: {}", storage_path);
     } else {
         log::warn!("⚠️  技能库路径不存在（可能已被手动删除）: {}", storage_path);
@@ -147,27 +146,27 @@ pub async fn delete_skill_library(storage_path: String) -> Result<(), String> {
 #[tauri::command]
 pub async fn validate_skill_library(storage_path: String) -> Result<bool, String> {
     let path = std::path::Path::new(&storage_path);
-    
+
     // 检查目录是否存在
     if !path.exists() {
         log::warn!("路径不存在: {}", storage_path);
         return Ok(false);
     }
-    
+
     // 检查关键文件是否存在
     let wiki_file = path.join("wiki_raw.jsonl");
     let metadata_file = path.join("metadata.json");
-    
+
     if !wiki_file.exists() {
         log::warn!("wiki_raw.jsonl 不存在: {}", storage_path);
         return Ok(false);
     }
-    
+
     if !metadata_file.exists() {
         log::warn!("metadata.json 不存在: {}", storage_path);
         return Ok(false);
     }
-    
+
     Ok(true)
 }
 

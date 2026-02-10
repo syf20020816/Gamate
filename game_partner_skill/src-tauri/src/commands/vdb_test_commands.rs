@@ -1,5 +1,5 @@
 use crate::settings::AppSettings;
-use crate::vector_db::{VectorDB, LocalVectorDB};
+use crate::vector_db::{LocalVectorDB, VectorDB};
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
@@ -33,18 +33,18 @@ async fn test_vector_db_connection_impl() -> Result<VectorDBTestResult> {
 
             std::fs::create_dir_all(&storage_path)?;
             let _db = LocalVectorDB::new(storage_path.clone(), "test_collection")?;
-            
+
             // 创建测试集合
             _db.create_collection(384)?;
-            
+
             // 插入测试数据
             let test_vector = vec![0.1; 384];
             let test_payload = serde_json::json!({ "test": "data" });
             _db.upsert_points(vec![(1, test_vector.clone(), test_payload)])?;
-            
+
             // 搜索测试
             let results = _db.search(test_vector, 1)?;
-            
+
             // 清理测试数据
             _db.delete_collection()?;
 
@@ -77,10 +77,14 @@ async fn test_vector_db_connection_impl() -> Result<VectorDBTestResult> {
             // AI 直接检索不需要测试连接
             Ok(VectorDBTestResult {
                 success: true,
-                message: "✅ AI 直接检索模式已启用！\n此模式不需要向量数据库，将直接使用文本匹配。".to_string(),
+                message: "✅ AI 直接检索模式已启用！\n此模式不需要向量数据库，将直接使用文本匹配。"
+                    .to_string(),
                 mode: "ai_direct".to_string(),
             })
         }
-        _ => Err(anyhow::anyhow!("不支持的向量数据库模式: {}", vdb_config.mode)),
+        _ => Err(anyhow::anyhow!(
+            "不支持的向量数据库模式: {}",
+            vdb_config.mode
+        )),
     }
 }

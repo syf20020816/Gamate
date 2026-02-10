@@ -1,7 +1,7 @@
 /// AI 陪玩角色配置加载模块
-/// 
+///
 /// 负责加载不同角色的提示词配置文件 (prompts_*.toml)
-/// 
+///
 use anyhow::{Context, Result};
 use serde::Deserialize;
 use std::fs;
@@ -86,10 +86,10 @@ pub struct ConfigMetadata {
 }
 
 /// 加载指定类型的角色配置
-/// 
+///
 /// # 参数
 /// - `personality_type`: 角色类型 ("sunnyou_male", "funny_female", 等)
-/// 
+///
 /// # 返回
 /// - Ok(PersonalityConfig): 成功加载的配置
 /// - Err: 加载失败
@@ -108,17 +108,21 @@ pub fn load_personality(personality_type: &str) -> Result<PersonalityConfig> {
     let config: PersonalityConfig = toml::from_str(&content)
         .with_context(|| format!("解析配置文件失败: {}", config_path.display()))?;
 
-    log::info!("✅ 角色配置加载成功: {} ({})", config.character.name_cn, config.character.name_en);
+    log::info!(
+        "✅ 角色配置加载成功: {} ({})",
+        config.character.name_cn,
+        config.character.name_en
+    );
 
     Ok(config)
 }
 
 /// 构建系统提示词 (用于 LLM)
-/// 
+///
 /// # 参数
 /// - `config`: 角色配置
 /// - `game_name`: 游戏名称
-/// 
+///
 /// # 返回
 /// 格式化后的系统提示词字符串
 pub fn build_system_prompt(config: &PersonalityConfig, game_name: &str) -> String {
@@ -230,17 +234,20 @@ fn get_config_path(filename: &str) -> Result<PathBuf> {
 
     // 如果都找不到,返回默认路径并报错
     let default_path = PathBuf::from(format!("config/{}", filename));
-    anyhow::bail!("配置文件不存在: {} (已尝试多个路径)", default_path.display())
+    anyhow::bail!(
+        "配置文件不存在: {} (已尝试多个路径)",
+        default_path.display()
+    )
 }
 
 /// 获取所有可用的角色类型
 pub fn get_available_personalities() -> Vec<&'static str> {
     vec![
-        "sunnyou_male",    // 损友-男
-        "funny_female",    // 搞笑-女
-        "kobe",           // 牢大
-        "sweet_girl",     // 甜妹
-        "trump",          // 特朗普
+        "sunnyou_male", // 损友-男
+        "funny_female", // 搞笑-女
+        "kobe",         // 牢大
+        "sweet_girl",   // 甜妹
+        "trump",        // 特朗普
     ]
 }
 
@@ -284,7 +291,7 @@ mod tests {
         };
 
         let prompt = build_system_prompt(&config, "测试游戏");
-        
+
         assert!(prompt.contains("测试角色"));
         assert!(prompt.contains("TestChar"));
         assert!(prompt.contains("测试游戏"));

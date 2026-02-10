@@ -1,6 +1,6 @@
-use anyhow::{Result, anyhow};
-use serde::{Deserialize, Serialize};
 use crate::settings::ModelConfig;
+use anyhow::{anyhow, Result};
+use serde::{Deserialize, Serialize};
 
 /// Ollama 聊天请求
 #[derive(Debug, Serialize)]
@@ -44,7 +44,7 @@ struct OllamaResponseMessage {
     role: String,
     content: String,
     #[serde(default)]
-    thinking: Option<String>,  // qwen3-vl 返回的思考过程
+    thinking: Option<String>, // qwen3-vl 返回的思考过程
 }
 
 /// Ollama 客户端 (原生 API)
@@ -63,11 +63,11 @@ impl OllamaClient {
             base_url = base_url.trim_end_matches("/v1").to_string();
             log::info!("🦙 检测到 /v1 后缀，已自动移除（Ollama 原生 API 不需要）");
         }
-        
+
         log::info!("🦙 创建 Ollama 客户端");
         log::info!("   Base URL: {}", base_url);
         log::info!("   模型: {}", settings.model_name);
-        
+
         Ok(Self {
             base_url,
             settings,
@@ -106,7 +106,8 @@ impl OllamaClient {
         let url = format!("{}/api/chat", self.base_url);
         log::debug!("📤 请求 URL: {}", url);
 
-        let response = self.client
+        let response = self
+            .client
             .post(&url)
             .json(&request)
             .send()
@@ -125,22 +126,22 @@ impl OllamaClient {
             .map_err(|e| anyhow!("解析 Ollama 响应失败: {}", e))?;
 
         log::info!("✅ Ollama 响应成功");
-        
+
         // 提取内容: content 是真正的答案
         let content = ollama_response.message.content;
-        
+
         // 记录 thinking 信息（如果存在）
         if let Some(ref thinking) = ollama_response.message.thinking {
             log::debug!("🧠 模型返回了 thinking 字段: {} bytes", thinking.len());
         }
-        
+
         if content.is_empty() {
             log::warn!("⚠️  Ollama 返回了空 content");
             return Err(anyhow!("AI 响应为空，请重试"));
         }
-        
+
         log::info!("📝 响应长度: {} bytes", content.len());
-        
+
         Ok(content)
     }
 
@@ -160,7 +161,11 @@ impl OllamaClient {
             image_base64
         };
 
-        log::debug!("📤 Base64 数据长度: {} bytes (原始: {})", clean_base64.len(), image_base64.len());
+        log::debug!(
+            "📤 Base64 数据长度: {} bytes (原始: {})",
+            clean_base64.len(),
+            image_base64.len()
+        );
 
         let messages = vec![
             OllamaMessage {
@@ -189,7 +194,8 @@ impl OllamaClient {
         let url = format!("{}/api/chat", self.base_url);
         log::debug!("📤 请求 URL: {}", url);
 
-        let response = self.client
+        let response = self
+            .client
             .post(&url)
             .json(&request)
             .timeout(std::time::Duration::from_secs(120))
@@ -201,13 +207,19 @@ impl OllamaClient {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
             log::error!("❌ Ollama Vision API 错误 {}: {}", status, error_text);
-            return Err(anyhow!("Ollama Vision API 返回错误 {}: {}", status, error_text));
+            return Err(anyhow!(
+                "Ollama Vision API 返回错误 {}: {}",
+                status,
+                error_text
+            ));
         }
 
         // 先获取原始文本，用于调试
-        let response_text = response.text().await
+        let response_text = response
+            .text()
+            .await
             .map_err(|e| anyhow!("读取 Ollama Vision 响应失败: {}", e))?;
-        
+
         log::info!("📥 原始响应长度: {} bytes", response_text.len());
         // 安全截取前 300 个字符 (处理多字节字符)
         let preview_len = response_text.len().min(300);
@@ -216,16 +228,22 @@ impl OllamaClient {
             safe_preview_len -= 1;
         }
         log::info!("📥 原始响应预览: {}", &response_text[..safe_preview_len]);
-        
+
         // 解析 JSON
-        let ollama_response: OllamaChatResponse = serde_json::from_str(&response_text)
-            .map_err(|e| anyhow!("解析 Ollama Vision 响应失败: {} | 响应: {}", e, &response_text[..response_text.len().min(200)]))?;
+        let ollama_response: OllamaChatResponse =
+            serde_json::from_str(&response_text).map_err(|e| {
+                anyhow!(
+                    "解析 Ollama Vision 响应失败: {} | 响应: {}",
+                    e,
+                    &response_text[..response_text.len().min(200)]
+                )
+            })?;
 
         log::info!("✅ Ollama Vision 响应成功");
-        
+
         // 提取内容: content 是真正的答案
         let content = ollama_response.message.content;
-        
+
         // 记录 thinking 信息（如果存在）用于调试
         if let Some(ref thinking) = ollama_response.message.thinking {
             log::debug!("🧠 模型返回了 thinking 字段: {} bytes", thinking.len());
@@ -237,7 +255,7 @@ impl OllamaClient {
             }
             log::debug!("🧠 thinking 预览: {}...", &thinking[..safe_len]);
         }
-        
+
         log::info!("📥 提取的 content 长度: {} bytes", content.len());
         if content.len() > 0 {
             // 安全截取前 200 个字符
@@ -248,12 +266,12 @@ impl OllamaClient {
             }
             log::info!("📥 content 前{}字符: {}", safe_len, &content[..safe_len]);
         }
-        
+
         if content.is_empty() {
             log::error!("⚠️  Ollama Vision 返回了空 content!");
             return Err(anyhow!("AI 视觉响应为空，请重试"));
         }
-        
+
         Ok(content)
     }
 }
@@ -261,9 +279,9 @@ impl OllamaClient {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use base64::Engine;
     use std::fs;
-    use std::path::Path;
-    use base64::Engine;  // 导入 base64 Engine trait
+    use std::path::Path; // 导入 base64 Engine trait
 
     #[tokio::test]
     #[ignore] // 需要本地 Ollama 服务运行
@@ -280,7 +298,7 @@ mod tests {
 
         let client = OllamaClient::new(settings).unwrap();
         let response = client.chat("你是游戏助手", "你好").await;
-        
+
         assert!(response.is_ok());
         println!("响应: {}", response.unwrap());
     }
@@ -299,9 +317,8 @@ mod tests {
         // 1. 读取图片文件
         let image_path = Path::new(r"C:\Users\Administrator\Downloads\1.png");
         println!("\n📁 读取图片: {}", image_path.display());
-        
-        let image_data = fs::read(image_path)
-            .expect("无法读取图片文件,请确保路径正确");
+
+        let image_data = fs::read(image_path).expect("无法读取图片文件,请确保路径正确");
         println!("✅ 图片读取成功: {} bytes", image_data.len());
 
         // 2. 转换为 Base64
@@ -326,17 +343,15 @@ mod tests {
         println!("\n🔮 调用 Vision API...");
         println!("   System: 你是游戏助手");
         println!("   User: 这是什么游戏?请详细描述");
-        
-        let result = client.chat_with_vision(
-            "你是游戏助手",
-            "这是什么游戏?请详细描述",
-            &base64_image
-        ).await;
+
+        let result = client
+            .chat_with_vision("你是游戏助手", "这是什么游戏?请详细描述", &base64_image)
+            .await;
 
         // 5. 检查结果
         println!("\n📊 测试结果:");
         println!("{}", "=".repeat(60));
-        
+
         match result {
             Ok(response) => {
                 println!("✅ 成功!");
@@ -345,11 +360,11 @@ mod tests {
                 println!("{}", response);
                 println!("{}", "-".repeat(60));
                 println!("\n📏 回复长度: {} 字符", response.len());
-                
+
                 // 验证回复不为空
                 assert!(!response.is_empty(), "响应内容不应该为空");
                 assert!(response.len() > 10, "响应内容太短,可能有问题");
-                
+
                 println!("\n✅ AI 成功识别了图片内容!");
             }
             Err(e) => {
@@ -358,8 +373,7 @@ mod tests {
                 panic!("Vision API 调用失败: {}", e);
             }
         }
-        
+
         println!("\n✅ 测试完成!");
     }
 }
-

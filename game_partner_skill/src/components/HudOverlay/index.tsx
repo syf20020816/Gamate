@@ -1,7 +1,6 @@
 // HUD 浮窗组件 - 游戏内显示的小型状态指示器
 import React, { useState, useEffect } from "react";
 import { Card, Select, Button, message as antdMessage } from "antd";
-import { PlayCircleOutlined, PauseCircleOutlined } from "@ant-design/icons";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { invoke } from "@tauri-apps/api/core";
@@ -35,7 +34,7 @@ export const HudOverlay: React.FC = () => {
   const [availableGames, setAvailableGames] = useState<any[]>([]);
   const [downloadedLibraries, setDownloadedLibraries] = useState<any[]>([]);
   
-  // 🔥 使用共享的 zustand store
+  // 使用共享的 zustand store
   const { currentGame, setCurrentGame: setStoreGame } = useAIAssistantStore();
   
   // 包装 setCurrentGame,同时通过事件通知主窗口
@@ -48,7 +47,7 @@ export const HudOverlay: React.FC = () => {
       const { emit } = await import("@tauri-apps/api/event");
       await emit("game-changed", { gameId });
     } catch (error) {
-      console.error("❌ 发送事件失败:", error);
+      console.error("发送事件失败:", error);
     }
   };
   
@@ -72,7 +71,7 @@ export const HudOverlay: React.FC = () => {
     }
   };
 
-  // ✅ 从后端加载已下载的技能库
+  // 从后端加载已下载的技能库
   useEffect(() => {
     const loadLibraries = async () => {
       try {
@@ -85,7 +84,7 @@ export const HudOverlay: React.FC = () => {
     loadLibraries();
   }, []);
 
-  // ✅ 从后端加载用户选择的游戏并过滤出有技能库的
+  // 从后端加载用户选择的游戏并过滤出有技能库的
   useEffect(() => {
     const loadAvailableGames = async () => {
       try {
@@ -124,7 +123,7 @@ export const HudOverlay: React.FC = () => {
     // 存储所有的 unlisten 函数
     const unlistenFunctions: Array<() => void> = [];
     
-    // 🔥 设置所有事件监听器
+    // 设置所有事件监听器
     const setupListeners = async () => {
       try {
         // 监听来自主窗口的游戏切换事件
@@ -198,7 +197,7 @@ export const HudOverlay: React.FC = () => {
         });
         unlistenFunctions.push(unlistenAiResponse);
       } catch (error) {
-        console.error("❌ [HUD] 设置事件监听器失败:", error);
+        console.error("[HUD] 设置事件监听器失败:", error);
       }
     };
     

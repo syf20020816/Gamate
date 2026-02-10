@@ -1,8 +1,8 @@
-use crate::rag::{build_rag_context, build_prompt, AIResponse, WikiReference};
+use crate::llm::{OllamaClient, OpenAIClient};
+use crate::rag::{build_prompt, build_rag_context, AIResponse, WikiReference};
 use crate::settings::AppSettings;
-use crate::llm::{OpenAIClient, OllamaClient};
 use anyhow::Result;
-use base64::{Engine as _, engine::general_purpose};
+use base64::{engine::general_purpose, Engine as _};
 
 /// 生成 AI 回复 (Tauri 命令)
 #[tauri::command]
@@ -70,16 +70,16 @@ fn get_game_name(game_id: &str) -> String {
 }
 
 /// 净化 base64 图片字符串
-/// 
+///
 /// 功能:
 /// 1. 去除 data:image/...;base64, 前缀 (如果有)
 /// 2. 移除换行符和空白字符
 /// 3. 校验 base64 格式是否有效
-/// 
+///
 /// 返回: 纯净的 base64 字符串
 fn sanitize_base64_image(s: &str) -> Result<String> {
     let mut cleaned = s.trim().to_string();
-    
+
     // 1. 去除 data URL 前缀
     if let Some(comma_idx) = cleaned.find(',') {
         // 先复制前缀用于日志,避免借用冲突
@@ -89,21 +89,27 @@ fn sanitize_base64_image(s: &str) -> Result<String> {
             log::info!("🧹 检测到 data URL 前缀,已移除: {}", prefix);
         }
     }
-    
+
     // 2. 移除所有换行符和空白字符
     cleaned.retain(|c| !c.is_whitespace());
-    
+
     // 3. 校验 base64 格式
     match general_purpose::STANDARD.decode(&cleaned) {
         Ok(decoded) => {
-            log::info!("✅ base64 图片校验成功 (解码后大小: {} bytes)", decoded.len());
+            log::info!(
+                "✅ base64 图片校验成功 (解码后大小: {} bytes)",
+                decoded.len()
+            );
             Ok(cleaned)
         }
         Err(e) => {
             log::error!("❌ base64 图片格式无效: {}", e);
             log::error!("   原始字符串长度: {}", s.len());
             log::error!("   清理后字符串长度: {}", cleaned.len());
-            log::error!("   前 50 字符: {}", &cleaned.chars().take(50).collect::<String>());
+            log::error!(
+                "   前 50 字符: {}",
+                &cleaned.chars().take(50).collect::<String>()
+            );
             Err(anyhow::anyhow!("无效的 base64 图片格式: {}", e))
         }
     }
@@ -127,14 +133,20 @@ async fn call_llm(
 
     // 检查 API Key (仅对非本地模型)
     if multimodal_config.provider != "local" && multimodal_config.api_key.is_none() {
-        log::warn!("⚠️  未配置 API Key (提供商: {}),使用 Mock 实现", multimodal_config.provider);
+        log::warn!(
+            "⚠️  未配置 API Key (提供商: {}),使用 Mock 实现",
+            multimodal_config.provider
+        );
         return mock_llm_fallback(user_prompt);
     }
 
     // 根据 provider 选择合适的客户端
     let is_local = multimodal_config.provider == "local";
-    
-    log::info!("🤖 使用 {} 客户端", if is_local { "Ollama" } else { "OpenAI" });
+
+    log::info!(
+        "🤖 使用 {} 客户端",
+        if is_local { "Ollama" } else { "OpenAI" }
+    );
 
     // 净化 base64 图片 (如果有截图)
     let clean_screenshot = if let Some(ref img) = screenshot {
@@ -169,7 +181,9 @@ async fn call_llm(
             };
 
             if let Some(ref img) = clean_screenshot {
-                client.chat_with_vision(system_prompt, user_prompt, img).await
+                client
+                    .chat_with_vision(system_prompt, user_prompt, img)
+                    .await
             } else {
                 client.chat(system_prompt, user_prompt).await
             }
@@ -189,7 +203,9 @@ async fn call_llm(
             };
 
             if let Some(ref img) = clean_screenshot {
-                client.chat_with_vision(system_prompt, user_prompt, img).await
+                client
+                    .chat_with_vision(system_prompt, user_prompt, img)
+                    .await
             } else {
                 client.chat(system_prompt, user_prompt).await
             }
@@ -225,10 +241,10 @@ fn mock_llm_fallback(user_prompt: &str) -> Result<String> {
     log::info!("⚠️  使用 Mock LLM 回退实现");
 
     let mut response = String::new();
-    
+
     // 添加语音播报专用标记 (前端会识别并简化播报内容)
     response.push_str("[TTS_SIMPLE]对话失败，请检查 API 配置。[/TTS_SIMPLE]\n\n");
-    
+
     // 详细信息用于屏幕显示
     response.push_str("## ⚠️  AI API 未配置或调用失败\n\n");
     response.push_str("当前使用的是 Mock AI 实现,无法提供智能对话。\n\n");

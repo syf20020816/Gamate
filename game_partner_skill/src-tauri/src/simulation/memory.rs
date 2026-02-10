@@ -1,14 +1,13 @@
 /// AI 员工记忆管理
-/// 
+///
 /// 为每个 AI 员工维护独立的对话历史 (最多30条)
-
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 /// 对话记录
 #[derive(Debug, Clone)]
 pub struct Message {
-    pub role: String,      // "user" 或 "assistant"
+    pub role: String, // "user" 或 "assistant"
     pub content: String,
     pub timestamp: u64,
 }
@@ -31,7 +30,9 @@ impl MemoryManager {
     /// 添加消息到员工记忆
     pub fn add_message(&self, employee_id: &str, role: &str, content: &str) {
         let mut memories = self.memories.lock().unwrap();
-        let history = memories.entry(employee_id.to_string()).or_insert_with(Vec::new);
+        let history = memories
+            .entry(employee_id.to_string())
+            .or_insert_with(Vec::new);
 
         let message = Message {
             role: role.to_string(),
@@ -53,10 +54,7 @@ impl MemoryManager {
     /// 获取员工的对话历史
     pub fn get_history(&self, employee_id: &str) -> Vec<Message> {
         let memories = self.memories.lock().unwrap();
-        memories
-            .get(employee_id)
-            .cloned()
-            .unwrap_or_default()
+        memories.get(employee_id).cloned().unwrap_or_default()
     }
 
     /// 🔥 获取对话历史（用于 AI 分析）
@@ -67,17 +65,18 @@ impl MemoryManager {
     /// 构建 LLM Prompt (包含历史对话)
     pub fn build_context(&self, employee_id: &str) -> String {
         let history = self.get_history(employee_id);
-        
+
         if history.is_empty() {
             return String::new();
         }
 
         let mut context = String::from("对话历史:\n");
-        for msg in history.iter().take(10) { // 只取最近10条
+        for msg in history.iter().take(10) {
+            // 只取最近10条
             let prefix = if msg.role == "user" { "主播" } else { "我" };
             context.push_str(&format!("{}: {}\n", prefix, msg.content));
         }
-        
+
         context
     }
 

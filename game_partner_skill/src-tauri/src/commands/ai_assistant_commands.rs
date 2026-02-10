@@ -1,5 +1,5 @@
-use anyhow::Result;
 use crate::settings::AppSettings;
+use anyhow::Result;
 
 /// AI 助手状态
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -11,9 +11,7 @@ pub struct AIAssistantState {
 
 /// 启动 AI 助手
 #[tauri::command]
-pub async fn start_ai_assistant(
-    game_id: String,
-) -> Result<AIAssistantState, String> {
+pub async fn start_ai_assistant(game_id: String) -> Result<AIAssistantState, String> {
     start_ai_assistant_impl(game_id)
         .await
         .map_err(|e| format!("启动 AI 助手失败: {}", e))
@@ -46,8 +44,14 @@ async fn start_ai_assistant_impl(game_id: String) -> Result<AIAssistantState> {
 
     log::info!("📸 截图配置:");
     log::info!("   启用: {}", screenshot_config.enabled);
-    log::info!("   活跃间隔: {} 秒", screenshot_config.active_interval_seconds);
-    log::info!("   闲置间隔: {} 秒", screenshot_config.idle_interval_seconds);
+    log::info!(
+        "   活跃间隔: {} 秒",
+        screenshot_config.active_interval_seconds
+    );
+    log::info!(
+        "   闲置间隔: {} 秒",
+        screenshot_config.idle_interval_seconds
+    );
     log::info!("   自动发送 AI: {}", screenshot_config.auto_send_to_ai);
 
     // 2. 验证截图是否启用

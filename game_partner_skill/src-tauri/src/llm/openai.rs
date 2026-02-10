@@ -1,14 +1,14 @@
-use anyhow::{Result, anyhow};
+use crate::settings::ModelConfig;
+use anyhow::{anyhow, Result};
 use async_openai::{
     config::OpenAIConfig,
     types::{
         ChatCompletionRequestMessage, ChatCompletionRequestSystemMessageArgs,
-        ChatCompletionRequestUserMessageArgs, CreateChatCompletionRequestArgs,
-        ChatCompletionRequestUserMessageContent, ImageDetail,
+        ChatCompletionRequestUserMessageArgs, ChatCompletionRequestUserMessageContent,
+        CreateChatCompletionRequestArgs, ImageDetail,
     },
     Client,
 };
-use crate::settings::ModelConfig;
 
 /// OpenAI 客户端
 pub struct OpenAIClient {
@@ -20,8 +20,7 @@ impl OpenAIClient {
     /// 创建新的 OpenAI 客户端
     pub fn new(settings: ModelConfig) -> Result<Self> {
         // 创建配置
-        let mut config = OpenAIConfig::new()
-            .with_api_base(&settings.api_base);
+        let mut config = OpenAIConfig::new().with_api_base(&settings.api_base);
 
         // 只有在提供了 API Key 时才设置 (本地 Ollama 不需要)
         if let Some(api_key) = &settings.api_key {
@@ -44,12 +43,12 @@ impl OpenAIClient {
             ChatCompletionRequestMessage::System(
                 ChatCompletionRequestSystemMessageArgs::default()
                     .content(system_prompt)
-                    .build()?
+                    .build()?,
             ),
             ChatCompletionRequestMessage::User(
                 ChatCompletionRequestUserMessageArgs::default()
                     .content(user_prompt)
-                    .build()?
+                    .build()?,
             ),
         ];
 
@@ -60,7 +59,8 @@ impl OpenAIClient {
             .max_tokens(self.settings.max_tokens)
             .build()?;
 
-        let response = self.client
+        let response = self
+            .client
             .chat()
             .create(request)
             .await
@@ -72,8 +72,10 @@ impl OpenAIClient {
             .and_then(|choice| choice.message.content.clone())
             .ok_or_else(|| anyhow!("OpenAI 返回空内容"))?;
 
-        log::info!("✅ OpenAI 响应成功 ({} tokens)", 
-            response.usage.map(|u| u.total_tokens).unwrap_or(0));
+        log::info!(
+            "✅ OpenAI 响应成功 ({} tokens)",
+            response.usage.map(|u| u.total_tokens).unwrap_or(0)
+        );
 
         Ok(content)
     }
@@ -94,7 +96,7 @@ impl OpenAIClient {
             ChatCompletionRequestMessage::System(
                 ChatCompletionRequestSystemMessageArgs::default()
                     .content(system_prompt)
-                    .build()?
+                    .build()?,
             ),
             ChatCompletionRequestMessage::User(
                 ChatCompletionRequestUserMessageArgs::default()
@@ -103,7 +105,7 @@ impl OpenAIClient {
                         async_openai::types::ChatCompletionRequestMessageContentPart::Text(
                             async_openai::types::ChatCompletionRequestMessageContentPartText {
                                 text: user_prompt.to_string(),
-                            }
+                            },
                         ),
                         // 图片内容
                         async_openai::types::ChatCompletionRequestMessageContentPart::ImageUrl(
@@ -111,11 +113,11 @@ impl OpenAIClient {
                                 image_url: async_openai::types::ImageUrl {
                                     url: image_url,
                                     detail: Some(ImageDetail::Auto),
-                                }
-                            }
+                                },
+                            },
                         ),
                     ]))
-                    .build()?
+                    .build()?,
             ),
         ];
 
@@ -126,7 +128,8 @@ impl OpenAIClient {
             .max_tokens(self.settings.max_tokens)
             .build()?;
 
-        let response = self.client
+        let response = self
+            .client
             .chat()
             .create(request)
             .await
@@ -138,8 +141,10 @@ impl OpenAIClient {
             .and_then(|choice| choice.message.content.clone())
             .ok_or_else(|| anyhow!("OpenAI Vision 返回空内容"))?;
 
-        log::info!("✅ OpenAI Vision 响应成功 ({} tokens)", 
-            response.usage.map(|u| u.total_tokens).unwrap_or(0));
+        log::info!(
+            "✅ OpenAI Vision 响应成功 ({} tokens)",
+            response.usage.map(|u| u.total_tokens).unwrap_or(0)
+        );
 
         Ok(content)
     }
@@ -151,8 +156,11 @@ impl OpenAIClient {
         user_prompt: &str,
         images_base64: &[String],
     ) -> Result<String> {
-        log::info!("👁️  调用 OpenAI Multi-Vision API: {} ({} 张图片)", 
-                  self.settings.model_name, images_base64.len());
+        log::info!(
+            "👁️  调用 OpenAI Multi-Vision API: {} ({} 张图片)",
+            self.settings.model_name,
+            images_base64.len()
+        );
 
         // 构建内容数组（文本 + 多张图片）
         let mut content_parts = vec![
@@ -160,7 +168,7 @@ impl OpenAIClient {
             async_openai::types::ChatCompletionRequestMessageContentPart::Text(
                 async_openai::types::ChatCompletionRequestMessageContentPartText {
                     text: user_prompt.to_string(),
-                }
+                },
             ),
         ];
 
@@ -173,9 +181,9 @@ impl OpenAIClient {
                         image_url: async_openai::types::ImageUrl {
                             url: image_url,
                             detail: Some(ImageDetail::Auto),
-                        }
-                    }
-                )
+                        },
+                    },
+                ),
             );
         }
 
@@ -183,12 +191,14 @@ impl OpenAIClient {
             ChatCompletionRequestMessage::System(
                 ChatCompletionRequestSystemMessageArgs::default()
                     .content(system_prompt)
-                    .build()?
+                    .build()?,
             ),
             ChatCompletionRequestMessage::User(
                 ChatCompletionRequestUserMessageArgs::default()
-                    .content(ChatCompletionRequestUserMessageContent::Array(content_parts))
-                    .build()?
+                    .content(ChatCompletionRequestUserMessageContent::Array(
+                        content_parts,
+                    ))
+                    .build()?,
             ),
         ];
 
@@ -199,7 +209,8 @@ impl OpenAIClient {
             .max_tokens(self.settings.max_tokens)
             .build()?;
 
-        let response = self.client
+        let response = self
+            .client
             .chat()
             .create(request)
             .await
@@ -211,8 +222,10 @@ impl OpenAIClient {
             .and_then(|choice| choice.message.content.clone())
             .ok_or_else(|| anyhow!("OpenAI Multi-Vision 返回空内容"))?;
 
-        log::info!("✅ OpenAI Multi-Vision 响应成功 ({} tokens)", 
-            response.usage.map(|u| u.total_tokens).unwrap_or(0));
+        log::info!(
+            "✅ OpenAI Multi-Vision 响应成功 ({} tokens)",
+            response.usage.map(|u| u.total_tokens).unwrap_or(0)
+        );
 
         Ok(content)
     }
@@ -236,10 +249,9 @@ mod tests {
         };
 
         let client = OpenAIClient::new(settings).unwrap();
-        let response = client.chat(
-            "你是一个游戏助手。",
-            "简单介绍一下恐鬼症游戏。"
-        ).await;
+        let response = client
+            .chat("你是一个游戏助手。", "简单介绍一下恐鬼症游戏。")
+            .await;
 
         assert!(response.is_ok());
         println!("响应: {}", response.unwrap());

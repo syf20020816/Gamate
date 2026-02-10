@@ -1,10 +1,9 @@
-/// 模拟场景配置管理命令
-/// 
-/// 提供保存和加载模拟场景配置的命令
-
-use tauri::AppHandle;
+use crate::settings::{AIEmployeeConfig, AppSettings};
 use serde::{Deserialize, Serialize};
-use crate::settings::{AppSettings, AIEmployeeConfig};
+/// 模拟场景配置管理命令
+///
+/// 提供保存和加载模拟场景配置的命令
+use tauri::AppHandle;
 
 /// 前端传入的模拟场景配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -43,30 +42,30 @@ pub async fn save_simulation_config(
     config: SimulationConfigPayload,
 ) -> Result<(), String> {
     let mut settings = AppSettings::load().map_err(|e| e.to_string())?;
-    
+
     // ✅ 检查员工昵称是否重复
     use std::collections::HashSet;
     let mut nickname_set = HashSet::new();
     let mut duplicate_nicknames = Vec::new();
-    
+
     for emp in &config.employees {
         let nickname = emp.nickname.trim();
         if nickname.is_empty() {
             return Err("员工昵称不能为空".to_string());
         }
-        
+
         if !nickname_set.insert(nickname.to_string()) {
             duplicate_nicknames.push(nickname.to_string());
         }
     }
-    
+
     if !duplicate_nicknames.is_empty() {
         return Err(format!(
             "员工昵称重复: {}。每个员工必须有唯一的昵称！",
             duplicate_nicknames.join(", ")
         ));
     }
-    
+
     // 更新直播间配置
     settings.simulation.livestream.online_users = config.livestream.online_users;
     settings.simulation.livestream.room_name = config.livestream.room_name;
@@ -74,20 +73,21 @@ pub async fn save_simulation_config(
     settings.simulation.livestream.danmaku_frequency = config.livestream.danmaku_frequency;
     settings.simulation.livestream.gift_frequency = config.livestream.gift_frequency;
     settings.simulation.livestream.allow_mic = config.livestream.allow_mic;
-    
+
     // 更新 AI 员工列表
-    settings.simulation.employees = config.employees.into_iter().map(|emp| {
-        AIEmployeeConfig {
+    settings.simulation.employees = config
+        .employees
+        .into_iter()
+        .map(|emp| AIEmployeeConfig {
             id: emp.id,
             personality: emp.personality,
             interaction_frequency: emp.interaction_frequency,
             nickname: emp.nickname,
-        }
-    }).collect();
-    
+        })
+        .collect();
+
     settings.save().map_err(|e| e.to_string())?;
-    
-    println!("✅ 模拟场景配置已保存");
+
     Ok(())
 }
 
@@ -95,13 +95,7 @@ pub async fn save_simulation_config(
 #[tauri::command]
 pub async fn load_simulation_config(_app: AppHandle) -> Result<SimulationConfigPayload, String> {
     let settings = AppSettings::load().map_err(|e| e.to_string())?;
-    
-    println!("===== 后端加载配置 =====");
-    println!("员工数量: {}", settings.simulation.employees.len());
-    for emp in &settings.simulation.employees {
-        println!("员工: {} ({})", emp.nickname, emp.personality);
-    }
-    
+
     let config = SimulationConfigPayload {
         livestream: LivestreamConfigPayload {
             online_users: settings.simulation.livestream.online_users,
@@ -111,18 +105,18 @@ pub async fn load_simulation_config(_app: AppHandle) -> Result<SimulationConfigP
             gift_frequency: settings.simulation.livestream.gift_frequency,
             allow_mic: settings.simulation.livestream.allow_mic,
         },
-        employees: settings.simulation.employees.into_iter().map(|emp| {
-            AIEmployeePayload {
+        employees: settings
+            .simulation
+            .employees
+            .into_iter()
+            .map(|emp| AIEmployeePayload {
                 id: emp.id,
                 personality: emp.personality,
                 interaction_frequency: emp.interaction_frequency,
                 nickname: emp.nickname,
-            }
-        }).collect(),
+            })
+            .collect(),
     };
-    
-    println!("返回的配置员工数量: {}", config.employees.len());
-    println!("========================");
-    println!("✅ 模拟场景配置已加载");
+
     Ok(config)
 }

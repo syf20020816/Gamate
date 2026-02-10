@@ -1,13 +1,13 @@
 use crate::{
     crawler::WikiEntry,
     embeddings::EmbeddingService,
-    vector_db::{VectorDB, LocalVectorDB, AIDirectSearch},
     settings::AppSettings,
+    vector_db::{AIDirectSearch, LocalVectorDB, VectorDB},
 };
 use anyhow::Result;
 use serde_json::json;
-use std::path::PathBuf;
 use std::fs;
+use std::path::PathBuf;
 
 /// 导入 Wiki 数据到向量数据库
 #[tauri::command]
@@ -43,17 +43,13 @@ async fn import_wiki_to_vector_db_impl(jsonl_path: String, game_id: String) -> R
     let settings = AppSettings::load()?;
     let embedding_config = &settings.ai_models.embedding;
     let vdb_config = &settings.ai_models.vector_db;
-    
+
     log::info!("🔧 向量数据库模式: {}", vdb_config.mode);
-    
+
     // 3. 根据模式选择不同的导入逻辑
     match vdb_config.mode.as_str() {
-        "local" => {
-            import_to_local_db(entries, game_id, embedding_config).await
-        }
-        "qdrant" => {
-            import_to_qdrant(entries, game_id, embedding_config, vdb_config).await
-        }
+        "local" => import_to_local_db(entries, game_id, embedding_config).await,
+        "qdrant" => import_to_qdrant(entries, game_id, embedding_config, vdb_config).await,
         "ai_direct" => {
             // AI 直接检索模式不需要导入向量数据库,只需要保存原始数据
             import_to_ai_direct(entries, game_id, vdb_config).await
@@ -71,28 +67,32 @@ async fn import_to_local_db(
     embedding_config: &crate::settings::ModelConfig,
 ) -> Result<String> {
     log::info!("📦 使用本地文件型数据库");
-    
+
     // 1. 初始化 Embedding 服务
     let embedding_service = EmbeddingService::new(
         embedding_config.api_base.clone(),
         embedding_config.api_key.clone(),
         embedding_config.model_name.clone(),
-    ).await?;
-    
+    )
+    .await?;
+
     // 2. 初始化本地数据库
     let settings = AppSettings::load()?;
-    let storage_path = settings.ai_models.vector_db.local_storage_path
+    let storage_path = settings
+        .ai_models
+        .vector_db
+        .local_storage_path
         .as_ref()
         .cloned()
         .unwrap_or_else(|| "./data/vector_db".to_string());
-    
+
     let collection_name = format!("game_wiki_{}", game_id);
     let mut local_db = LocalVectorDB::new(PathBuf::from(&storage_path), &collection_name)?;
-    
+
     // 3. 创建集合
     let vector_size = embedding_service.dimension();
     local_db.create_collection(vector_size)?;
-    
+
     // 4. 批量生成 Embedding 并插入
     let batch_size = 50;
     let mut total_imported = 0;
@@ -133,7 +133,11 @@ async fn import_to_local_db(
         local_db.upsert_points(points)?;
         total_imported += chunk.len();
 
-        log::info!("✅ 批次 {} 完成，累计导入 {} 条", batch_idx + 1, total_imported);
+        log::info!(
+            "✅ 批次 {} 完成，累计导入 {} 条",
+            batch_idx + 1,
+            total_imported
+        );
     }
 
     let summary = format!(
@@ -153,16 +157,18 @@ async fn import_to_qdrant(
     vdb_config: &crate::settings::VectorDBSettings,
 ) -> Result<String> {
     log::info!("🚀 使用 Qdrant 服务器");
-    
+
     // 1. 初始化 Embedding 服务
     let embedding_service = EmbeddingService::new(
         embedding_config.api_base.clone(),
         embedding_config.api_key.clone(),
         embedding_config.model_name.clone(),
-    ).await?;
+    )
+    .await?;
 
     // 2. 连接 Qdrant
-    let qdrant_url = vdb_config.qdrant_url
+    let qdrant_url = vdb_config
+        .qdrant_url
         .as_ref()
         .cloned()
         .unwrap_or_else(|| "http://localhost:6333".to_string());
@@ -219,7 +225,11 @@ async fn import_to_qdrant(
         vector_db.upsert_points(points).await?;
         total_imported += chunk.len();
 
-        log::info!("✅ 批次 {} 完成，累计导入 {} 条", batch_idx + 1, total_imported);
+        log::info!(
+            "✅ 批次 {} 完成，累计导入 {} 条",
+            batch_idx + 1,
+            total_imported
+        );
     }
 
     let summary = format!(
@@ -238,19 +248,20 @@ async fn import_to_ai_direct(
     vdb_config: &crate::settings::VectorDBSettings,
 ) -> Result<String> {
     log::info!("🤖 使用 AI 直接检索模式，准备保存 JSONL 文件");
-    
-    let storage_path = vdb_config.local_storage_path
+
+    let storage_path = vdb_config
+        .local_storage_path
         .as_ref()
         .cloned()
         .unwrap_or_else(|| "./data/vector_db".to_string());
-    
+
     // 确保目录存在
     std::fs::create_dir_all(&storage_path)?;
-    
+
     // 保存为 {game_id}.jsonl
     let jsonl_path = PathBuf::from(&storage_path).join(format!("{}.jsonl", game_id));
     let mut file = std::fs::File::create(&jsonl_path)?;
-    
+
     use std::io::Write;
     for entry in &entries {
         // 只保留必要字段
@@ -261,7 +272,7 @@ async fn import_to_ai_direct(
         });
         writeln!(file, "{}", serde_json::to_string(&simple_entry)?)?;
     }
-    
+
     let count = entries.len();
     let summary = format!(
         "AI 直接检索模式已就绪，共 {} 条 Wiki 条目保存到 {:?}",
@@ -299,20 +310,14 @@ pub async fn search_wiki_impl(
     // 1. 加载应用配置
     let settings = AppSettings::load()?;
     let vdb_config = &settings.ai_models.vector_db;
-    
+
     log::info!("🔧 搜索模式: {}", vdb_config.mode);
-    
+
     // 2. 根据模式选择不同的搜索逻辑
     match vdb_config.mode.as_str() {
-        "local" => {
-            search_with_local_db(query, game_id, top_k, &settings).await
-        }
-        "qdrant" => {
-            search_with_qdrant(query, game_id, top_k, &settings).await
-        }
-        "ai_direct" => {
-            search_with_ai_direct(query, game_id, top_k, vdb_config).await
-        }
+        "local" => search_with_local_db(query, game_id, top_k, &settings).await,
+        "qdrant" => search_with_qdrant(query, game_id, top_k, &settings).await,
+        "ai_direct" => search_with_ai_direct(query, game_id, top_k, vdb_config).await,
         _ => {
             anyhow::bail!("不支持的向量数据库模式: {}", vdb_config.mode);
         }
@@ -327,53 +332,67 @@ async fn search_with_local_db(
     settings: &AppSettings,
 ) -> Result<Vec<WikiSearchResult>> {
     log::info!("📦 使用本地文件型数据库搜索");
-    
+
     let embedding_config = &settings.ai_models.embedding;
-    
+
     // 1. 初始化 Embedding 服务
     let embedding_service = EmbeddingService::new(
         embedding_config.api_base.clone(),
         embedding_config.api_key.clone(),
         embedding_config.model_name.clone(),
-    ).await?;
-    
+    )
+    .await?;
+
     // 2. 初始化本地数据库
-    let storage_path = settings.ai_models.vector_db.local_storage_path
+    let storage_path = settings
+        .ai_models
+        .vector_db
+        .local_storage_path
         .as_ref()
         .cloned()
         .unwrap_or_else(|| "./data/vector_db".to_string());
-    
+
     let collection_name = format!("game_wiki_{}", game_id);
     let local_db = LocalVectorDB::new(PathBuf::from(&storage_path), &collection_name)?;
-    
+
     // 3. 生成查询向量
     let query_vector = embedding_service.embed_text(&query).await?;
-    
+
     // 4. 搜索
     let results = local_db.search(query_vector, top_k)?;
-    
+
     // 5. 转换结果
     let wiki_results: Vec<WikiSearchResult> = results
         .into_iter()
         .map(|r| WikiSearchResult {
             score: r.score,
-            id: r.payload.get("id")
+            id: r
+                .payload
+                .get("id")
                 .and_then(|v| v.as_str())
                 .unwrap_or("")
                 .to_string(),
-            title: r.payload.get("title")
+            title: r
+                .payload
+                .get("title")
                 .and_then(|v| v.as_str())
                 .unwrap_or("")
                 .to_string(),
-            content: r.payload.get("content")
+            content: r
+                .payload
+                .get("content")
                 .and_then(|v| v.as_str())
                 .unwrap_or("")
                 .to_string(),
-            url: r.payload.get("url")
+            url: r
+                .payload
+                .get("url")
                 .and_then(|v| v.as_str())
                 .unwrap_or("")
                 .to_string(),
-            categories: r.payload.get("categories")
+            categories: r
+                .payload
+                .get("categories")
                 .and_then(|v| v.as_array())
                 .map(|arr| {
                     arr.iter()
@@ -383,7 +402,7 @@ async fn search_with_local_db(
                 .unwrap_or_default(),
         })
         .collect();
-    
+
     log::info!("✅ 找到 {} 个相关结果", wiki_results.len());
     Ok(wiki_results)
 }
@@ -396,18 +415,22 @@ async fn search_with_qdrant(
     settings: &AppSettings,
 ) -> Result<Vec<WikiSearchResult>> {
     log::info!("🚀 使用 Qdrant 服务器搜索");
-    
+
     let embedding_config = &settings.ai_models.embedding;
-    
+
     // 1. 初始化 Embedding 服务
     let embedding_service = EmbeddingService::new(
         embedding_config.api_base.clone(),
         embedding_config.api_key.clone(),
         embedding_config.model_name.clone(),
-    ).await?;
+    )
+    .await?;
 
     // 2. 连接 Qdrant
-    let qdrant_url = settings.ai_models.vector_db.qdrant_url
+    let qdrant_url = settings
+        .ai_models
+        .vector_db
+        .qdrant_url
         .as_ref()
         .cloned()
         .unwrap_or_else(|| "http://localhost:6333".to_string());
@@ -459,17 +482,18 @@ async fn search_with_ai_direct(
     vdb_config: &crate::settings::VectorDBSettings,
 ) -> Result<Vec<WikiSearchResult>> {
     log::info!("🤖 使用 AI 直接检索模式搜索");
-    
-    let storage_path = vdb_config.local_storage_path
+
+    let storage_path = vdb_config
+        .local_storage_path
         .as_ref()
         .cloned()
         .unwrap_or_else(|| "./data/vector_db".to_string());
-    
+
     let ai_search = AIDirectSearch::new(PathBuf::from(storage_path));
-    
+
     // 执行关键词匹配搜索
     let results = ai_search.search(&query, &game_id, top_k)?;
-    
+
     // 转换结果格式 (AI 直接搜索的结果字段较少)
     let wiki_results: Vec<WikiSearchResult> = results
         .into_iter()
@@ -482,7 +506,7 @@ async fn search_with_ai_direct(
             categories: Vec::new(), // AI 直接搜索没有分类信息
         })
         .collect();
-    
+
     log::info!("✅ 找到 {} 个相关结果", wiki_results.len());
     Ok(wiki_results)
 }
@@ -498,12 +522,13 @@ pub async fn get_vector_db_stats(game_id: String) -> Result<VectorDBStats, Strin
 async fn get_vector_db_stats_impl(game_id: String) -> Result<VectorDBStats> {
     let settings = AppSettings::load()?;
     let vdb_config = &settings.ai_models.vector_db;
-    
+
     // 根据模式获取不同的统计信息
     match vdb_config.mode.as_str() {
         "qdrant" => {
             // Qdrant 模式 - 获取详细统计
-            let qdrant_url = vdb_config.qdrant_url
+            let qdrant_url = vdb_config
+                .qdrant_url
                 .as_ref()
                 .cloned()
                 .unwrap_or_else(|| "http://localhost:6333".to_string());
@@ -555,39 +580,42 @@ pub async fn check_game_vector_db(game_id: String) -> Result<bool, String> {
 async fn check_game_vector_db_impl(game_id: String) -> Result<bool> {
     let settings = AppSettings::load()?;
     let vdb_config = &settings.ai_models.vector_db;
-    
+
     // 根据模式检查不同的后端
     match vdb_config.mode.as_str() {
         "local" => {
             // 检查本地数据库文件是否存在
-            let storage_path = vdb_config.local_storage_path
+            let storage_path = vdb_config
+                .local_storage_path
                 .as_ref()
                 .cloned()
                 .unwrap_or_else(|| "./data/vector_db".to_string());
-            
+
             let collection_name = format!("game_wiki_{}", game_id);
             let local_db = LocalVectorDB::new(PathBuf::from(&storage_path), &collection_name)?;
             Ok(local_db.collection_exists())
         }
         "qdrant" => {
             // 检查 Qdrant 集合是否存在
-            let qdrant_url = vdb_config.qdrant_url
+            let qdrant_url = vdb_config
+                .qdrant_url
                 .as_ref()
                 .cloned()
                 .unwrap_or_else(|| "http://localhost:6333".to_string());
             let collection_name = format!("game_wiki_{}", game_id);
-            
+
             let vector_db = VectorDB::new(&qdrant_url, &collection_name).await?;
             let exists = vector_db.collection_exists().await?;
             Ok(exists)
         }
         "ai_direct" => {
             // 检查 JSONL 文件是否存在
-            let storage_path = vdb_config.local_storage_path
+            let storage_path = vdb_config
+                .local_storage_path
                 .as_ref()
                 .cloned()
                 .unwrap_or_else(|| "./data/vector_db".to_string());
-            
+
             let jsonl_path = PathBuf::from(&storage_path).join(format!("{}.jsonl", game_id));
             Ok(jsonl_path.exists())
         }
@@ -608,27 +636,28 @@ pub async fn list_imported_games() -> Result<Vec<String>, String> {
 async fn list_imported_games_impl() -> Result<Vec<String>> {
     let settings = AppSettings::load()?;
     let vdb_config = &settings.ai_models.vector_db;
-    
+
     // 根据模式列出不同后端的游戏
     match vdb_config.mode.as_str() {
         "local" => {
             // 列出本地数据库的所有集合
-            let storage_path = vdb_config.local_storage_path
+            let storage_path = vdb_config
+                .local_storage_path
                 .as_ref()
                 .cloned()
                 .unwrap_or_else(|| "./data/vector_db".to_string());
-            
+
             let storage_dir = PathBuf::from(&storage_path);
             if !storage_dir.exists() {
                 return Ok(Vec::new());
             }
-            
+
             let mut game_ids = Vec::new();
             for entry in std::fs::read_dir(&storage_dir)? {
                 let entry = entry?;
                 let file_name = entry.file_name();
                 let file_name_str = file_name.to_string_lossy();
-                
+
                 // 查找 game_wiki_*.json 文件
                 if file_name_str.starts_with("game_wiki_") && file_name_str.ends_with(".json") {
                     if let Some(game_id) = file_name_str
@@ -639,44 +668,45 @@ async fn list_imported_games_impl() -> Result<Vec<String>> {
                     }
                 }
             }
-            
+
             Ok(game_ids)
         }
         "qdrant" => {
             // 从 Qdrant 获取集合列表
-            let qdrant_url = vdb_config.qdrant_url
+            let qdrant_url = vdb_config
+                .qdrant_url
                 .as_ref()
                 .cloned()
                 .unwrap_or_else(|| "http://localhost:6333".to_string());
-            
+
             // 获取所有集合
             let client = reqwest::Client::new();
             let response = client
                 .get(format!("{}/collections", qdrant_url))
                 .send()
                 .await?;
-            
+
             if !response.status().is_success() {
                 anyhow::bail!("获取集合列表失败");
             }
-            
+
             #[derive(serde::Deserialize)]
             struct CollectionsResponse {
                 result: CollectionsResult,
             }
-            
+
             #[derive(serde::Deserialize)]
             struct CollectionsResult {
                 collections: Vec<CollectionItem>,
             }
-            
+
             #[derive(serde::Deserialize)]
             struct CollectionItem {
                 name: String,
             }
-            
+
             let collections: CollectionsResponse = response.json().await?;
-            
+
             // 筛选出 game_wiki_ 开头的集合
             let game_ids: Vec<String> = collections
                 .result
@@ -690,27 +720,28 @@ async fn list_imported_games_impl() -> Result<Vec<String>> {
                     }
                 })
                 .collect();
-            
+
             Ok(game_ids)
         }
         "ai_direct" => {
             // 列出所有 JSONL 文件
-            let storage_path = vdb_config.local_storage_path
+            let storage_path = vdb_config
+                .local_storage_path
                 .as_ref()
                 .cloned()
                 .unwrap_or_else(|| "./data/vector_db".to_string());
-            
+
             let storage_dir = PathBuf::from(&storage_path);
             if !storage_dir.exists() {
                 return Ok(Vec::new());
             }
-            
+
             let mut game_ids = Vec::new();
             for entry in std::fs::read_dir(&storage_dir)? {
                 let entry = entry?;
                 let file_name = entry.file_name();
                 let file_name_str = file_name.to_string_lossy();
-                
+
                 // 查找 *.jsonl 文件
                 if file_name_str.ends_with(".jsonl") {
                     if let Some(game_id) = file_name_str.strip_suffix(".jsonl") {
@@ -718,7 +749,7 @@ async fn list_imported_games_impl() -> Result<Vec<String>> {
                     }
                 }
             }
-            
+
             Ok(game_ids)
         }
         _ => {
@@ -730,30 +761,29 @@ async fn list_imported_games_impl() -> Result<Vec<String>> {
 /// 获取游戏最新的 Wiki JSONL 文件路径
 #[tauri::command]
 pub async fn get_latest_wiki_jsonl(game_id: String) -> Result<String, String> {
-    get_latest_wiki_jsonl_impl(game_id)
-        .map_err(|e| format!("获取文件路径失败: {}", e))
+    get_latest_wiki_jsonl_impl(game_id).map_err(|e| format!("获取文件路径失败: {}", e))
 }
 
 fn get_latest_wiki_jsonl_impl(game_id: String) -> Result<String> {
     // 1. 加载应用配置
     let settings = AppSettings::load()?;
     let base_path = PathBuf::from(&settings.skill_library.storage_base_path);
-    
+
     // 2. 构建游戏目录路径: storage_base_path/game_id
     let game_dir = base_path.join(&game_id);
-    
+
     if !game_dir.exists() {
         anyhow::bail!("游戏目录不存在: {:?}", game_dir);
     }
-    
+
     // 3. 读取所有时间戳目录,找到最新的
     let mut timestamp_dirs: Vec<u64> = Vec::new();
-    
+
     for entry in fs::read_dir(&game_dir)? {
         let entry = entry?;
         let file_name = entry.file_name();
         let file_name_str = file_name.to_string_lossy();
-        
+
         // 尝试解析为时间戳(纯数字目录名)
         if let Ok(timestamp) = file_name_str.parse::<u64>() {
             if entry.path().is_dir() {
@@ -761,22 +791,24 @@ fn get_latest_wiki_jsonl_impl(game_id: String) -> Result<String> {
             }
         }
     }
-    
+
     if timestamp_dirs.is_empty() {
         anyhow::bail!("未找到任何技能库版本目录");
     }
-    
+
     // 4. 获取最新的时间戳
     timestamp_dirs.sort_unstable();
     let latest_timestamp = timestamp_dirs.last().unwrap();
-    
+
     // 5. 构建 wiki_raw.jsonl 路径
-    let jsonl_path = game_dir.join(latest_timestamp.to_string()).join("wiki_raw.jsonl");
-    
+    let jsonl_path = game_dir
+        .join(latest_timestamp.to_string())
+        .join("wiki_raw.jsonl");
+
     if !jsonl_path.exists() {
         anyhow::bail!("wiki_raw.jsonl 文件不存在: {:?}", jsonl_path);
     }
-    
+
     Ok(jsonl_path.to_string_lossy().to_string())
 }
 
@@ -791,10 +823,10 @@ pub async fn auto_import_latest_wiki(game_id: String) -> Result<String, String> 
 async fn auto_import_latest_wiki_impl(game_id: String) -> Result<String> {
     // 1. 获取最新的 JSONL 文件路径
     let jsonl_path = get_latest_wiki_jsonl_impl(game_id.clone())?;
-    
+
     log::info!("📖 自动导入 Wiki: {}", game_id);
     log::info!("   文件: {}", jsonl_path);
-    
+
     // 2. 调用现有的导入逻辑
     import_wiki_to_vector_db_impl(jsonl_path, game_id).await
 }

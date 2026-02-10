@@ -43,47 +43,36 @@ impl Config {
     /// 从 TOML 文件加载配置，如果不存在则创建默认配置
     pub fn from_toml_file<P: AsRef<Path>>(path: P) -> Result<Self, String> {
         let path = path.as_ref();
-        
+
         // 检查文件是否存在
         if !path.exists() {
-            log::warn!("📝 配置文件不存在: {:?}", path);
-            log::info!("   正在创建默认游戏配置文件...");
-            
             // 创建默认配置
             let default_config = Self::default();
-            
+
             // 确保父目录存在
             if let Some(parent) = path.parent() {
-                fs::create_dir_all(parent)
-                    .map_err(|e| format!("无法创建配置目录: {}", e))?;
+                fs::create_dir_all(parent).map_err(|e| format!("无法创建配置目录: {}", e))?;
             }
-            
+
             // 保存默认配置
             let content = toml::to_string_pretty(&default_config)
                 .map_err(|e| format!("序列化配置失败: {}", e))?;
-            
-            fs::write(path, content)
-                .map_err(|e| format!("无法写入配置文件: {}", e))?;
-            
-            log::info!("✅ 已创建默认配置文件: {:?}", path);
+
+            fs::write(path, content).map_err(|e| format!("无法写入配置文件: {}", e))?;
             return Ok(default_config);
         }
-        
+
         // 读取现有配置
-        let content = fs::read_to_string(path)
-            .map_err(|e| format!("无法读取配置文件: {}", e))?;
-        
-        toml::from_str(&content)
-            .map_err(|e| format!("解析配置文件失败: {}", e))
+        let content = fs::read_to_string(path).map_err(|e| format!("无法读取配置文件: {}", e))?;
+
+        toml::from_str(&content).map_err(|e| format!("解析配置文件失败: {}", e))
     }
 
     /// 从 JSON 文件加载配置
     pub fn from_json_file<P: AsRef<Path>>(path: P) -> Result<Self, String> {
-        let content = fs::read_to_string(path)
-            .map_err(|e| format!("无法读取配置文件: {}", e))?;
-        
-        serde_json::from_str(&content)
-            .map_err(|e| format!("解析配置文件失败: {}", e))
+        let content = fs::read_to_string(path).map_err(|e| format!("无法读取配置文件: {}", e))?;
+
+        serde_json::from_str(&content).map_err(|e| format!("解析配置文件失败: {}", e))
     }
 
     /// 根据游戏 ID 查找游戏配置
@@ -212,7 +201,7 @@ tags = ["test"]
   version = "1.0.0"
   source_type = "FandomWiki"
 "#;
-        
+
         let config: Config = toml::from_str(config_toml).unwrap();
         assert_eq!(config.games.len(), 1);
         assert_eq!(config.games[0].id, "test-game");

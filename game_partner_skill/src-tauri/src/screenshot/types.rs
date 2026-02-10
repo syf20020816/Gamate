@@ -53,16 +53,16 @@ pub struct DisplayInfo {
 pub enum ScreenshotError {
     #[error("截图失败: {0}")]
     CaptureFailed(String),
-    
+
     #[error("显示器不存在: {0}")]
     DisplayNotFound(usize),
-    
+
     #[error("图片编码失败: {0}")]
     EncodeFailed(String),
-    
+
     #[error("无效的截图区域")]
     InvalidArea,
-    
+
     #[error("IO 错误: {0}")]
     IoError(#[from] std::io::Error),
 }

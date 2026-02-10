@@ -1,7 +1,6 @@
 /// 系统托盘管理
-/// 
+///
 /// 提供托盘图标、菜单和窗口最小化到托盘的功能
-
 use tauri::{
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
@@ -15,10 +14,7 @@ pub fn create_tray<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
     let hide_i = MenuItem::with_id(app, "hide", "隐藏主窗口", true, None::<&str>)?;
     let quit_i = MenuItem::with_id(app, "quit", "退出应用", true, None::<&str>)?;
 
-    let menu = Menu::with_items(
-        app,
-        &[&show_i, &hide_i, &quit_i],
-    )?;
+    let menu = Menu::with_items(app, &[&show_i, &hide_i, &quit_i])?;
 
     // 创建托盘图标
     let _tray = TrayIconBuilder::new()

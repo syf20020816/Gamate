@@ -19,14 +19,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         ("rvslots", "main"),
     ];
 
-    let response = client
-        .get(api_url)
-        .query(&params)
-        .send()
-        .await?;
+    let response = client.get(api_url).query(&params).send().await?;
 
     println!("  状态码: {}", response.status());
-    
+
     let json: serde_json::Value = response.json().await?;
     println!("\n📄 完整响应:");
     println!("{}\n", serde_json::to_string_pretty(&json)?);
@@ -37,8 +33,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             if let Some(pages_obj) = pages.as_object() {
                 for (page_id, page_data) in pages_obj {
                     println!("📌 页面 ID: {}", page_id);
-                    println!("   标题: {}", page_data.get("title").and_then(|v| v.as_str()).unwrap_or("N/A"));
-                    
+                    println!(
+                        "   标题: {}",
+                        page_data
+                            .get("title")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("N/A")
+                    );
+
                     if let Some(revisions) = page_data.get("revisions") {
                         if let Some(rev_array) = revisions.as_array() {
                             if let Some(first_rev) = rev_array.first() {
@@ -49,7 +51,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                             if let Some(text) = content.as_str() {
                                                 println!("   ✅ 有 slots.main.* 内容");
                                                 println!("   内容长度: {} 字符", text.len());
-                                                println!("   前200字符: {}", &text.chars().take(200).collect::<String>());
+                                                println!(
+                                                    "   前200字符: {}",
+                                                    &text.chars().take(200).collect::<String>()
+                                                );
                                             }
                                         }
                                     }
@@ -59,14 +64,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                     if let Some(text) = content.as_str() {
                                         println!("   ✅ 有旧格式 * 内容");
                                         println!("   内容长度: {} 字符", text.len());
-                                        println!("   前200字符: {}", &text.chars().take(200).collect::<String>());
+                                        println!(
+                                            "   前200字符: {}",
+                                            &text.chars().take(200).collect::<String>()
+                                        );
                                     }
                                 }
                             }
                         }
                     } else {
                         println!("   ❌ 没有 revisions 字段");
-                        println!("   可用字段: {:?}", page_data.as_object().map(|o| o.keys().collect::<Vec<_>>()));
+                        println!(
+                            "   可用字段: {:?}",
+                            page_data.as_object().map(|o| o.keys().collect::<Vec<_>>())
+                        );
                     }
                 }
             }

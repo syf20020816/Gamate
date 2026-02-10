@@ -77,9 +77,8 @@ impl FandomApiCrawler {
 
         // 从 URL 提取 wiki 基础地址
         // 例如: https://phasmophobia.fandom.com/wiki/ -> https://phasmophobia.fandom.com/api.php
-        let api_url = self.config.source_url
-            .replace("/wiki/", "/api.php");
-        
+        let api_url = self.config.source_url.replace("/wiki/", "/api.php");
+
         log::info!("📡 API URL: {}", api_url);
         log::info!("⚙️  最大页面数: {}", self.config.max_pages);
 
@@ -87,7 +86,7 @@ impl FandomApiCrawler {
         log::info!("📋 正在获取页面列表...");
         let page_titles = self.fetch_all_pages(&api_url).await?;
         log::info!("✅ 找到 {} 个页面", page_titles.len());
-        
+
         if page_titles.is_empty() {
             log::error!("❌ 未找到任何页面！");
             log::error!("   请检查:");
@@ -103,20 +102,31 @@ impl FandomApiCrawler {
                 details: vec!["错误: 未找到任何页面".to_string()],
             });
         }
-        
+
         details.push(format!("总页面数: {}", page_titles.len()));
 
         // 2. 批量获取页面内容
         let max_pages = self.config.max_pages.min(page_titles.len());
-        log::info!("📄 正在获取 {} 个页面的内容（共{}个）...", max_pages, page_titles.len());
-        
+        log::info!(
+            "📄 正在获取 {} 个页面的内容（共{}个）...",
+            max_pages,
+            page_titles.len()
+        );
+
         for (i, chunk) in page_titles[..max_pages].chunks(50).enumerate() {
             log::info!("   批次 {}: 获取 {} 个页面...", i + 1, chunk.len());
             self.fetch_pages_content(&api_url, chunk).await?;
-            log::info!("   批次 {} 完成，当前共 {} 个条目", i + 1, self.entries.len());
-            
+            log::info!(
+                "   批次 {} 完成，当前共 {} 个条目",
+                i + 1,
+                self.entries.len()
+            );
+
             // 延迟避免限流
-            tokio::time::sleep(std::time::Duration::from_millis(self.config.request_delay_ms)).await;
+            tokio::time::sleep(std::time::Duration::from_millis(
+                self.config.request_delay_ms,
+            ))
+            .await;
         }
 
         // 保存结果
@@ -157,7 +167,7 @@ impl FandomApiCrawler {
                 ("action", "query"),
                 ("format", "json"),
                 ("list", "allpages"),
-                ("aplimit", "500"), // 每次获取500个
+                ("aplimit", "500"),   // 每次获取500个
                 ("apnamespace", "0"), // 只要主命名空间（文章）
             ];
 
@@ -165,26 +175,25 @@ impl FandomApiCrawler {
                 params.push(("apcontinue", token));
             }
 
-            let response = self.client
-                .get(api_url)
-                .query(&params)
-                .send()
-                .await?;
+            let response = self.client.get(api_url).query(&params).send().await?;
 
             let status = response.status();
             log::info!("API 响应状态: {}", status);
 
             if !status.is_success() {
                 log::error!("API 返回错误状态: {}", status);
-                return Err(CrawlerError::HttpError(
-                    reqwest::Error::from(response.error_for_status().unwrap_err()),
-                ));
+                return Err(CrawlerError::HttpError(reqwest::Error::from(
+                    response.error_for_status().unwrap_err(),
+                )));
             }
 
             let json: serde_json::Value = response.json().await?;
-            
+
             // 调试：打印响应结构
-            log::debug!("API 响应: {}", serde_json::to_string_pretty(&json).unwrap_or_default());
+            log::debug!(
+                "API 响应: {}",
+                serde_json::to_string_pretty(&json).unwrap_or_default()
+            );
 
             // 提取页面标题
             if let Some(pages) = json["query"]["allpages"].as_array() {
@@ -217,9 +226,13 @@ impl FandomApiCrawler {
     }
 
     /// 批量获取页面内容
-    async fn fetch_pages_content(&mut self, api_url: &str, titles: &[String]) -> CrawlerResult2<()> {
+    async fn fetch_pages_content(
+        &mut self,
+        api_url: &str,
+        titles: &[String],
+    ) -> CrawlerResult2<()> {
         let titles_str = titles.join("|");
-        
+
         log::info!("获取 {} 个页面的内容...", titles.len());
 
         // 修改：使用 revisions 而不是 extracts
@@ -229,50 +242,49 @@ impl FandomApiCrawler {
             ("prop", "revisions|categories"),
             ("titles", &titles_str),
             ("rvprop", "content"), // 获取修订内容
-            ("rvslots", "main"), // 获取主槽位
-            ("cllimit", "50"), // 最多50个分类
-            ("redirects", "1"), // 自动跟随重定向
+            ("rvslots", "main"),   // 获取主槽位
+            ("cllimit", "50"),     // 最多50个分类
+            ("redirects", "1"),    // 自动跟随重定向
         ];
 
-        let response = self.client
-            .get(api_url)
-            .query(&params)
-            .send()
-            .await?;
+        let response = self.client.get(api_url).query(&params).send().await?;
 
         let status = response.status();
         log::info!("内容 API 响应状态: {}", status);
 
         if !status.is_success() {
             log::error!("内容 API 返回错误: {}", status);
-            return Err(CrawlerError::HttpError(
-                reqwest::Error::from(response.error_for_status().unwrap_err()),
-            ));
+            return Err(CrawlerError::HttpError(reqwest::Error::from(
+                response.error_for_status().unwrap_err(),
+            )));
         }
 
         // 先获取原始 JSON 来调试
         let json: serde_json::Value = response.json().await?;
-        log::debug!("📝 原始 API 响应: {}", serde_json::to_string_pretty(&json).unwrap_or_default());
-        
+        log::debug!(
+            "📝 原始 API 响应: {}",
+            serde_json::to_string_pretty(&json).unwrap_or_default()
+        );
+
         // 尝试解析
-        let api_response: ApiResponse = serde_json::from_value(json.clone())
-            .map_err(|e| {
-                log::error!("❌ 解析 API 响应失败: {}", e);
-                log::error!("响应内容: {:?}", json);
-                CrawlerError::Other(format!("解析失败: {}", e))
-            })?;
+        let api_response: ApiResponse = serde_json::from_value(json.clone()).map_err(|e| {
+            log::error!("❌ 解析 API 响应失败: {}", e);
+            log::error!("响应内容: {:?}", json);
+            CrawlerError::Other(format!("解析失败: {}", e))
+        })?;
 
         if let Some(query) = api_response.query {
             log::info!("收到 {} 个页面的数据", query.pages.len());
-            
+
             let mut success_count = 0;
             let mut no_content_count = 0;
-            
+
             for (page_id, page_data) in query.pages {
                 log::debug!("处理页面: {} (ID: {})", page_data.title, page_id);
-                
+
                 // 从 revisions 中提取内容
-                let content_opt = page_data.revisions
+                let content_opt = page_data
+                    .revisions
                     .and_then(|revisions| revisions.into_iter().next())
                     .and_then(|revision| {
                         // 优先使用 slots.main.content
@@ -284,15 +296,16 @@ impl FandomApiCrawler {
                         // 降级：使用旧格式的 content
                         revision.content
                     });
-                
+
                 if let Some(raw_content) = content_opt {
                     if raw_content.trim().is_empty() {
                         log::warn!("页面 {} 的内容为空", page_data.title);
                         no_content_count += 1;
                         continue;
                     }
-                    
-                    let categories = page_data.categories
+
+                    let categories = page_data
+                        .categories
                         .unwrap_or_default()
                         .iter()
                         .map(|c| c.title.replace("Category:", ""))
@@ -310,7 +323,11 @@ impl FandomApiCrawler {
                         id: format!("{}_{}", self.config.game_id, hash),
                         title: page_data.title.clone(),
                         content,
-                        url: format!("{}{}", self.config.source_url, page_data.title.replace(" ", "_")),
+                        url: format!(
+                            "{}{}",
+                            self.config.source_url,
+                            page_data.title.replace(" ", "_")
+                        ),
                         timestamp,
                         hash,
                         categories,
@@ -326,12 +343,19 @@ impl FandomApiCrawler {
                     success_count += 1;
                     log::debug!("✅ 成功添加条目: {}", page_data.title);
                 } else {
-                    log::warn!("⚠️  页面 {} 没有内容（可能是重定向或特殊页面）", page_data.title);
+                    log::warn!(
+                        "⚠️  页面 {} 没有内容（可能是重定向或特殊页面）",
+                        page_data.title
+                    );
                     no_content_count += 1;
                 }
             }
-            
-            log::info!("📊 本批次: 成功 {} 个，无内容 {} 个", success_count, no_content_count);
+
+            log::info!(
+                "📊 本批次: 成功 {} 个，无内容 {} 个",
+                success_count,
+                no_content_count
+            );
         } else {
             log::warn!("API 响应中没有 query 字段");
         }
@@ -349,8 +373,8 @@ impl FandomApiCrawler {
 
         let mut file_content = String::new();
         for entry in &self.entries {
-            let json = serde_json::to_string(entry)
-                .map_err(|e| CrawlerError::Other(e.to_string()))?;
+            let json =
+                serde_json::to_string(entry).map_err(|e| CrawlerError::Other(e.to_string()))?;
             file_content.push_str(&json);
             file_content.push('\n');
             total_bytes += json.len() + 1;

@@ -1,6 +1,6 @@
+use crate::commands::vector_commands::search_wiki_impl;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
-use crate::commands::vector_commands::search_wiki_impl;
 
 /// RAG 上下文结构
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -81,8 +81,23 @@ pub fn extract_query_keywords(user_message: &str) -> String {
 
     // 移除常见的问句词
     let stop_words = [
-        "怎么", "如何", "什么", "哪些", "为什么", "吗", "呢", "啊",
-        "这个", "那个", "的", "是", "在", "有", "能", "会", "要",
+        "怎么",
+        "如何",
+        "什么",
+        "哪些",
+        "为什么",
+        "吗",
+        "呢",
+        "啊",
+        "这个",
+        "那个",
+        "的",
+        "是",
+        "在",
+        "有",
+        "能",
+        "会",
+        "要",
     ];
 
     let mut keywords: Vec<&str> = message
@@ -110,24 +125,23 @@ pub fn extract_query_keywords(user_message: &str) -> String {
 }
 
 /// 构建 Prompt
-pub fn build_prompt(
-    game_name: &str,
-    user_message: &str,
-    context: &RAGContext,
-) -> (String, String) {
+pub fn build_prompt(game_name: &str, user_message: &str, context: &RAGContext) -> (String, String) {
     // 加载角色配置
-    let settings = crate::settings::AppSettings::load()
-        .unwrap_or_else(|e| {
-            log::warn!("⚠️  加载设置失败: {}, 使用默认配置", e);
-            crate::settings::AppSettings::default()
-        });
-    
+    let settings = crate::settings::AppSettings::load().unwrap_or_else(|e| {
+        log::warn!("⚠️  加载设置失败: {}, 使用默认配置", e);
+        crate::settings::AppSettings::default()
+    });
+
     let personality_type = &settings.ai_models.ai_personality;
-    
+
     // 加载 personality 配置并构建系统提示词
     let system_prompt = match crate::personality::load_personality(personality_type) {
         Ok(config) => {
-            log::info!("✅ 使用角色: {} ({})", config.character.name_cn, config.character.name_en);
+            log::info!(
+                "✅ 使用角色: {} ({})",
+                config.character.name_cn,
+                config.character.name_en
+            );
             crate::personality::build_system_prompt(&config, game_name)
         }
         Err(e) => {

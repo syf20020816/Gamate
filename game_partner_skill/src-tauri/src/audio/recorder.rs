@@ -30,10 +30,10 @@ pub struct AudioRecorder {
     device: Device,
     config: StreamConfig,
     stream: Option<Stream>,
-    
+
     /// 共享的音频缓冲区
     audio_buffer: Arc<Mutex<Vec<f32>>>,
-    
+
     /// 实际的设备配置（包含实际采样率）
     actual_config: RecorderConfig,
 }
@@ -43,47 +43,49 @@ impl AudioRecorder {
     pub fn new(recorder_config: RecorderConfig) -> Result<Self> {
         // 获取默认音频主机
         let host = cpal::default_host();
-        
+
         // 获取默认输入设备 (麦克风)
         let device = host
             .default_input_device()
             .context("未找到默认输入设备 (麦克风)")?;
-        
+
         log::info!("🎙️ 使用音频设备: {:?}", device.name());
-        
+
         // 获取设备的默认配置
         let default_config = device
             .default_input_config()
             .context("无法获取设备默认配置")?;
-        
+
         log::info!("📋 设备默认配置: {:?}", default_config);
-        
+
         // 使用设备默认配置(稍后会重采样到16kHz)
         let config = StreamConfig {
             channels: default_config.channels(),
             sample_rate: default_config.sample_rate(),
             buffer_size: cpal::BufferSize::Default,
         };
-        
+
         log::info!("✅ 使用配置: {:?}", config);
         if config.sample_rate.0 != 16000 {
-            log::warn!("⚠️ 设备采样率({} Hz)与目标(16000 Hz)不同,需要重采样", 
-                      config.sample_rate.0);
+            log::warn!(
+                "⚠️ 设备采样率({} Hz)与目标(16000 Hz)不同,需要重采样",
+                config.sample_rate.0
+            );
         }
-        
+
         // 更新 RecorderConfig 为实际的设备采样率
         let actual_config = RecorderConfig {
-            sample_rate: config.sample_rate.0,  // 使用实际设备采样率
+            sample_rate: config.sample_rate.0, // 使用实际设备采样率
             channels: config.channels,
         };
-        
+
         Ok(Self {
             host,
             device,
             config,
             stream: None,
             audio_buffer: Arc::new(Mutex::new(Vec::new())),
-            actual_config,  // 保存实际配置
+            actual_config, // 保存实际配置
         })
     }
 
@@ -95,31 +97,29 @@ impl AudioRecorder {
         }
 
         let buffer = Arc::clone(&self.audio_buffer);
-        
+
         // 清空缓冲区
         buffer.lock().unwrap().clear();
 
         // 获取采样格式
         let default_config = self.device.default_input_config()?;
         let sample_format = default_config.sample_format();
-        
+
         log::info!("🎵 采样格式: {:?}", sample_format);
 
         // 根据采样格式创建不同的音频流
         let stream = match sample_format {
-            cpal::SampleFormat::F32 => {
-                self.device.build_input_stream(
-                    &self.config,
-                    move |data: &[f32], _: &cpal::InputCallbackInfo| {
-                        let mut buf = buffer.lock().unwrap();
-                        buf.extend_from_slice(data);
-                    },
-                    |err| {
-                        log::error!("❌ 音频流错误: {}", err);
-                    },
-                    None,
-                )?
-            }
+            cpal::SampleFormat::F32 => self.device.build_input_stream(
+                &self.config,
+                move |data: &[f32], _: &cpal::InputCallbackInfo| {
+                    let mut buf = buffer.lock().unwrap();
+                    buf.extend_from_slice(data);
+                },
+                |err| {
+                    log::error!("❌ 音频流错误: {}", err);
+                },
+                None,
+            )?,
             cpal::SampleFormat::I16 => {
                 let buffer_clone = Arc::clone(&buffer);
                 self.device.build_input_stream(
@@ -161,10 +161,10 @@ impl AudioRecorder {
 
         // 启动流
         stream.play()?;
-        
+
         self.stream = Some(stream);
         log::info!("🎙️ 开始录音");
-        
+
         Ok(())
     }
 
@@ -197,7 +197,7 @@ impl AudioRecorder {
     pub fn is_recording(&self) -> bool {
         self.stream.is_some()
     }
-    
+
     /// 获取实际的设备采样率
     pub fn actual_sample_rate(&self) -> u32 {
         self.actual_config.sample_rate
@@ -218,7 +218,7 @@ mod tests {
     fn test_recorder_creation() {
         let config = RecorderConfig::default();
         let recorder = AudioRecorder::new(config);
-        
+
         // 在没有麦克风的环境中可能失败,这是正常的
         match recorder {
             Ok(r) => {

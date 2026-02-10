@@ -34,58 +34,22 @@ impl WebCrawler {
         );
         headers.insert(
             reqwest::header::ACCEPT_LANGUAGE,
-            "en-US,en;q=0.9,zh-CN;q=0.8,zh;q=0.7"
-                .parse()
-                .unwrap(),
+            "en-US,en;q=0.9,zh-CN;q=0.8,zh;q=0.7".parse().unwrap(),
         );
         headers.insert(
             reqwest::header::ACCEPT_ENCODING,
-            "gzip, deflate, br"
-                .parse()
-                .unwrap(),
+            "gzip, deflate, br".parse().unwrap(),
         );
-        headers.insert(
-            reqwest::header::DNT,
-            "1"
-                .parse()
-                .unwrap(),
-        );
-        headers.insert(
-            reqwest::header::CONNECTION,
-            "keep-alive"
-                .parse()
-                .unwrap(),
-        );
+        headers.insert(reqwest::header::DNT, "1".parse().unwrap());
+        headers.insert(reqwest::header::CONNECTION, "keep-alive".parse().unwrap());
         headers.insert(
             reqwest::header::UPGRADE_INSECURE_REQUESTS,
-            "1"
-                .parse()
-                .unwrap(),
+            "1".parse().unwrap(),
         );
-        headers.insert(
-            "Sec-Fetch-Dest",
-            "document"
-                .parse()
-                .unwrap(),
-        );
-        headers.insert(
-            "Sec-Fetch-Mode",
-            "navigate"
-                .parse()
-                .unwrap(),
-        );
-        headers.insert(
-            "Sec-Fetch-Site",
-            "none"
-                .parse()
-                .unwrap(),
-        );
-        headers.insert(
-            "Sec-Fetch-User",
-            "?1"
-                .parse()
-                .unwrap(),
-        );
+        headers.insert("Sec-Fetch-Dest", "document".parse().unwrap());
+        headers.insert("Sec-Fetch-Mode", "navigate".parse().unwrap());
+        headers.insert("Sec-Fetch-Site", "none".parse().unwrap());
+        headers.insert("Sec-Fetch-User", "?1".parse().unwrap());
 
         let client = Client::builder()
             .user_agent(user_agent)
@@ -189,18 +153,18 @@ impl WebCrawler {
     async fn crawl_page(&self, url: &str) -> CrawlerResult2<(WikiEntry, Vec<String>)> {
         // 发送 HTTP 请求，添加 Referer 模拟真实浏览行为
         let mut request = self.client.get(url);
-        
+
         // 添加 Referer（如果不是首页）
         if url != self.config.source_url {
             request = request.header(reqwest::header::REFERER, self.config.source_url.clone());
         }
-        
+
         let response = request.send().await?;
 
         if !response.status().is_success() {
-            return Err(CrawlerError::HttpError(
-                reqwest::Error::from(response.error_for_status().unwrap_err()),
-            ));
+            return Err(CrawlerError::HttpError(reqwest::Error::from(
+                response.error_for_status().unwrap_err(),
+            )));
         }
 
         let html = response.text().await?;
@@ -283,11 +247,9 @@ impl WebCrawler {
                 "main",
                 "article",
             ],
-            WikiSourceType::GamepediaWiki => vec![
-                "div.mw-parser-output",
-                "div#bodyContent",
-                "main",
-            ],
+            WikiSourceType::GamepediaWiki => {
+                vec!["div.mw-parser-output", "div#bodyContent", "main"]
+            }
             _ => vec!["main", "article", "div.content"],
         };
 
@@ -314,9 +276,7 @@ impl WebCrawler {
             }
         }
 
-        Err(CrawlerError::ParseError(
-            "无法提取页面内容".to_string(),
-        ))
+        Err(CrawlerError::ParseError("无法提取页面内容".to_string()))
     }
 
     /// 提取分类
@@ -397,8 +357,8 @@ impl WebCrawler {
 
         let mut file_content = String::new();
         for entry in &self.entries {
-            let json = serde_json::to_string(entry)
-                .map_err(|e| CrawlerError::Other(e.to_string()))?;
+            let json =
+                serde_json::to_string(entry).map_err(|e| CrawlerError::Other(e.to_string()))?;
             file_content.push_str(&json);
             file_content.push('\n');
             total_bytes += json.len() + 1;

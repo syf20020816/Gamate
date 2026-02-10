@@ -10,10 +10,7 @@ import {
   Tabs,
 } from "antd";
 import { SendOutlined, ClearOutlined } from "@ant-design/icons";
-import {
-  Image as ImageIcon,
-  BookOpen,
-} from "lucide-react";
+import { Image as ImageIcon, BookOpen } from "lucide-react";
 import { motion } from "framer-motion";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
@@ -37,18 +34,18 @@ const cleanMarkdownForTTS = (text: string): string => {
 
   // 否则进行常规 Markdown 清理
   return text
-    .replace(/\*\*(.+?)\*\*/g, '$1')      // 移除加粗 **text**
-    .replace(/\*(.+?)\*/g, '$1')          // 移除斜体 *text*
-    .replace(/`(.+?)`/g, '$1')            // 移除代码标记 `code`
-    .replace(/~~(.+?)~~/g, '$1')          // 移除删除线 ~~text~~
-    .replace(/#{1,6}\s+/g, '')            // 移除标题标记 # ## ###
-    .replace(/\[(.+?)\]\(.+?\)/g, '$1')   // 移除链接 [text](url) -> text
-    .replace(/!\[.+?\]\(.+?\)/g, '')      // 移除图片
-    .replace(/^\s*[-*+]\s+/gm, '')        // 移除列表标记
-    .replace(/^\s*\d+\.\s+/gm, '')        // 移除数字列表
-    .replace(/\n{3,}/g, '\n\n')           // 多个换行合并
-    .replace(/```[\s\S]*?```/g, '')       // 移除代码块
-    .replace(/`/g, '')                    // 移除单个反引号
+    .replace(/\*\*(.+?)\*\*/g, "$1") // 移除加粗 **text**
+    .replace(/\*(.+?)\*/g, "$1") // 移除斜体 *text*
+    .replace(/`(.+?)`/g, "$1") // 移除代码标记 `code`
+    .replace(/~~(.+?)~~/g, "$1") // 移除删除线 ~~text~~
+    .replace(/#{1,6}\s+/g, "") // 移除标题标记 # ## ###
+    .replace(/\[(.+?)\]\(.+?\)/g, "$1") // 移除链接 [text](url) -> text
+    .replace(/!\[.+?\]\(.+?\)/g, "") // 移除图片
+    .replace(/^\s*[-*+]\s+/gm, "") // 移除列表标记
+    .replace(/^\s*\d+\.\s+/gm, "") // 移除数字列表
+    .replace(/\n{3,}/g, "\n\n") // 多个换行合并
+    .replace(/```[\s\S]*?```/g, "") // 移除代码块
+    .replace(/`/g, "") // 移除单个反引号
     .trim();
 };
 
@@ -74,36 +71,34 @@ const AIAssistant: React.FC = () => {
   const [useScreenshot, setUseScreenshot] = useState(true);
   const voiceListenerRegistered = useRef(false); // 防止重复注册语音识别监听器
 
-  // 🔍 调试: 监听 currentGame 变化
-  useEffect(() => {
-    console.log("🎮 [AIAssistant] currentGame 变化:", currentGame);
-  }, [currentGame]);
-
-  // 🔥 监听来自 HUD 的游戏切换事件
+  // 监听来自 HUD 的游戏切换事件
   useEffect(() => {
     const setupGameChangeListener = async () => {
       try {
         const { listen: listenEvent } = await import("@tauri-apps/api/event");
-        
-        const unlisten = await listenEvent<{ gameId: string }>("game-changed", (event) => {
-          console.log("📡 [AIAssistant] 收到 game-changed 事件:", event.payload.gameId);
-          setCurrentGame(event.payload.gameId);
-        });
-        
+        const unlisten = await listenEvent<{ gameId: string }>(
+          "game-changed",
+          (event) => {
+            setCurrentGame(event.payload.gameId);
+          },
+        );
+
         return unlisten;
       } catch (error) {
-        console.error("❌ [AIAssistant] 监听器注册失败:", error);
+        console.error("[AIAssistant] 监听器注册失败:", error);
         throw error;
       }
     };
-    
+
     let unlistenFn: (() => void) | null = null;
-    setupGameChangeListener().then(fn => { 
-      unlistenFn = fn;
-    }).catch(err => {
-      console.error("❌ [AIAssistant] 监听器设置失败:", err);
-    });
-    
+    setupGameChangeListener()
+      .then((fn) => {
+        unlistenFn = fn;
+      })
+      .catch((err) => {
+        console.error("[AIAssistant] 监听器设置失败:", err);
+      });
+
     return () => {
       if (unlistenFn) {
         unlistenFn();
@@ -111,46 +106,47 @@ const AIAssistant: React.FC = () => {
     };
   }, [setCurrentGame]);
 
-  // ✅ 从后端扫描已下载的技能库
+  // 从后端扫描已下载的技能库
   useEffect(() => {
     const loadLibraries = async () => {
       try {
-        const libraries = await invoke<any[]>('scan_downloaded_libraries');
+        const libraries = await invoke<any[]>("scan_downloaded_libraries");
         setDownloadedLibraries(libraries);
       } catch (error) {
-        console.error('扫描技能库失败:', error);
+        console.error("扫描技能库失败:", error);
       }
     };
     loadLibraries();
   }, []);
 
-  // ✅ 从后端加载用户选择的游戏并过滤出有技能库的
+  // 从后端加载用户选择的游戏并过滤出有技能库的
   useEffect(() => {
     const loadAvailableGames = async () => {
       try {
-        const settings = await invoke<any>('get_app_settings');
+        const settings = await invoke<any>("get_app_settings");
         const selectedGameIds = settings.user?.selected_games || [];
-        
+
         // 获取有技能库的游戏 ID
-        const gamesWithSkills = [...new Set(downloadedLibraries.map((lib) => lib.gameId))];
-        
+        const gamesWithSkills = [
+          ...new Set(downloadedLibraries.map((lib) => lib.gameId)),
+        ];
+
         // 过滤出既被选择又有技能库的游戏
-        const filteredIds = selectedGameIds.filter((id: string) => gamesWithSkills.includes(id));
-        
-        // ✅ 使用 Promise.all 等待所有异步调用完成
+        const filteredIds = selectedGameIds.filter((id: string) =>
+          gamesWithSkills.includes(id),
+        );
+
+        // 使用 Promise.all 等待所有异步调用完成
         const games = await Promise.all(
-          filteredIds.map((id: string) => getGameById(id))
+          filteredIds.map((id: string) => getGameById(id)),
         );
         const validGames = games.filter(Boolean);
-        
         setAvailableGames(validGames);
-        
-        console.log('✅ [AIAssistant] 加载可用游戏:', validGames.map((g: any) => g?.name));
       } catch (error) {
-        console.error('加载游戏配置失败:', error);
+        console.error("加载游戏配置失败:", error);
       }
     };
-    
+
     if (downloadedLibraries.length > 0) {
       loadAvailableGames();
     }
@@ -161,7 +157,6 @@ const AIAssistant: React.FC = () => {
     const unlisten = listen("screenshot_captured", (event: any) => {
       const screenshot = event.payload as string;
       updateContext(screenshot);
-      console.log("📸 收到新截图,已更新上下文");
     });
 
     return () => {
@@ -173,11 +168,8 @@ const AIAssistant: React.FC = () => {
   useEffect(() => {
     // 防止重复注册（React Strict Mode 会执行两次）
     if (voiceListenerRegistered.current) {
-      console.log("⚠️ [跳过] 语音监听器已注册，避免重复");
       return;
     }
-    
-    console.log("🔧 [初始化] 注册语音识别完成监听器...");
     voiceListenerRegistered.current = true;
 
     // 防止同一次识别被处理多次
@@ -192,17 +184,14 @@ const AIAssistant: React.FC = () => {
 
       // 生成唯一标识防止重复处理
       const textKey = recognizedText.trim();
-      
+
       if (processedRecognitions.has(textKey)) {
-        console.log("⚠️ [跳过重复] 该识别结果已处理:", textKey);
         return;
       }
       processedRecognitions.add(textKey);
-      
+
       // 5秒后清除标记(允许重复提问)
       setTimeout(() => processedRecognitions.delete(textKey), 5000);
-
-      console.log("🎤 [语音识别完成]", recognizedText);
 
       // 检查是否选择了游戏
       if (!currentGame) {
@@ -214,10 +203,12 @@ const AIAssistant: React.FC = () => {
 
       try {
         // 1. 自动截图
-        console.log("📸 [语音对话] 开始自动截图...");
-        antdMessage.loading({ content: "正在截图...", key: "voice_screenshot" });
-        
-        // 🔥 通知 HUD: 正在截图
+        antdMessage.loading({
+          content: "正在截图...",
+          key: "voice_screenshot",
+        });
+
+        // 通知 HUD: 正在截图
         try {
           const { emit } = await import("@tauri-apps/api/event");
           await emit("screenshot_started", {});
@@ -232,7 +223,6 @@ const AIAssistant: React.FC = () => {
           key: "voice_screenshot",
           duration: 1,
         });
-        console.log("✅ [语音对话] 截图成功");
       } catch (error) {
         console.error("❌ [语音对话] 截图失败:", error);
         antdMessage.warning({
@@ -246,9 +236,8 @@ const AIAssistant: React.FC = () => {
       sendMessage(recognizedText, screenshot);
 
       try {
-        console.log("🤖 [语音对话] 准备调用 generate_ai_response");
-        
-        // 🔥 通知 HUD: AI 思考中
+        // [语音对话] 准备调用 generate_ai_response
+        // 通知 HUD: AI 思考中
         try {
           const { emit } = await import("@tauri-apps/api/event");
           await emit("ai_thinking", {});
@@ -269,13 +258,10 @@ const AIAssistant: React.FC = () => {
           gameId: currentGame,
           screenshot,
         });
-
-        console.log("✅ [语音对话] AI 回复成功:", response);
-
         // 4. 添加 AI 回复到对话历史
         receiveAIResponse(response.content, response.wiki_references);
-        
-        // 🔥 通知 HUD: AI 回答准备好了
+
+        // 通知 HUD: AI 回答准备好了
         try {
           const { emit } = await import("@tauri-apps/api/event");
           await emit("ai_response_ready", {});
@@ -292,30 +278,23 @@ const AIAssistant: React.FC = () => {
             volume: number;
           }>("get_app_settings").then((settings: any) => settings.tts);
 
-          console.log("🔊 [语音对话] TTS 配置:", ttsSettings);
-
           if (ttsSettings?.enabled && ttsSettings?.auto_speak) {
-            console.log("🎤 [语音对话] 开始播报 AI 回复...");
-
             // 清理 Markdown 标记 (支持 [TTS_SIMPLE] 简化标记)
             const cleanText = cleanMarkdownForTTS(response.content);
-
-            console.log("🧹 [清理后的文本]", cleanText);
-
             await invoke("set_tts_rate", { rate: ttsSettings.rate || 1.0 });
-            await invoke("set_tts_volume", { volume: ttsSettings.volume || 0.8 });
+            await invoke("set_tts_volume", {
+              volume: ttsSettings.volume || 0.8,
+            });
             await invoke("speak_text", {
-              text: cleanText,  // 使用清理后的文本
+              text: cleanText, // 使用清理后的文本
               interrupt: true,
             });
-
-            console.log("✅ [语音对话] TTS 播报已开始");
           }
         } catch (ttsError) {
-          console.warn("⚠️ [语音对话] TTS 播报失败:", ttsError);
+          console.warn("[语音对话] TTS 播报失败:", ttsError);
         }
       } catch (error) {
-        console.error("❌ [语音对话] AI 回复失败:", error);
+        console.error("[语音对话] AI 回复失败:", error);
 
         receiveAIResponse(
           `抱歉,AI 助手暂时无法回复。错误信息: ${error}\n\n请检查:\n1. 多模态模型是否已启用\n2. API Key 是否配置正确 (本地 Ollama 不需要)\n3. 网络连接是否正常\n4. 向量数据库是否已导入`,
@@ -327,11 +306,16 @@ const AIAssistant: React.FC = () => {
     };
 
     // 监听自定义事件
-    window.addEventListener("voice_recognition_completed", handleVoiceRecognitionCompleted);
+    window.addEventListener(
+      "voice_recognition_completed",
+      handleVoiceRecognitionCompleted,
+    );
 
     return () => {
-      console.log("🧹 [清理] 取消语音识别监听器");
-      window.removeEventListener("voice_recognition_completed", handleVoiceRecognitionCompleted);
+      window.removeEventListener(
+        "voice_recognition_completed",
+        handleVoiceRecognitionCompleted,
+      );
       voiceListenerRegistered.current = false; // 重置标志
     };
   }, [currentGame, sendMessage, receiveAIResponse]); // 添加依赖
@@ -346,7 +330,6 @@ const AIAssistant: React.FC = () => {
         await invoke("apply_personality_voice", {
           personalityType,
         });
-        console.log("🎤 已应用角色语音:", personalityType);
       } catch (error) {
         console.error("应用角色语音失败:", error);
       }
@@ -369,15 +352,9 @@ const AIAssistant: React.FC = () => {
 
     const userMessage = inputValue.trim();
     let screenshot: string | undefined = undefined;
-
-    console.log("🚀 开始发送消息:", userMessage);
-    console.log("📷 截图启用状态:", useScreenshot);
-    console.log("🎮 当前游戏:", currentGame);
-
     // 如果启用截图,先执行截图
     if (useScreenshot) {
       try {
-        console.log("📸 开始截图...");
         antdMessage.loading({ content: "正在截图...", key: "screenshot" });
 
         // 调用截图命令
@@ -389,9 +366,8 @@ const AIAssistant: React.FC = () => {
           key: "screenshot",
           duration: 1,
         });
-        console.log("✅ 截图成功,长度:", screenshot?.length);
       } catch (error) {
-        console.error("❌ 截图失败:", error);
+        console.error("截图失败:", error);
         antdMessage.warning({
           content: "截图失败,将以纯文本模式发送",
           key: "screenshot",
@@ -405,13 +381,6 @@ const AIAssistant: React.FC = () => {
     setInputValue("");
 
     try {
-      console.log("🤖 准备调用 generate_ai_response");
-      console.log("   参数:", {
-        message: userMessage,
-        gameId: currentGame,
-        hasScreenshot: !!screenshot,
-      });
-
       // 调用后端 RAG 生成 AI 回复
       const response = await invoke<{
         content: string;
@@ -425,9 +394,6 @@ const AIAssistant: React.FC = () => {
         gameId: currentGame,
         screenshot,
       });
-
-      console.log("✅ AI 回复成功:", response);
-
       // 添加 AI 回复
       receiveAIResponse(response.content, response.wiki_references);
 
@@ -441,34 +407,26 @@ const AIAssistant: React.FC = () => {
           volume: number;
         }>("get_app_settings").then((settings: any) => settings.tts);
 
-        console.log("🔊 TTS 配置:", ttsSettings);
-
         // 如果启用了 TTS 且自动播报
         if (ttsSettings?.enabled && ttsSettings?.auto_speak) {
-          console.log("🎤 开始播报 AI 回复...");
-
           // 清理 Markdown 标记 (支持 [TTS_SIMPLE] 简化标记)
           const cleanText = cleanMarkdownForTTS(response.content);
-          console.log("🧹 [清理后的文本]", cleanText);
-
           // 设置语速和音量
           await invoke("set_tts_rate", { rate: ttsSettings.rate || 1.0 });
           await invoke("set_tts_volume", { volume: ttsSettings.volume || 0.8 });
 
           // 播报 AI 回复内容
           await invoke("speak_text", {
-            text: cleanText,  // 使用清理后的文本
+            text: cleanText, // 使用清理后的文本
             interrupt: true, // 打断之前的播报
           });
-
-          console.log("✅ TTS 播报已开始");
         }
       } catch (ttsError) {
-        console.warn("⚠️  TTS 播报失败:", ttsError);
+        console.warn("TTS 播报失败:", ttsError);
         // TTS 失败不影响主流程
       }
     } catch (error) {
-      console.error("❌ AI 回复失败:", error);
+      console.error("AI 回复失败:", error);
 
       // Fallback: 显示错误信息
       receiveAIResponse(
@@ -491,21 +449,20 @@ const AIAssistant: React.FC = () => {
   // 包装 setCurrentGame,同时通知 HUD 窗口
   const handleGameChange = async (gameId: string | null) => {
     setCurrentGame(gameId);
-    
+
     // 通知 HUD 窗口
     try {
       const { emit } = await import("@tauri-apps/api/event");
       await emit("game-changed", { gameId });
     } catch (error) {
-      console.error("❌ 发送游戏切换事件失败:", error);
+      console.error("发送游戏切换事件失败:", error);
     }
   };
 
   return (
     <div className="ai-assistant-page">
       <div className="conversation-header">
-        
-        <h3 style={{fontSize: 22}}>AI 陪玩对话</h3>
+        <h3 style={{ fontSize: 22 }}>AI 陪玩对话</h3>
         <Select
           value={currentGame}
           onChange={handleGameChange}

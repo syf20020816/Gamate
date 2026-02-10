@@ -1,5 +1,5 @@
 /// TTS (文字转语音) 模块
-/// 
+///
 /// 使用 `tts` crate 实现跨平台语音合成
 /// Windows: SAPI
 /// macOS: AVFoundation
@@ -7,8 +7,8 @@
 ///
 use anyhow::{Context, Result};
 use std::sync::{Arc, Mutex};
-use tts::Tts;
 use tokio::sync::mpsc;
+use tts::Tts;
 
 /// TTS 播报请求
 #[derive(Debug, Clone)]
@@ -29,13 +29,12 @@ impl TtsEngine {
         log::info!("🔊 初始化 TTS 引擎...");
 
         // 创建 TTS 实例
-        let tts = Tts::default()
-            .context("无法初始化 TTS 引擎")?;
+        let tts = Tts::default().context("无法初始化 TTS 引擎")?;
 
         log::info!("✅ TTS 引擎初始化成功");
 
         let tts = Arc::new(Mutex::new(tts));
-        
+
         // 创建播报队列
         let (queue_tx, mut queue_rx) = mpsc::unbounded_channel::<SpeakRequest>();
 
@@ -43,30 +42,33 @@ impl TtsEngine {
         let tts_clone = Arc::clone(&tts);
         tokio::spawn(async move {
             log::info!("🎙️ TTS 播报队列已启动");
-            
+
             while let Some(request) = queue_rx.recv().await {
                 log::debug!("📢 收到播报请求: {:?}", request);
-                
+
                 let mut tts = tts_clone.lock().unwrap();
-                
+
                 // 如果需要打断,先停止当前播报
                 if request.interrupt {
                     if let Err(e) = tts.stop() {
                         log::warn!("⚠️  停止播报失败: {}", e);
                     }
                 }
-                
+
                 // 开始播报
                 match tts.speak(&request.text, request.interrupt) {
                     Ok(_) => {
-                        log::debug!("✅ 播报成功: {}", &request.text[..request.text.len().min(50)]);
+                        log::debug!(
+                            "✅ 播报成功: {}",
+                            &request.text[..request.text.len().min(50)]
+                        );
                     }
                     Err(e) => {
                         log::error!("❌ 播报失败: {}", e);
                     }
                 }
             }
-            
+
             log::warn!("🛑 TTS 播报队列已关闭");
         });
 
@@ -75,7 +77,8 @@ impl TtsEngine {
 
     /// 播报文本 (异步,不阻塞)
     pub fn speak(&self, text: String, interrupt: bool) -> Result<()> {
-        self.queue_tx.send(SpeakRequest { text, interrupt })
+        self.queue_tx
+            .send(SpeakRequest { text, interrupt })
             .context("发送播报请求失败")?;
         Ok(())
     }
@@ -90,7 +93,7 @@ impl TtsEngine {
     /// 设置语速 (0.0 - 10.0, 默认 1.0)
     pub fn set_rate(&self, rate: f32) -> Result<()> {
         let mut tts = self.tts.lock().unwrap();
-        
+
         // 尝试设置语速
         match tts.set_rate(rate) {
             Ok(_) => {
@@ -107,7 +110,7 @@ impl TtsEngine {
     /// 设置音量 (0.0 - 1.0)
     pub fn set_volume(&self, volume: f32) -> Result<()> {
         let mut tts = self.tts.lock().unwrap();
-        
+
         // 尝试设置音量
         match tts.set_volume(volume) {
             Ok(_) => {
@@ -124,14 +127,12 @@ impl TtsEngine {
     /// 获取可用的音色列表
     pub fn get_voices(&self) -> Result<Vec<String>> {
         let tts = self.tts.lock().unwrap();
-        
+
         match tts.voices() {
             Ok(voices) => {
-                let voice_names: Vec<String> = voices
-                    .iter()
-                    .map(|v| v.name().to_string())
-                    .collect();
-                
+                let voice_names: Vec<String> =
+                    voices.iter().map(|v| v.name().to_string()).collect();
+
                 log::debug!("🎤 可用音色: {:?}", voice_names);
                 Ok(voice_names)
             }
@@ -145,7 +146,7 @@ impl TtsEngine {
     /// 设置音色 (通过名称)
     pub fn set_voice(&self, voice_name: &str) -> Result<()> {
         let mut tts = self.tts.lock().unwrap();
-        
+
         match tts.voices() {
             Ok(voices) => {
                 // 查找匹配的音色
@@ -180,14 +181,12 @@ static INIT: std::sync::Once = std::sync::Once::new();
 /// 获取或初始化 TTS 引擎
 pub fn get_tts_engine() -> Result<Arc<TtsEngine>> {
     unsafe {
-        INIT.call_once(|| {
-            match TtsEngine::new() {
-                Ok(engine) => {
-                    TTS_ENGINE = Some(Arc::new(engine));
-                }
-                Err(e) => {
-                    log::error!("❌ TTS 引擎初始化失败: {}", e);
-                }
+        INIT.call_once(|| match TtsEngine::new() {
+            Ok(engine) => {
+                TTS_ENGINE = Some(Arc::new(engine));
+            }
+            Err(e) => {
+                log::error!("❌ TTS 引擎初始化失败: {}", e);
             }
         });
 
@@ -202,10 +201,12 @@ mod tests {
     #[tokio::test]
     async fn test_tts_basic() {
         env_logger::init();
-        
+
         let engine = TtsEngine::new().unwrap();
-        engine.speak("你好,这是一个测试".to_string(), false).unwrap();
-        
+        engine
+            .speak("你好,这是一个测试".to_string(), false)
+            .unwrap();
+
         // 等待播报完成
         tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
     }
@@ -213,7 +214,7 @@ mod tests {
     #[test]
     fn test_tts_rate() {
         env_logger::init();
-        
+
         let engine = TtsEngine::new().unwrap();
         engine.set_rate(1.5).unwrap();
         engine.speak("语速测试".to_string(), false).unwrap();

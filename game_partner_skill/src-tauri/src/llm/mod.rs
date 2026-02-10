@@ -1,5 +1,5 @@
-pub mod openai;
 pub mod ollama;
+pub mod openai;
 
-pub use openai::OpenAIClient;
 pub use ollama::OllamaClient;
+pub use openai::OpenAIClient;

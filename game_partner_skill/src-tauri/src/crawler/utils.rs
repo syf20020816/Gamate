@@ -7,14 +7,14 @@ pub fn clean_html_text(text: &str) -> String {
     // 移除多余空白
     let re_whitespace = Regex::new(r"\s+").unwrap();
     let text = re_whitespace.replace_all(text, " ");
-    
+
     // 移除特殊字符
     let text = text.trim();
-    
+
     // 移除 Wiki 引用标记 [1], [2] 等
     let re_refs = Regex::new(r"\[\d+\]").unwrap();
     let text = re_refs.replace_all(&text, "");
-    
+
     text.to_string()
 }
 
@@ -23,13 +23,13 @@ pub fn extract_main_content(html: &str) -> String {
     // 简化版本：移除常见的非内容标签
     let re_script = Regex::new(r"<script[^>]*>.*?</script>").unwrap();
     let html = re_script.replace_all(html, "");
-    
+
     let re_style = Regex::new(r"<style[^>]*>.*?</style>").unwrap();
     let html = re_style.replace_all(&html, "");
-    
+
     let re_nav = Regex::new(r"<nav[^>]*>.*?</nav>").unwrap();
     let html = re_nav.replace_all(&html, "");
-    
+
     html.to_string()
 }
 
@@ -74,11 +74,11 @@ pub fn split_into_chunks(text: &str, max_chunk_size: usize, overlap: usize) -> V
         let end = (start + max_chunk_size).min(words.len());
         let chunk = words[start..end].join(" ");
         chunks.push(chunk);
-        
+
         if end >= words.len() {
             break;
         }
-        
+
         start += max_chunk_size - overlap;
     }
 
@@ -88,50 +88,50 @@ pub fn split_into_chunks(text: &str, max_chunk_size: usize, overlap: usize) -> V
 /// 清理 Wiki 标记语法，转换为纯文本
 pub fn clean_wiki_markup(text: &str) -> String {
     let mut result = text.to_string();
-    
+
     // 1. 移除 <ref> 标签
     let re_ref = Regex::new(r"<ref[^>]*>.*?</ref>").unwrap();
     result = re_ref.replace_all(&result, "").to_string();
-    
+
     // 2. 移除 HTML 注释
     let re_comment = Regex::new(r"<!--.*?-->").unwrap();
     result = re_comment.replace_all(&result, "").to_string();
-    
+
     // 3. 移除文件/图片链接 [[File:...]] [[Image:...]]
     let re_file = Regex::new(r"\[\[(File|Image):[^\]]+\]\]").unwrap();
     result = re_file.replace_all(&result, "").to_string();
-    
+
     // 4. 处理内部链接 [[Link|Text]] -> Text 或 [[Link]] -> Link
     let re_link = Regex::new(r"\[\[([^\]|]+)\|([^\]]+)\]\]").unwrap();
     result = re_link.replace_all(&result, "$2").to_string();
     let re_simple_link = Regex::new(r"\[\[([^\]]+)\]\]").unwrap();
     result = re_simple_link.replace_all(&result, "$1").to_string();
-    
+
     // 5. 移除外部链接 [http://... Text] -> Text
     let re_external = Regex::new(r"\[https?://[^\s\]]+ ([^\]]+)\]").unwrap();
     result = re_external.replace_all(&result, "$1").to_string();
     let re_bare_url = Regex::new(r"\[https?://[^\]]+\]").unwrap();
     result = re_bare_url.replace_all(&result, "").to_string();
-    
+
     // 6. 移除模板 {{...}}
     let re_template = Regex::new(r"\{\{[^\}]+\}\}").unwrap();
     result = re_template.replace_all(&result, "").to_string();
-    
+
     // 7. 移除粗体/斜体 '''text''' -> text, ''text'' -> text
     result = result.replace("'''", "").replace("''", "");
-    
+
     // 8. 移除标题标记 == Title == -> Title
     let re_heading = Regex::new(r"^=+\s*(.+?)\s*=+$").unwrap();
     result = re_heading.replace_all(&result, "$1").to_string();
-    
+
     // 9. 移除多余空白
     let re_whitespace = Regex::new(r"\s+").unwrap();
     result = re_whitespace.replace_all(&result, " ").to_string();
-    
+
     // 10. 移除 Wiki 引用标记 [1], [2] 等
     let re_refs = Regex::new(r"\[\d+\]").unwrap();
     result = re_refs.replace_all(&result, "").to_string();
-    
+
     result.trim().to_string()
 }
 
