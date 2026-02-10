@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, CSSProperties } from "react";
 import {
   Card,
   Typography,
@@ -57,6 +57,10 @@ const SkillDatabase: React.FC = () => {
   const [downloadedLibraries, setDownloadedLibraries] = useState<
     DownloadedSkillLibrary[]
   >([]);
+
+  const basicCardStyle: CSSProperties = {
+    height: "100%",
+  };
 
   // 从后端加载配置
   useEffect(() => {
@@ -430,7 +434,7 @@ const SkillDatabase: React.FC = () => {
         {/* 统计卡片 */}
         <Row gutter={16} style={{ marginBottom: 24 }}>
           <Col span={6}>
-            <Card>
+            <Card style={basicCardStyle}>
               <Space direction="vertical" size={0}>
                 <Text type="secondary">已下载游戏</Text>
                 <Title level={3} style={{ margin: 0 }}>
@@ -440,7 +444,7 @@ const SkillDatabase: React.FC = () => {
             </Card>
           </Col>
           <Col span={6}>
-            <Card>
+            <Card style={basicCardStyle}>
               <Space direction="vertical" size={0}>
                 <Text type="secondary">技能库版本</Text>
                 <Title level={3} style={{ margin: 0 }}>
@@ -450,7 +454,7 @@ const SkillDatabase: React.FC = () => {
             </Card>
           </Col>
           <Col span={6}>
-            <Card>
+            <Card style={basicCardStyle}>
               <Space direction="vertical" size={0}>
                 <Text type="secondary">活跃版本</Text>
                 <Title level={3} style={{ margin: 0 }}>
@@ -460,7 +464,7 @@ const SkillDatabase: React.FC = () => {
             </Card>
           </Col>
           <Col span={6}>
-            <Card>
+            <Card style={basicCardStyle}>
               <Space direction="vertical" size={0}>
                 <Text type="secondary">总存储大小</Text>
                 <Title level={3} style={{ margin: 0 }}>

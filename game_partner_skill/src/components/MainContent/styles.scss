@@ -3,6 +3,7 @@
   height: 100vh;
   overflow-y: auto;
   background: #141414;
+  min-width: 580px;
 
   &::-webkit-scrollbar {
     width: 8px;

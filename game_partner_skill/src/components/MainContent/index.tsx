@@ -1,7 +1,7 @@
 import GameLibrary from "../GameLibrary";
 import SkillDatabase from "../SkillDatabase";
 import Home from "../Home";
-import Logs from "../Logs";
+// import Logs from "../Logs";
 import SettingsPanel from "../Settings";
 import WikiKnowledgeBase from "../WikiKnowledgeBase";
 import AIAssistant from "../AIAssistant";
@@ -27,8 +27,8 @@ const MainContent: React.FC<MainContentProps> = ({ selectedMenu, onMenuChange })
         return <GameLibrary />;
       case "skill-database":
         return <SkillDatabase />;
-      case "logs":
-        return <Logs />;
+      // case "logs":
+      //   return <Logs />;
       case "settings":
         return <SettingsPanel />;
       case "user-agreement":

@@ -2,7 +2,7 @@
   height: 100vh;
   background: #1f1f1f !important;
   border-left: 1px solid rgba(255, 255, 255, 0.1);
-
+  position: relative;
   .panel-content {
     padding: 24px 16px;
     height: 100%;
@@ -86,6 +86,11 @@
     }
 
     .panel-footer {
+      bottom: 0;
+      width: calc(100% - 32px);
+      margin-bottom: 8px;
+      position: absolute;
+      box-sizing: border-box;
       padding-top: 16px;
       border-top: 1px solid rgba(255, 255, 255, 0.05);
 

@@ -13,6 +13,7 @@ import { motion } from "framer-motion";
 import { invoke } from "@tauri-apps/api/core";
 import { useState, useEffect } from "react";
 import "./styles.scss";
+import { VERSION } from "../../utils/version";
 
 const { Sider } = Layout;
 const { Title, Text } = Typography;
@@ -326,7 +327,7 @@ const RightPanel: React.FC<RightPanelProps> = ({ onMenuChange }) => {
                 opacity: 0.4 
               }}
             >
-              Gamate v1.0.0
+              Gamate {VERSION}
             </Text>
           </Space>
         </div>

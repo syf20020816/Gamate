@@ -52,11 +52,11 @@ const Sidebar: React.FC<SidebarProps> = ({ selectedMenu, onMenuChange }) => {
       icon: <Database size={20} />,
       label: "技能库",
     },
-    {
-      key: "logs",
-      icon: <FileText size={20} />,
-      label: "日志",
-    },
+    // {
+    //   key: "logs",
+    //   icon: <FileText size={20} />,
+    //   label: "日志",
+    // },
     {
       key: "settings",
       icon: <Settings size={20} />,

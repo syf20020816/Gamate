@@ -166,12 +166,12 @@ const Home: React.FC<HomeProps> = ({ onNavigate }) => {
           </Paragraph>
 
           {/* 核心特性卡片 */}
-          <Row gutter={16} style={{ marginBottom: 16 }}>
+          <Row gutter={16} style={{ marginBottom: 16, height: "max-content" }}>
             <Col span={8}>
               <Card size="small" style={{ textAlign: "center" }}>
                 <MessageCircle
                   size={32}
-                  style={{ color: "#1890ff", marginBottom: 12 }}
+                  style={{ color: "#1890ff", marginBottom: 12, height: "100%" }}
                 />
                 <Title level={5}>语音对话</Title>
                 <Text type="secondary" style={{ fontSize: 12 }}>
@@ -180,7 +180,10 @@ const Home: React.FC<HomeProps> = ({ onNavigate }) => {
               </Card>
             </Col>
             <Col span={8}>
-              <Card size="small" style={{ textAlign: "center" }}>
+              <Card
+                size="small"
+                style={{ textAlign: "center", height: "100%" }}
+              >
                 <Brain
                   size={32}
                   style={{ color: "#52c41a", marginBottom: 12 }}
@@ -192,7 +195,10 @@ const Home: React.FC<HomeProps> = ({ onNavigate }) => {
               </Card>
             </Col>
             <Col span={8}>
-              <Card size="small" style={{ textAlign: "center" }}>
+              <Card
+                size="small"
+                style={{ textAlign: "center", height: "100%" }}
+              >
                 <Sparkles
                   size={32}
                   style={{ color: "#722ed1", marginBottom: 12 }}
