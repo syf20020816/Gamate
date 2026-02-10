@@ -3,7 +3,11 @@
 /// 接收主播语音 + 双截图 + 员工对话历史，返回智能化的弹幕回复
 
 use serde::{Deserialize, Serialize};
-use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
+use anyhow::Result;
+use std::sync::Arc;
+use crate::llm::OpenAIClient;
+use crate::settings::ModelConfig;
+use base64::{Engine as _, engine::general_purpose};
 
 /// AI 分析请求
 #[derive(Debug, Clone, Serialize)]
@@ -74,16 +78,27 @@ pub struct EmployeeAction {
 /// AI 分析器
 #[derive(Clone)]
 pub struct AIAnalyzer {
-    api_endpoint: String,
-    api_key: String,
+    client: Arc<OpenAIClient>,
     model: String,
 }
 
 impl AIAnalyzer {
     pub fn new(api_endpoint: String, api_key: String, model: String) -> Self {
+        // 构建 ModelConfig
+        let config = ModelConfig {
+            provider: "openai".to_string(),
+            api_base: api_endpoint,
+            api_key: Some(api_key),
+            model_name: model.clone(),
+            enabled: true,
+            temperature: 0.8,
+            max_tokens: 2000,
+        };
+        
+        let client = OpenAIClient::new(config).expect("创建 OpenAI 客户端失败");
+        
         Self {
-            api_endpoint,
-            api_key,
+            client: Arc::new(client),
             model,
         }
     }
@@ -97,94 +112,130 @@ impl AIAnalyzer {
         println!("  主播说话: {}", request.streamer_speech);
         println!("  员工数量: {}", request.employees.len());
 
-        // 构建提示词
-        let prompt = self.build_prompt(&request);
+        // 🧹 清理和验证 base64 图片，过滤掉空截图
+        let mut images = Vec::new();
         
-        // 构建多模态消息
-        let messages = vec![
-            serde_json::json!({
-                "role": "system",
-                "content": "你是一个直播间互动分析专家。根据主播的语音和游戏画面变化，为每个AI员工生成自然、有趣、符合其性格的弹幕回复。你必须严格按照JSON格式返回，不要包含任何其他文字。"
-            }),
-            serde_json::json!({
-                "role": "user",
-                "content": [
-                    {
-                        "type": "text",
-                        "text": prompt
-                    },
-                    {
-                        "type": "image_url",
-                        "image_url": {
-                            "url": format!("data:image/png;base64,{}", request.screenshot_before)
-                        }
-                    },
-                    {
-                        "type": "image_url",
-                        "image_url": {
-                            "url": format!("data:image/png;base64,{}", request.screenshot_after)
-                        }
-                    }
-                ]
-            }),
-        ];
-
-        // 调用 LLM API
-        let client = reqwest::Client::new();
-        let response = client
-            .post(&self.api_endpoint)
-            .header("Authorization", format!("Bearer {}", self.api_key))
-            .header("Content-Type", "application/json")
-            .json(&serde_json::json!({
-                "model": self.model,
-                "messages": messages,
-                "temperature": 0.8,
-                "max_tokens": 2000,
-                "response_format": { "type": "json_object" }
-            }))
-            .send()
-            .await
-            .map_err(|e| format!("API 请求失败: {}", e))?;
-
-        if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            return Err(format!("API 返回错误 {}: {}", status, error_text));
+        // 处理第一张截图
+        if !request.screenshot_before.is_empty() {
+            match Self::sanitize_base64_image(&request.screenshot_before) {
+                Ok(clean_img) => {
+                    images.push(clean_img);
+                    println!("✅ 前截图有效，已添加");
+                }
+                Err(e) => {
+                    println!("⚠️ 前截图无效，已跳过: {}", e);
+                }
+            }
+        } else {
+            println!("⚠️ 前截图为空，已跳过");
         }
+        
+        // 处理第二张截图
+        if !request.screenshot_after.is_empty() {
+            match Self::sanitize_base64_image(&request.screenshot_after) {
+                Ok(clean_img) => {
+                    images.push(clean_img);
+                    println!("✅ 后截图有效，已添加");
+                }
+                Err(e) => {
+                    println!("⚠️ 后截图无效，已跳过: {}", e);
+                }
+            }
+        } else {
+            println!("⚠️ 后截图为空，已跳过");
+        }
+        
+        println!("📊 有效截图数量: {}/2", images.len());
 
-        let response_json: serde_json::Value = response
-            .json()
+        // 构建提示词
+        let user_prompt = self.build_prompt(&request, images.len());
+        let system_prompt = "你是一个直播间互动分析专家。根据主播的语音和游戏画面变化，为每个AI员工生成自然、有趣、符合其性格的弹幕回复。\n\n你必须严格按照以下JSON格式返回，不要包含任何其他文字：\n{\n  \"actions\": [\n    {\n      \"employee\": \"员工ID\",\n      \"content\": \"弹幕内容\",\n      \"gift\": false\n    }\n  ]\n}";
+
+        // 调用 OpenAI Multi-Vision API
+        let ai_response = self.client
+            .chat_with_multi_vision(system_prompt, &user_prompt, &images)
             .await
-            .map_err(|e| format!("解析响应失败: {}", e))?;
+            .map_err(|e| format!("AI API 调用失败: {}", e))?;
 
-        // 提取 AI 返回的内容
-        let content = response_json["choices"][0]["message"]["content"]
-            .as_str()
-            .ok_or("无法获取 AI 响应内容")?;
+        println!("✅ AI 返回: {}", ai_response);
 
-        println!("✅ AI 返回: {}", content);
+        // 解析 JSON 响应
+        let response: AIAnalysisResponse = serde_json::from_str(&ai_response)
+            .map_err(|e| format!("解析 AI 响应 JSON 失败: {}\n原始响应: {}", e, ai_response))?;
 
-        // 解析 JSON
-        let ai_response: AIAnalysisResponse = serde_json::from_str(content)
-            .map_err(|e| format!("解析 AI 响应 JSON 失败: {}", e))?;
+        println!("✅ AI 分析完成，生成 {} 个员工行为", response.actions.len());
 
-        println!("✅ AI 分析完成，生成 {} 个员工行为", ai_response.actions.len());
+        Ok(response)
+    }
 
-        Ok(ai_response)
+    /// 净化 base64 图片字符串
+    /// 
+    /// 功能:
+    /// 1. 去除 data:image/...;base64, 前缀 (如果有)
+    /// 2. 移除换行符和空白字符
+    /// 3. 校验 base64 格式是否有效
+    /// 4. 确保解码后的数据不为空
+    fn sanitize_base64_image(s: &str) -> Result<String, String> {
+        let mut cleaned = s.trim().to_string();
+        
+        // 0. 检查原始字符串是否为空
+        if cleaned.is_empty() {
+            return Err("base64 字符串为空".to_string());
+        }
+        
+        // 1. 去除 data URL 前缀
+        if let Some(comma_idx) = cleaned.find(',') {
+            // 先复制前缀用于日志，避免借用冲突
+            let prefix = cleaned[..comma_idx].to_string();
+            if prefix.starts_with("data:") && prefix.contains("base64") {
+                cleaned = cleaned[comma_idx + 1..].to_string();
+                println!("🧹 检测到 data URL 前缀，已移除: {}", prefix);
+            }
+        }
+        
+        // 2. 移除所有换行符和空白字符
+        cleaned.retain(|c| !c.is_whitespace());
+        
+        // 3. 校验 base64 格式
+        match general_purpose::STANDARD.decode(&cleaned) {
+            Ok(decoded) => {
+                // 4. 检查解码后的数据是否为空
+                if decoded.is_empty() {
+                    println!("❌ base64 解码后数据为空");
+                    return Err("base64 解码后数据为空".to_string());
+                }
+                
+                println!("✅ base64 图片校验成功 (解码后大小: {} bytes)", decoded.len());
+                Ok(cleaned)
+            }
+            Err(e) => {
+                println!("❌ base64 图片格式无效: {}", e);
+                println!("   原始字符串长度: {}", s.len());
+                println!("   清理后字符串长度: {}", cleaned.len());
+                println!("   前 50 字符: {}", &cleaned.chars().take(50).collect::<String>());
+                Err(format!("无效的 base64 图片格式: {}", e))
+            }
+        }
     }
 
     /// 构建提示词
-    fn build_prompt(&self, request: &AIAnalysisRequest) -> String {
+    fn build_prompt(&self, request: &AIAnalysisRequest, screenshot_count: usize) -> String {
+        let screenshot_info = match screenshot_count {
+            0 => "（没有游戏截图，仅根据语音内容分析）",
+            1 => "- 图片：主播说话时的游戏状态\n请分析游戏画面中的内容",
+            2 => "- 图片1：主播开始说话时的游戏状态\n- 图片2：主播结束说话时的游戏状态\n请分析游戏画面中发生了什么变化（如角色移动、战斗、得分等）",
+            _ => "- 多张游戏截图\n请分析游戏画面变化",
+        };
+        
         let mut prompt = format!(
             "# 直播间互动分析任务\n\n\
             ## 主播语音识别结果\n\
             \"{}\"\n\n\
             ## 游戏画面变化\n\
-            - 图片1：主播开始说话时的游戏状态\n\
-            - 图片2：主播结束说话时的游戏状态\n\
-            请分析游戏画面中发生了什么变化（如角色移动、战斗、得分等）\n\n\
+            {}\n\n\
             ## AI 员工信息\n",
-            request.streamer_speech
+            request.streamer_speech,
+            screenshot_info
         );
 
         // 添加每个员工的信息

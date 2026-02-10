@@ -88,7 +88,9 @@ export const ConversationArea: React.FC<ConversationAreaProps> = ({
         }}
       >
         <div className="message-header">
-          <span className="message-role">{isUser ? "玩家" : "AI 助手"}</span>
+          <span className="message-role">
+            {isUser ? "玩家" : msg.nickname || "AI 助手"}
+          </span>
           <span className="message-time">
             {new Date(msg.timestamp).toLocaleTimeString()}
           </span>

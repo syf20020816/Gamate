@@ -44,6 +44,29 @@ pub async fn save_simulation_config(
 ) -> Result<(), String> {
     let mut settings = AppSettings::load().map_err(|e| e.to_string())?;
     
+    // ✅ 检查员工昵称是否重复
+    use std::collections::HashSet;
+    let mut nickname_set = HashSet::new();
+    let mut duplicate_nicknames = Vec::new();
+    
+    for emp in &config.employees {
+        let nickname = emp.nickname.trim();
+        if nickname.is_empty() {
+            return Err("员工昵称不能为空".to_string());
+        }
+        
+        if !nickname_set.insert(nickname.to_string()) {
+            duplicate_nicknames.push(nickname.to_string());
+        }
+    }
+    
+    if !duplicate_nicknames.is_empty() {
+        return Err(format!(
+            "员工昵称重复: {}。每个员工必须有唯一的昵称！",
+            duplicate_nicknames.join(", ")
+        ));
+    }
+    
     // 更新直播间配置
     settings.simulation.livestream.online_users = config.livestream.online_users;
     settings.simulation.livestream.room_name = config.livestream.room_name;

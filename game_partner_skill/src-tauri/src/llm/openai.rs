@@ -143,6 +143,79 @@ impl OpenAIClient {
 
         Ok(content)
     }
+
+    /// 调用 GPT Vision 模型 (带多张图片)
+    pub async fn chat_with_multi_vision(
+        &self,
+        system_prompt: &str,
+        user_prompt: &str,
+        images_base64: &[String],
+    ) -> Result<String> {
+        log::info!("👁️  调用 OpenAI Multi-Vision API: {} ({} 张图片)", 
+                  self.settings.model_name, images_base64.len());
+
+        // 构建内容数组（文本 + 多张图片）
+        let mut content_parts = vec![
+            // 文本内容
+            async_openai::types::ChatCompletionRequestMessageContentPart::Text(
+                async_openai::types::ChatCompletionRequestMessageContentPartText {
+                    text: user_prompt.to_string(),
+                }
+            ),
+        ];
+
+        // 添加所有图片
+        for img_base64 in images_base64 {
+            let image_url = format!("data:image/png;base64,{}", img_base64);
+            content_parts.push(
+                async_openai::types::ChatCompletionRequestMessageContentPart::ImageUrl(
+                    async_openai::types::ChatCompletionRequestMessageContentPartImage {
+                        image_url: async_openai::types::ImageUrl {
+                            url: image_url,
+                            detail: Some(ImageDetail::Auto),
+                        }
+                    }
+                )
+            );
+        }
+
+        let messages = vec![
+            ChatCompletionRequestMessage::System(
+                ChatCompletionRequestSystemMessageArgs::default()
+                    .content(system_prompt)
+                    .build()?
+            ),
+            ChatCompletionRequestMessage::User(
+                ChatCompletionRequestUserMessageArgs::default()
+                    .content(ChatCompletionRequestUserMessageContent::Array(content_parts))
+                    .build()?
+            ),
+        ];
+
+        let request = CreateChatCompletionRequestArgs::default()
+            .model(&self.settings.model_name)
+            .messages(messages)
+            .temperature(self.settings.temperature)
+            .max_tokens(self.settings.max_tokens)
+            .build()?;
+
+        let response = self.client
+            .chat()
+            .create(request)
+            .await
+            .map_err(|e| anyhow!("OpenAI Multi-Vision API 调用失败: {}", e))?;
+
+        let content = response
+            .choices
+            .first()
+            .and_then(|choice| choice.message.content.clone())
+            .ok_or_else(|| anyhow!("OpenAI Multi-Vision 返回空内容"))?;
+
+        log::info!("✅ OpenAI Multi-Vision 响应成功 ({} tokens)", 
+            response.usage.map(|u| u.total_tokens).unwrap_or(0));
+
+        Ok(content)
+    }
 }
 
 #[cfg(test)]

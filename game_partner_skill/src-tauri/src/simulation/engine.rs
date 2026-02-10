@@ -32,6 +32,8 @@ pub struct SimulationEngine {
     pub employees: Vec<EmployeeConfig>,
     gift_frequency: String,
     pub ai_analyzer: Option<AIAnalyzer>,
+    /// 🔥 智能模式开关：true = 等待语音触发, false = 自动循环发送
+    pub enable_smart_mode: bool,
 }
 
 impl SimulationEngine {
@@ -43,6 +45,7 @@ impl SimulationEngine {
             employees: Vec::new(),
             gift_frequency: "medium".to_string(),
             ai_analyzer: None,
+            enable_smart_mode: true,  // 🔥 默认启用智能模式
         }
     }
 
@@ -99,9 +102,14 @@ impl SimulationEngine {
         // 触发开播事件
         self.trigger_stream_start().await;
 
-        // 启动各个员工的事件循环
-        for employee in &self.employees {
-            self.spawn_employee_loop(employee.clone());
+        // 🔥 只有在非智能模式下才启动自动循环
+        if !self.enable_smart_mode {
+            println!("🤖 传统模式：启动自动弹幕循环");
+            for employee in &self.employees {
+                self.spawn_employee_loop(employee.clone());
+            }
+        } else {
+            println!("🤖 智能模式已启用，等待主播语音触发 AI 互动");
         }
 
         Ok(())

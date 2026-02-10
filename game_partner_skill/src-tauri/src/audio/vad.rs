@@ -230,6 +230,11 @@ impl VoiceActivityDetector {
             .map(|start| Instant::now().duration_since(start).as_secs_f32())
             .unwrap_or(0.0)
     }
+    
+    /// 获取音量阈值
+    pub fn volume_threshold(&self) -> f32 {
+        self.config.volume_threshold
+    }
 }
 
 #[cfg(test)]

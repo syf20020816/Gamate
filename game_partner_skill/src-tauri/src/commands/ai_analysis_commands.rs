@@ -19,6 +19,11 @@ pub async fn trigger_ai_analysis(
     state: State<'_, SimulationState>,
     request: AIAnalysisRequest,
 ) -> Result<String, String> {
+    println!("🤖 ===== 收到 AI 分析请求 =====");
+    println!("  语音文本: {}", request.speech_text);
+    println!("  截图前大小: {} 字节", request.screenshot_before.len());
+    println!("  截图后大小: {} 字节", request.screenshot_after.len());
+    
     log::info!("🤖 收到 AI 分析请求");
     log::info!("  语音文本: {}", request.speech_text);
     log::info!("  截图数据: {}B / {}B", 
@@ -36,7 +41,8 @@ pub async fn trigger_ai_analysis(
                 engine.ai_analyzer.clone(),
             )
         } else {
-            return Err("直播间模拟未启动".to_string());
+            log::warn!("⚠️ 直播间已停止，忽略 AI 分析请求");
+            return Err("直播间模拟未启动，已忽略此请求".to_string());
         }
     };
 
@@ -82,6 +88,12 @@ pub async fn trigger_ai_analysis(
         Ok(response) => {
             log::info!("✅ AI 分析成功，生成 {} 个行为", response.actions.len());
             
+            // 🔥 打印所有 actions 详情
+            for (i, action) in response.actions.iter().enumerate() {
+                log::info!("  Action {}: employee={}, content={}, gift={}", 
+                    i + 1, action.employee, action.content, action.gift);
+            }
+            
             // 保存主播的话到所有员工的记忆
             for emp in &employees {
                 memory.add_message(&emp.id, "user", &request.speech_text);
@@ -89,14 +101,24 @@ pub async fn trigger_ai_analysis(
 
             // 执行 AI 决策的行为
             for action in response.actions {
-                // 查找对应的员工
-                let Some(employee) = employees.iter().find(|e| e.id == action.employee) else {
-                    log::warn!("⚠️ 未找到员工: {}", action.employee);
+                log::info!("🎯 开始处理 action: employee={}, content={}", action.employee, action.content);
+                
+                // 查找对应的员工（支持 ID 或昵称匹配）
+                let employee_opt = employees.iter().find(|e| {
+                    e.id == action.employee || e.nickname == action.employee
+                });
+                
+                let Some(employee) = employee_opt else {
+                    log::warn!("⚠️ 未找到员工: {} (尝试了 ID 和昵称匹配)", action.employee);
                     continue;
                 };
 
+                log::info!("✅ 匹配到员工: {} (ID: {})", employee.nickname, employee.id);
+
                 // 随机延迟 0.5-2 秒（让互动更自然）
                 let delay = 500 + (rand::random::<u64>() % 1500);
+                
+                log::info!("⏰ 将在 {}ms 后发送弹幕", delay);
                 
                 let app_clone = app.clone();
                 let emp_clone = employee.clone();
@@ -112,6 +134,7 @@ pub async fn trigger_ai_analysis(
                     use tauri::Emitter;
                     use crate::simulation::events::{SimulationEvent, EventType};
                     
+                    log::info!("🚀 异步任务开始: 将为 {} 发送弹幕", emp_clone.nickname);
                     sleep(Duration::from_millis(delay)).await;
                     
                     // 发送弹幕
@@ -124,6 +147,7 @@ pub async fn trigger_ai_analysis(
                         personality: emp_clone.personality.clone(),
                     });
 
+                    log::info!("📤 即将 emit 事件: {}", emp_clone.nickname);
                     let _ = app_clone.emit("simulation_event", event);
                     log::info!("💬 [{}] {}", emp_clone.nickname, content);
 

@@ -189,6 +189,12 @@ impl ContinuousListener {
                 match Self::resample_to_16khz(&audio_samples, actual_sample_rate) {
                     Ok(pcm_data) => {
                         println!("✅ 重采样成功: {} 字节 PCM 数据", pcm_data.len());
+                        
+                        // 💾 保存 WAV 文件到下载目录
+                        if let Err(e) = Self::save_wav_file(&pcm_data, 16000, duration) {
+                            log::error!("❌ 保存 WAV 文件失败: {}", e);
+                        }
+                        
                         Some((pcm_data, actual_sample_rate, duration))
                     },
                     Err(e) => {
@@ -324,21 +330,46 @@ impl ContinuousListener {
 
             // 获取音频数据
             let audio_chunk = recorder.take_audio_data();
+            
+            // 检查音频数据
             if audio_chunk.is_empty() {
                 continue;
             }
 
             // VAD 处理
-            let should_trigger_stt = {
+            let (should_trigger_stt, speech_ended_with_audio) = {
                 let mut state = state.lock().unwrap();
                 let old_vad_state = state.vad.state();
+                
                 let should_trigger = state.vad.process_audio(&audio_chunk);
 
                 // 检测状态变化,发送事件
                 let new_vad_state = state.vad.state();
+                
+                // 如果从 Speaking 切换到 Processing，立即取出音频数据
+                let audio_data_for_recognition = if old_vad_state == VadState::Speaking 
+                    && new_vad_state == VadState::Processing {
+                    let buffer = state.vad.take_audio_buffer();
+                    let duration = state.vad.recording_duration();
+                    
+                    if buffer.len() > 0 && duration >= 0.3 {
+                        println!("🎤 检测到停止说话 (时长: {:.2}s, {} 样本)", duration, buffer.len());
+                        log::info!("🎤 检测到停止说话 (时长: {:.2}s, {} 样本)", duration, buffer.len());
+                        Some((buffer, duration))
+                    } else {
+                        println!("⚠️ 语音过短或无数据，忽略");
+                        None
+                    }
+                } else {
+                    None
+                };
+                
+                // 🔍 只在状态真正变化时打印
                 if old_vad_state != new_vad_state {
                     match new_vad_state {
                         VadState::Speaking => {
+                            println!("🎤 检测到开始说话");
+                            log::info!("🎤 检测到开始说话");
                             let _ = event_tx.send(ListenerEvent::SpeechStarted);
                         }
                         VadState::Processing => {
@@ -347,31 +378,52 @@ impl ContinuousListener {
                                 duration_secs: duration,
                             });
                         }
-                        _ => {}
+                        VadState::Idle => {
+                            println!("🔄 VAD 状态恢复空闲");
+                            log::info!("🔄 VAD 状态恢复空闲");
+                        }
                     }
                 }
 
-                should_trigger
+                (should_trigger, audio_data_for_recognition)
             };
-
-            // 如果检测到语音结束,不再自动触发STT
-            // 原因: Windows STT有采样率问题,改用手动停止触发阿里云ASR
-            if should_trigger_stt {
-                // 不要取出音频数据,让它保留在VAD缓冲区中
-                // 等待用户手动停止时再处理
-                let buffer_size = {
-                    let state = state.lock().unwrap();
-                    state.vad.buffer_size()
-                };
-
-                log::info!("🎯 检测到语音结束, 音频: {} samples @ {} Hz (已缓存,等待手动停止)", 
-                          buffer_size, actual_sample_rate);
+            
+            // 在释放锁后处理音频识别（如果有的话）
+            if let Some((audio_samples, duration)) = speech_ended_with_audio {
+                // 计算实际采样率
+                let actual_sample_rate = (audio_samples.len() as f32 / duration) as u32;
                 
-                // 不执行自动STT,不取出音频数据,等待用户手动停止以触发阿里云ASR
-                // 这样可以避免Windows STT的采样率问题,并且保留音频数据
+                println!("🔄 开始重采样: {} 样本 从 {}Hz 到 16000Hz", audio_samples.len(), actual_sample_rate);
+                log::info!("🔄 计算的实际采样率: {} Hz (样本数: {}, 时长: {:.2}s)", 
+                          actual_sample_rate, audio_samples.len(), duration);
+                
+                // 重采样到16kHz
+                match Self::resample_to_16khz(&audio_samples, actual_sample_rate) {
+                    Ok(pcm_data) => {
+                        println!("✅ 重采样成功: {} 字节 PCM 数据", pcm_data.len());
+                        
+                        // 💾 保存 WAV 文件到下载目录
+                        if let Err(e) = Self::save_wav_file(&pcm_data, 16000, duration) {
+                            log::error!("❌ 保存 WAV 文件失败: {}", e);
+                        }
+                        
+                        // 发送识别请求
+                        println!("🚀 发送阿里云识别请求");
+                        if let Err(e) = event_tx.send(ListenerEvent::AliyunRecognizeRequest {
+                            pcm_data,
+                            sample_rate: actual_sample_rate,
+                            duration_secs: duration,
+                        }) {
+                            println!("❌ 发送识别请求失败: {}", e);
+                            log::error!("❌ 发送识别请求失败: {}", e);
+                        }
+                    },
+                    Err(e) => {
+                        println!("❌ 重采样失败: {}", e);
+                        log::error!("❌ 重采样失败: {}", e);
+                    }
+                }
             }
-
-            // 等待下一次处理
         }
 
         // 停止录音
@@ -449,6 +501,52 @@ impl ContinuousListener {
                   samples.len(), resampled_samples.len(), pcm_data.len());
         
         Ok(pcm_data)
+    }
+
+    /// 保存 WAV 文件到下载目录
+    fn save_wav_file(pcm_data: &[u8], sample_rate: u32, duration: f32) -> Result<()> {
+        use std::fs::File;
+        use std::io::Write;
+        
+        // 生成文件名（时间戳）
+        let timestamp = chrono::Local::now().format("%Y%m%d_%H%M%S");
+        let filename = format!("voice_{}_{:.1}s.wav", timestamp, duration);
+        let filepath = format!(r"C:\Users\Administrator\Downloads\{}", filename);
+        
+        // 创建 WAV 文件
+        let mut file = File::create(&filepath)
+            .context(format!("创建 WAV 文件失败: {}", filepath))?;
+        
+        // 写入 WAV 头
+        let num_samples = pcm_data.len() / 2; // 16-bit = 2 bytes per sample
+        let byte_rate = sample_rate * 2; // 16-bit mono
+        let data_size = pcm_data.len() as u32;
+        let file_size = 36 + data_size;
+        
+        // RIFF header
+        file.write_all(b"RIFF")?;
+        file.write_all(&file_size.to_le_bytes())?;
+        file.write_all(b"WAVE")?;
+        
+        // fmt chunk
+        file.write_all(b"fmt ")?;
+        file.write_all(&16u32.to_le_bytes())?; // chunk size
+        file.write_all(&1u16.to_le_bytes())?;  // audio format (1 = PCM)
+        file.write_all(&1u16.to_le_bytes())?;  // num channels (1 = mono)
+        file.write_all(&sample_rate.to_le_bytes())?;
+        file.write_all(&byte_rate.to_le_bytes())?;
+        file.write_all(&2u16.to_le_bytes())?;  // block align (2 = 16-bit mono)
+        file.write_all(&16u16.to_le_bytes())?; // bits per sample
+        
+        // data chunk
+        file.write_all(b"data")?;
+        file.write_all(&data_size.to_le_bytes())?;
+        file.write_all(pcm_data)?;
+        
+        println!("💾 已保存语音文件: {}", filepath);
+        log::info!("💾 已保存语音文件: {} ({:.1}s, {} bytes)", filepath, duration, pcm_data.len());
+        
+        Ok(())
     }
 }
 

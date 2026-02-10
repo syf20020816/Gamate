@@ -7,7 +7,7 @@
 /// 4. 将双截图+语音文本发送给多模态 AI 分析
 ///
 /// VAD 配置优化（直播间场景）：
-/// - 音量阈值：0.035（避免游戏音效误触发）
+/// - 音量阈值：0.008（适合人声检测，过滤背景噪音）
 /// - 静音判定：2.5秒（允许主播思考暂停）
 /// - 最短语音：0.5秒（过滤短促噪音）
 /// - 最长语音：60秒（支持连续讲解）
@@ -34,6 +34,12 @@ pub enum SmartCaptureEvent {
     /// 开始说话（已截图）
     SpeechStarted {
         screenshot_start: Screenshot,
+        timestamp: u64,
+    },
+    /// 语音结束（仅截图，等待识别）
+    SpeechEndedWithScreenshot {
+        screenshot_end: Screenshot,
+        duration_secs: f32,
         timestamp: u64,
     },
     /// 结束说话（已截图+识别）
@@ -94,7 +100,7 @@ impl VadConfigDto {
     /// 直播间优化配置
     pub fn livestream_optimized() -> Self {
         Self {
-            volume_threshold: 0.035,          // 避免游戏音效误触发
+            volume_threshold: 1.0,            // 提高阈值，过滤键盘敲击等环境噪音
             silence_duration_secs: 2.5,       // 允许主播思考暂停
             min_speech_duration_secs: 0.5,    // 过滤短促噪音
             max_speech_duration_secs: 60.0,   // 支持连续讲解
@@ -267,22 +273,15 @@ impl SmartCaptureManager {
                     Ok(screenshot_end) => {
                         log::info!("📸 结束截图成功: {}x{}", screenshot_end.width, screenshot_end.height);
                         
-                        // 获取开始截图
-                        let screenshot_start = {
-                            let mut current = screenshot_start_ref.lock().unwrap();
-                            current.take()
+                        // 发送事件到前端（带截图数据）
+                        let event = SmartCaptureEvent::SpeechEndedWithScreenshot {
+                            screenshot_end: screenshot_end.clone(),
+                            duration_secs,
+                            timestamp: chrono::Utc::now().timestamp() as u64,
                         };
-
-                        if let Some(screenshot_start) = screenshot_start {
-                            log::info!("✅ 双截图准备完成，等待语音识别结果...");
-                            // 注意：语音识别结果会在 AliyunRecognizeRequest 事件中处理
-                            // 这里暂时不发送事件，等待识别完成
-                            
-                            // 临时存储结束截图，等待识别结果
-                            // TODO: 需要在 AliyunRecognizeRequest 事件中获取这两张截图
-                        } else {
-                            log::warn!("⚠️ 未找到开始截图，跳过本次双截图");
-                        }
+                        let _ = app.emit("smart_capture_event", event);
+                        
+                        log::info!("✅ 已发送结束截图到前端，等待语音识别结果...");
                     }
                     Err(e) => {
                         log::error!("❌ 结束截图失败: {}", e);
