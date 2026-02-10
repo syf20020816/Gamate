@@ -304,7 +304,7 @@ mod tests {
             }],
         };
 
-        let prompt = analyzer.build_prompt(&request);
+        let prompt = analyzer.build_prompt(&request, 0);
         assert!(prompt.contains("直播间互动分析任务"));
         assert!(prompt.contains("小明"));
         assert!(prompt.contains("损友男"));

@@ -170,7 +170,7 @@ const UserAgreement: React.FC = () => {
                 <Paragraph>
                   <Text strong>GitHub：</Text>{" "}
                   <Text code>
-                    https://github.com/yourusername/gamate
+                    https://github.com/syf20020816/Gamate
                   </Text>
                 </Paragraph>
                 <Paragraph type="secondary" style={{ marginTop: 32 }}>

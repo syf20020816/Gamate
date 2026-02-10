@@ -33,7 +33,7 @@
 □ 安装 Rust 工具链 (rustc 1.75+, cargo)
 □ 安装 Node.js 20+ 和 pnpm
 □ 创建 Tauri 项目
-  - pnpm create tauri-app game-partner-skill
+  - pnpm create tauri-app Gamate
   - 选择: React + TypeScript + pnpm
 □ 配置 Tauri 权限 (tauri.conf.json)
   - 允许截屏、文件系统访问
@@ -906,6 +906,7 @@
 - Day 5-7: ~~OCR~~ (已跳过 - 多模态模型替代)
 - Day 8-10: Wiki 爬虫系统 (Fandom/GitHub/Web + JSONL 输出)
 - Day 11-14: 向量数据库 (三种模式 + 语义检索)
+- Day 23-24: 弹幕与互动系统
 
 **✅ Week 3 已完成:**
 - **Day 15-17: RAG + LLM 集成** ✅
@@ -953,7 +954,6 @@
   - ✅ 文档: DAY22_COMPLETE_SUMMARY.md
 
 **📅 待开始:**
-- Day 23-24: 弹幕与互动系统
 - Day 25-26: UI 完善与测试
 
 ---

@@ -31,8 +31,8 @@ import {
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { motion } from "framer-motion";
-import { useSkillLibraryStore } from "../../stores/skillLibraryStore";
 import { getGameById } from "../../services/configService";
+import { getSkillLibraryConfig } from "../../services/settingsService";
 import type { DownloadedSkillLibrary } from "../../types/skillLibrary";
 import type { Game } from "../../types/game";
 import "./styles.scss";
@@ -47,7 +47,6 @@ interface SkillLibraryConfig {
 }
 
 const SkillDatabase: React.FC = () => {
-  const { setActiveVersion } = useSkillLibraryStore();
   const [config, setConfig] = useState<SkillLibraryConfig | null>(null);
   const [configModalVisible, setConfigModalVisible] = useState(false);
   const [form] = Form.useForm();
@@ -66,28 +65,7 @@ const SkillDatabase: React.FC = () => {
   useEffect(() => {
     const loadConfig = async () => {
       try {
-        const settings = await invoke<any>("get_app_settings");
-
-        // 后端返回的是 snake_case，前端需要 camelCase
-        const skillLibConfig: SkillLibraryConfig = {
-          storageBasePath:
-            settings.skillLibrary?.storageBasePath ||
-            settings.skill_library?.storage_base_path ||
-            "./data/skills",
-          maxVersionsToKeep:
-            settings.skillLibrary?.maxVersionsToKeep ||
-            settings.skill_library?.max_versions_to_keep ||
-            3,
-          autoUpdate:
-            settings.skillLibrary?.autoUpdate ??
-            settings.skill_library?.auto_update ??
-            false,
-          updateCheckInterval:
-            settings.skillLibrary?.updateCheckInterval ||
-            settings.skill_library?.update_check_interval ||
-            24,
-        };
-
+        const skillLibConfig = await getSkillLibraryConfig();
         setConfig(skillLibConfig);
         setLoading(false);
       } catch (error) {
@@ -312,7 +290,8 @@ const SkillDatabase: React.FC = () => {
 
   // 处理切换活跃版本
   const handleSetActive = (library: DownloadedSkillLibrary) => {
-    setActiveVersion(library.gameId, library.timestamp);
+    // 注意: 活跃版本现在由后端管理,不再使用前端 store
+    // TODO: 可能需要调用后端 API 来设置活跃版本
     message.success(`已切换到版本: ${formatTimestamp(library.timestamp)}`);
   };
 

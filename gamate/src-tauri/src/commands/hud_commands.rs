@@ -238,9 +238,7 @@ mod tests {
     #[test]
     fn test_hud_commands_exist() {
         // 确保命令函数存在
-        assert_eq!(
-            std::any::type_name::<fn(AppHandle) -> _>(),
-            std::any::type_name_of_val(&(open_hud_window as fn(AppHandle) -> _))
-        );
+        let _ = open_hud_window;
+        let _ = close_hud_window;
     }
 }

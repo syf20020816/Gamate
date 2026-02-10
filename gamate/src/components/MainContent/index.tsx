@@ -7,6 +7,7 @@ import WikiKnowledgeBase from "../WikiKnowledgeBase";
 import AIAssistant from "../AIAssistant";
 import UserAgreement from "../UserAgreement";
 import PrivacyPolicy from "../PrivacyPolicy";
+import SteamLogin from "../SteamLogin";
 import "./styles.scss";
 
 interface MainContentProps {
@@ -31,6 +32,8 @@ const MainContent: React.FC<MainContentProps> = ({ selectedMenu, onMenuChange })
       //   return <Logs />;
       case "settings":
         return <SettingsPanel />;
+      case "steam-login":
+        return <SteamLogin />;
       case "user-agreement":
         return <UserAgreement />;
       case "privacy-policy":

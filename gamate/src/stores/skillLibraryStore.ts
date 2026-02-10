@@ -80,7 +80,7 @@ export const useSkillLibraryStore = create<SkillLibraryState>()(
         })),
     }),
     {
-      name: 'game-partner-skill-library',
+      name: 'Gamate-library',
     }
   )
 );

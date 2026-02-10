@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   Card,
   Typography,
@@ -14,6 +14,8 @@ import {
   Progress,
   Flex,
   Empty,
+  Pagination,
+  Switch,
 } from "antd";
 import {
   Plus,
@@ -27,21 +29,19 @@ import {
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { useUserStore } from "../../stores/userStore";
-import { useSkillLibraryStore } from "../../stores/skillLibraryStore";
 import { GameType, GameTypeLabels, SkillStatus } from "../../types/game";
 import type { Game, GameSkillConfig } from "../../types/game";
-import type { DownloadedSkillLibrary } from "../../types/skillLibrary";
 import {
   getGames,
   getSkillConfigsByGameId,
 } from "../../services/configService";
+import { getSkillLibraryConfig } from "../../services/settingsService";
 import "./styles.scss";
 
 const { Title, Text, Paragraph } = Typography;
 
 const GameLibrary: React.FC = () => {
   const { addSelectedGame, removeSelectedGame } = useUserStore();
-  const { config, addDownloadedLibrary } = useSkillLibraryStore();
   const [searchText, setSearchText] = useState("");
   const [filterType, setFilterType] = useState<GameType | "all">("all");
   const [selectedGame, setSelectedGame] = useState<Game | null>(null);
@@ -53,38 +53,158 @@ const GameLibrary: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [selectedGameIds, setSelectedGameIds] = useState<string[]>([]);
   const [syncing, setSyncing] = useState(false);
+  const [storageBasePath, setStorageBasePath] = useState<string>("./data/skills");
+  
+  // Steam 相关状态
+  const [useSteamLibrary, setUseSteamLibrary] = useState(false);
+  const [steamUser, setSteamUser] = useState<any>(null);
+  const [steamGames, setSteamGames] = useState<any[]>([]);
+  
+  // 分页相关状态
+  const [currentPage, setCurrentPage] = useState(0);
+  const [pageSize] = useState(10);
+  const [totalGames, setTotalGames] = useState(0);
+  const [hasNextPage, setHasNextPage] = useState(false);
+  
+  // 缓存已加载的页面
+  const gamesCache = useRef<Map<number, Game[]>>(new Map());
+  const steamGamesCache = useRef<Map<number, any[]>>(new Map());
 
   // 从后端加载选中的游戏列表
+  // 加载配置和选中的游戏
   useEffect(() => {
-    const loadSelectedGames = async () => {
+    const loadData = async () => {
       try {
         const { invoke } = await import("@tauri-apps/api/core");
+        
+        // 加载技能库配置
+        const config = await getSkillLibraryConfig();
+        setStorageBasePath(config.storageBasePath);
+        
+        // 加载选中的游戏
         const settings = await invoke<any>("get_app_settings");
         const selected = settings?.user?.selected_games || [];
         setSelectedGameIds(selected);
       } catch (error) {
-        console.error("加载选中游戏失败:", error);
+        console.error("加载配置失败:", error);
       }
     };
-    loadSelectedGames();
+    loadData();
   }, []);
 
-  // 从后端加载游戏列表
+  // 检查 Steam 登录状态
   useEffect(() => {
-    const loadGames = async () => {
+    const checkSteamUser = async () => {
+      try {
+        const { invoke } = await import("@tauri-apps/api/core");
+        const user = await invoke<any>("get_current_steam_user");
+        if (user) {
+          setSteamUser(user);
+          setUseSteamLibrary(true);
+          // 加载 Steam 游戏库
+          await loadSteamLibrary();
+        }
+      } catch (error) {
+        console.log("未登录 Steam");
+      }
+    };
+    checkSteamUser();
+  }, []);
+
+  // 加载 Steam 游戏库（分页）
+  const loadSteamLibrary = useCallback(async () => {
+    try {
+      const { invoke } = await import("@tauri-apps/api/core");
+      const library = await invoke<any>("fetch_steam_library", {
+        includeFreeGames: true, // 包含免费游戏
+      });
+      setSteamGames(library || []);
+      setTotalGames(library?.length || 0);
+    } catch (error) {
+      console.error("加载 Steam 游戏库失败:", error);
+      message.error("加载 Steam 游戏库失败");
+    }
+  }, []);
+
+  // 从后端分页加载游戏列表（默认游戏库或 Steam）
+  const loadGamesPage = useCallback(
+    async (page: number) => {
+      // 检查缓存
+      const cacheKey = useSteamLibrary ? steamGamesCache : gamesCache;
+      if (cacheKey.current.has(page)) {
+        const cachedGames = cacheKey.current.get(page)!;
+        setGames(cachedGames);
+        return;
+      }
+
       try {
         setLoading(true);
-        const loadedGames = await getGames();
-        setGames(loadedGames);
+
+        if (useSteamLibrary && steamGames.length > 0) {
+          // 使用 Steam 游戏库（前端分页）
+          const start = page * pageSize;
+          const end = Math.min(start + pageSize, steamGames.length);
+          const pageGames = steamGames.slice(start, end);
+          
+          // 转换为统一的 Game 格式
+          const convertedGames: Game[] = pageGames.map((game: any) => ({
+            id: `steam_${game.appid}`,
+            name: game.name,
+            nameEn: game.name,
+            category: GameType.Other, // Steam 游戏默认分类
+            description: `总游玩时间: ${Math.floor((game.playtime_forever || 0) / 60)} 小时`,
+            tags: ["Steam"],
+            banner: `https://steamcdn-a.akamaihd.net/steam/apps/${game.appid}/header.jpg`,
+            icon: game.img_icon_url || "",
+            // Steam 游戏没有预定义的 skill_configs，在后端动态生成
+          }));
+
+          setGames(convertedGames);
+          setHasNextPage(end < steamGames.length);
+          steamGamesCache.current.set(page, convertedGames);
+        } else {
+          // 使用默认游戏库（全量加载后前端分页）
+          if (page === 0 || !gamesCache.current.has(0)) {
+            const allGames = await getGames();
+            const start = page * pageSize;
+            const end = Math.min(start + pageSize, allGames.length);
+            const pageGames = allGames.slice(start, end);
+            
+            setGames(pageGames);
+            setTotalGames(allGames.length);
+            setHasNextPage(end < allGames.length);
+            
+            // 缓存全部游戏（分页）
+            for (let i = 0; i < Math.ceil(allGames.length / pageSize); i++) {
+              const s = i * pageSize;
+              const e = Math.min(s + pageSize, allGames.length);
+              gamesCache.current.set(i, allGames.slice(s, e));
+            }
+          } else {
+            const cachedGames = gamesCache.current.get(page)!;
+            setGames(cachedGames);
+          }
+        }
       } catch (error) {
         console.error("加载游戏列表失败:", error);
         message.error("加载游戏列表失败");
       } finally {
         setLoading(false);
       }
-    };
-    loadGames();
-  }, []);
+    },
+    [useSteamLibrary, steamGames, pageSize]
+  );
+
+  // 初始加载第一页
+  useEffect(() => {
+    loadGamesPage(0);
+  }, [loadGamesPage]);
+
+  // 页码变化时加载对应页
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page - 1); // Ant Design Pagination 从 1 开始
+    loadGamesPage(page - 1);
+  };
 
   // 当选择游戏时加载其技能配置
   useEffect(() => {
@@ -132,19 +252,68 @@ const GameLibrary: React.FC = () => {
     }
   };
 
-  // 过滤游戏
-  const filteredGames = games.filter((game) => {
-    const matchSearch =
-      game.name.toLowerCase().includes(searchText.toLowerCase()) ||
-      game.nameEn?.toLowerCase().includes(searchText.toLowerCase());
-    const matchType = filterType === "all" || game.category === filterType;
-    return matchSearch && matchType;
-  });
+  // 切换游戏源（Steam / 默认库）
+  const handleToggleGameSource = (checked: boolean) => {
+    setUseSteamLibrary(checked);
+    setCurrentPage(0);
+    gamesCache.current.clear();
+    steamGamesCache.current.clear();
+    loadGamesPage(0);
+  };
 
-  console.warn(games);
-
-  const handleAddGame = (game: Game) => {
+  const handleAddGame = async (game: Game) => {
     setSelectedGame(game);
+    
+    // 如果是 Steam 游戏,动态获取 wiki 配置
+    if (game.id.startsWith('steam_')) {
+      try {
+        const { invoke } = await import("@tauri-apps/api/core");
+        const appid = parseInt(game.id.replace('steam_', ''));
+        
+        // 从后端获取 SkillConfig
+        const backendConfigs = await invoke<Array<{
+          id: string;
+          name: string;
+          description: string;
+          repo: string;
+          version: string;
+          source_type: string;
+          max_pages?: number;
+          max_depth?: number;
+          request_delay_ms?: number;
+        }>>('get_steam_game_wiki_configs', { 
+          appid, 
+          gameName: game.name 
+        });
+        
+        // 转换为 GameSkillConfig 格式
+        const convertedConfigs: GameSkillConfig[] = backendConfigs.map(skill => ({
+          id: skill.id,
+          gameId: game.id,
+          repo: skill.repo,
+          name: skill.name,
+          description: skill.description,
+          version: skill.version,
+          source: skill.source_type as any,
+          status: SkillStatus.NotDownloaded,
+          statistics: {
+            totalEntries: 0,
+            vectorCount: 0,
+            storageSize: 0,
+          },
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        }));
+        
+        setSkillConfigs(convertedConfigs);
+      } catch (error) {
+        console.error('获取 Steam 游戏 Wiki 配置失败:', error);
+        message.error('获取游戏 Wiki 配置失败');
+        return;
+      }
+    }
+    // 默认游戏使用现有的配置加载逻辑(在 useEffect 中已加载)
+    
     setSkillModalVisible(true);
   };
 
@@ -159,7 +328,7 @@ const GameLibrary: React.FC = () => {
     try {
       // 生成时间戳（秒级）
       const timestamp = Math.floor(Date.now() / 1000);
-      const storagePath = `${config.storageBasePath}\\${selectedGame.id}\\${timestamp}`;
+      const storagePath = `${storageBasePath}\\${selectedGame.id}\\${timestamp}`;
 
       // 模拟下载进度
       progressInterval = setInterval(() => {
@@ -194,26 +363,7 @@ const GameLibrary: React.FC = () => {
         throw new Error("下载失败：未获取到任何内容");
       }
 
-      // 创建技能库记录
-      const library: DownloadedSkillLibrary = {
-        id: `lib_${timestamp}_${selectedGame.id}`,
-        gameId: selectedGame.id,
-        gameName: selectedGame.name,
-        skillConfigId: skillConfig.id,
-        skillConfigName: skillConfig.name,
-        version: skillConfig.version,
-        timestamp,
-        storagePath,
-        storageSize: result.totalBytes || 0,
-        downloadedAt: new Date().toISOString(),
-        statistics: {
-          totalEntries: result.totalEntries || 0,
-          vectorCount: result.totalEntries || 0,
-        },
-        status: "active",
-      };
-
-      addDownloadedLibrary(library);
+      // 注意: 下载的库信息现在存储在后端,不再使用前端 store
 
       // 保存到后端配置
       const { invoke: invoke2 } = await import("@tauri-apps/api/core");
@@ -343,30 +493,42 @@ const GameLibrary: React.FC = () => {
             }
           }}
         >
-          <Input
-            placeholder="搜索游戏名称..."
-            prefix={<Search size={16} />}
-            value={searchText}
-            onChange={(e) => setSearchText(e.target.value)}
-            style={{ width: 300 }}
-            allowClear
-          />
-          <Select
-            value={filterType}
-            onChange={setFilterType}
-            style={{ width: 150 }}
-            suffixIcon={<Filter size={16} />}
-          >
-            <Select.Option value="all">全部类型</Select.Option>
-            {Object.entries(GameTypeLabels).map(([key, label]) => (
-              <Select.Option key={key} value={key}>
-                {label}
-              </Select.Option>
-            ))}
-          </Select>
+          <Space size="middle" style={{ flex: 1 }}>
+            <Input
+              placeholder="搜索游戏名称..."
+              prefix={<Search size={16} />}
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value)}
+              style={{ width: 300 }}
+              allowClear
+            />
+            <Select
+              value={filterType}
+              onChange={setFilterType}
+              style={{ width: 150 }}
+              suffixIcon={<Filter size={16} />}
+            >
+              <Select.Option value="all">全部类型</Select.Option>
+              {Object.entries(GameTypeLabels).map(([key, label]) => (
+                <Select.Option key={key} value={key}>
+                  {label}
+                </Select.Option>
+              ))}
+            </Select>
+            {steamUser && (
+              <Space>
+                <Text type="secondary">使用 Steam 游戏库</Text>
+                <Switch
+                  checked={useSteamLibrary}
+                  onChange={handleToggleGameSource}
+                  checkedChildren="Steam"
+                  unCheckedChildren="默认"
+                />
+              </Space>
+            )}
+          </Space>
           <Tooltip title="检测已下载的技能库并同步到配置">
             <Button
-              style={{ flex: 1 }}
               icon={<RefreshCw size={18} />}
               onClick={handleSyncLibraries}
               loading={syncing}
@@ -382,99 +544,115 @@ const GameLibrary: React.FC = () => {
             <Empty description="正在加载游戏列表..." />
           </Card>
         ) : (
-          <Flex wrap="wrap" gap={16} align="flex-start" justify="space-between">
-            {filteredGames.map((game, index) => {
-              const isAdded = selectedGameIds.includes(game.id);
+          <>
+            <Flex wrap="wrap" gap={16} align="flex-start" justify="space-between">
+              {games.map((game, index) => {
+                const isAdded = selectedGameIds.includes(game.id);
 
-              return (
-                <div key={game.id} style={{ width: "46%", minWidth: 240 }}>
-                  <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: index * 0.05 }}
-                  >
-                    <Card
-                      hoverable
-                      className={`game-card ${isAdded ? "game-card-added" : ""}`}
-                      cover={
-                        <div className="game-banner">
-                          <div className="game-banner-placeholder">
-                            <img
-                              src={game.banner}
-                              alt={game.icon || game.name[0]}
-                            />
-                          </div>
-                          {isAdded && (
-                            <div className="added-overlay">
-                              <CheckCircle size={48} />
+                return (
+                  <div key={game.id} style={{ width: "46%", minWidth: 240 }}>
+                    <motion.div
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: index * 0.05 }}
+                    >
+                      <Card
+                        hoverable
+                        className={`game-card ${isAdded ? "game-card-added" : ""}`}
+                        cover={
+                          <div className="game-banner">
+                            <div className="game-banner-placeholder">
+                              <img
+                                src={game.banner}
+                                alt={game.icon || game.name[0]}
+                              />
                             </div>
+                            {isAdded && (
+                              <div className="added-overlay">
+                                <CheckCircle size={48} />
+                              </div>
+                            )}
+                          </div>
+                        }
+                      >
+                        <Card.Meta
+                          title={
+                            <Space
+                              style={{
+                                width: "100%",
+                                justifyContent: "space-between",
+                              }}
+                            >
+                              <span>{game.name}</span>
+                              <Tag color="blue">
+                                {GameTypeLabels[game.category]}
+                              </Tag>
+                            </Space>
+                          }
+                          description={
+                            <div className="game-description">
+                              <Paragraph
+                                ellipsis={{ rows: 2 }}
+                                type="secondary"
+                                style={{ marginBottom: 8 }}
+                              >
+                                {game.description}
+                              </Paragraph>
+                              <Space size={4} wrap>
+                                {game.tags.slice(0, 3).map((tag) => (
+                                  <Tag key={tag} style={{ margin: 0 }}>
+                                    {tag}
+                                  </Tag>
+                                ))}
+                              </Space>
+                            </div>
+                          }
+                        />
+
+                        <div className="game-footer">
+                          <Space size="small">
+                            <Text type="secondary" style={{ fontSize: 12 }}>
+                              技能库可用
+                            </Text>
+                          </Space>
+                          {!isAdded ? (
+                            <Button
+                              type="primary"
+                              icon={<Plus size={16} />}
+                              onClick={() => handleAddGame(game)}
+                            >
+                              添加
+                            </Button>
+                          ) : (
+                            <Button
+                              danger
+                              onClick={() => handleRemoveGame(game.id)}
+                            >
+                              移除
+                            </Button>
                           )}
                         </div>
-                      }
-                    >
-                      <Card.Meta
-                        title={
-                          <Space
-                            style={{
-                              width: "100%",
-                              justifyContent: "space-between",
-                            }}
-                          >
-                            <span>{game.name}</span>
-                            <Tag color="blue">
-                              {GameTypeLabels[game.category]}
-                            </Tag>
-                          </Space>
-                        }
-                        description={
-                          <div className="game-description">
-                            <Paragraph
-                              ellipsis={{ rows: 2 }}
-                              type="secondary"
-                              style={{ marginBottom: 8 }}
-                            >
-                              {game.description}
-                            </Paragraph>
-                            <Space size={4} wrap>
-                              {game.tags.slice(0, 3).map((tag) => (
-                                <Tag key={tag} style={{ margin: 0 }}>
-                                  {tag}
-                                </Tag>
-                              ))}
-                            </Space>
-                          </div>
-                        }
-                      />
-
-                      <div className="game-footer">
-                        <Space size="small">
-                          <Text type="secondary" style={{ fontSize: 12 }}>
-                            技能库可用
-                          </Text>
-                        </Space>
-                        {!isAdded ? (
-                          <Button
-                            type="primary"
-                            icon={<Plus size={16} />}
-                            onClick={() => handleAddGame(game)}
-                          >
-                            添加
-                          </Button>
-                        ) : (
-                          <Button
-                            danger
-                            onClick={() => handleRemoveGame(game.id)}
-                          >
-                            移除
-                          </Button>
-                        )}
-                      </div>
-                    </Card>
-                  </motion.div>
-                </div>
-              );
-            })}
-          </Flex>
+                      </Card>
+                    </motion.div>
+                  </div>
+                );
+              })}
+            </Flex>
+            
+            {/* 分页组件 - 简单模式 */}
+            {totalGames > pageSize && (
+              <div style={{ marginTop: 24, textAlign: "center" }}>
+                <Pagination
+                  simple
+                  current={currentPage + 1}
+                  total={totalGames}
+                  pageSize={pageSize}
+                  onChange={handlePageChange}
+                  showSizeChanger={false}
+                />
+              </div>
+            )}
+          </>
         )}
       </motion.div>
 
@@ -506,7 +684,7 @@ const GameLibrary: React.FC = () => {
                   </div>
                   <Progress percent={downloadProgress} status="active" />
                   <Text type="secondary" style={{ fontSize: 12 }}>
-                    下载完成后将自动保存到: {config.storageBasePath}
+                    下载完成后将自动保存到: {storageBasePath}
                   </Text>
                 </Space>
               </div>

@@ -34,12 +34,33 @@ pub struct UserSettings {
     /// 用户选择的游戏列表
     #[serde(default)]
     pub selected_games: Vec<String>,
+    /// Steam 用户信息
+    #[serde(default)]
+    pub steam: Option<SteamUserData>,
+}
+
+/// Steam 用户数据
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub struct SteamUserData {
+    /// Steam ID
+    pub steamid: String,
+    /// 用户名
+    pub personaname: String,
+    /// 个人资料 URL
+    pub profileurl: String,
+    /// 头像 URL
+    pub avatar: String,
+    /// 最后登录时间（时间戳）
+    #[serde(default)]
+    pub last_login: Option<u64>,
 }
 
 impl Default for UserSettings {
     fn default() -> Self {
         Self {
             selected_games: Vec::new(),
+            steam: None,
         }
     }
 }

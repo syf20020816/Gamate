@@ -11,12 +11,20 @@ mod rag;
 mod screenshot;
 mod settings;
 mod simulation; // 新增模拟系统
+pub mod steam_api; // Steam API 集成 (public for examples)
+pub mod steam_auth; // Steam 登录和用户数据
+mod steam_config; // Steam 配置（编译时）
+mod steam_wiki_mapper; // Steam 游戏 Wiki 映射
 mod tray;
 mod tts;
 pub mod vector_db;
 
 use commands::*;
 use config::Config;
+
+// 导入 Steam 认证状态
+use commands::steam_auth_commands::SteamAuthState;
+use crate::steam_wiki_commands::get_steam_game_wiki_configs;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -54,6 +62,9 @@ pub fn run() {
     let simulation_state = simulation_engine_commands::SimulationState::new();
     let smart_capture_state = smart_capture_commands::SmartCaptureState::new();
 
+    // 初始化 Steam 认证状态
+    let steam_auth_state = SteamAuthState::default();
+
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
@@ -62,6 +73,7 @@ pub fn run() {
         .manage(audio_state) // 注入音频状态
         .manage(simulation_state) // 注入模拟状态
         .manage(smart_capture_state) // 注入智能截图状态
+        .manage(steam_auth_state) // 注入 Steam 认证状态
         .setup(|app| {
             // 创建系统托盘
             tray::create_tray(app.handle())?;
@@ -161,6 +173,20 @@ pub fn run() {
             get_smart_capture_status,
             // AI 分析命令
             trigger_ai_analysis,
+            // Steam 登录命令
+            is_steam_available,
+            generate_steam_login_url,
+            handle_steam_callback,
+            get_current_steam_user,
+            load_steam_user_from_config,
+            fetch_steam_library,
+            fetch_recently_played_games,
+            get_cached_steam_library,
+            get_steam_library_paginated,
+            steam_logout,
+            verify_steam_login,
+            // Steam Wiki 配置命令
+            get_steam_game_wiki_configs,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

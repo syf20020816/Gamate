@@ -12,6 +12,7 @@ import { Database, Zap, Mic, PlayCircle, Activity } from "lucide-react";
 import { motion } from "framer-motion";
 import { invoke } from "@tauri-apps/api/core";
 import { useState, useEffect } from "react";
+import SteamUserCard from "../SteamUserCard";
 import "./styles.scss";
 import { VERSION } from "../../utils/version";
 
@@ -123,11 +124,20 @@ const RightPanel: React.FC<RightPanelProps> = ({ onMenuChange }) => {
   return (
     <Sider width={380} className="right-panel" theme="dark">
       <div className="panel-content">
-        {/* 快捷操作区 (固定) */}
+        {/* Steam 用户卡片 */}
         <motion.div
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.3 }}
+        >
+          <SteamUserCard onLoginClick={() => onMenuChange?.('steam-login')} />
+        </motion.div>
+
+        {/* 快捷操作区 (固定) */}
+        <motion.div
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.3, delay: 0.1 }}
         >
           <Card className="quick-actions-card" size="small">
             <Title level={5}>
@@ -178,7 +188,7 @@ const RightPanel: React.FC<RightPanelProps> = ({ onMenuChange }) => {
         <motion.div
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.3, delay: 0.1 }}
+          transition={{ duration: 0.3, delay: 0.2 }}
         >
           <Card className="system-status-card" size="small">
             <Title level={5}>

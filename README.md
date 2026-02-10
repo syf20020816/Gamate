@@ -17,8 +17,8 @@
 
 - **作者**: Will Sheng (ShengYiFei)
 - **Email**: syf2002016@outlook.com
-- **项目主页**: https://github.com/your-username/game-partner-skill
-- **问题反馈**: https://github.com/your-username/game-partner-skill/issues
+- **项目主页**: https://github.com/syf20020816/Gamate
+- **问题反馈**: https://github.com/syf20020816/Gamate/issues
 
 ---
 
@@ -92,8 +92,8 @@
 #### 1. 克隆仓库
 
 ```bash
-git clone https://github.com/your-username/game-partner-skill.git
-cd game-partner-skill/gamate
+git clone https://github.com/syf20020816/Gamate.git
+cd Gamate/gamate
 ```
 
 #### 2. 安装依赖
@@ -330,8 +330,8 @@ tags = ["多人", "合作"]
 
 ### 贡献方式
 
-- 提交 Bug 报告: [Issue Tracker](https://github.com/your-username/game-partner-skill/issues)
-- 功能建议: [Feature Requests](https://github.com/your-username/game-partner-skill/discussions)
+- 提交 Bug 报告: [Issue Tracker](https://github.com/syf20020816/Gamate/issues)
+- 功能建议: [Feature Requests](https://github.com/syf20020816/Gamate/discussions)
 - 完善文档: Fork → 修改 → Pull Request
 - 添加游戏支持: 提供游戏 Wiki 地址和测试用例
 

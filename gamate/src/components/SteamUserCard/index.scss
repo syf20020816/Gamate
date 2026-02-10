@@ -1,0 +1,32 @@
+.steam-user-card {
+  margin-bottom: 16px;
+  transition: all 0.3s ease;
+
+  &:hover {
+    border-color: #1890ff;
+  }
+
+  .user-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+
+    .username {
+      font-size: 14px;
+      line-height: 1.4;
+    }
+
+    .steam-id,
+    .hint {
+      font-size: 12px;
+      line-height: 1.4;
+    }
+  }
+
+  // 未登录状态的高亮效果
+  &:not(:has(.steam-id)) {
+    &:hover {
+      box-shadow: 0 2px 8px rgba(24, 144, 255, 0.2);
+    }
+  }
+}

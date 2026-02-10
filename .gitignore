@@ -36,3 +36,8 @@ docs
 1769626506
 store
 /data
+.steam_api_key
+*/.env.*
+*/.env
+*.ps1
+*/config.toml

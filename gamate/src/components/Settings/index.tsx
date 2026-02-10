@@ -27,70 +27,15 @@ import {
   ReloadOutlined,
 } from "@ant-design/icons";
 import { invoke } from "@tauri-apps/api/core";
+import {
+  loadAppSettings,
+  saveAppSettings,
+  resetAppSettings,
+  type AppSettings,
+} from "../../services/settingsService";
 import "./styles.scss";
 
 const { Title, Text, Paragraph } = Typography;
-
-interface AppSettings {
-  general: {
-    language: string;
-    theme: string;
-    hud_mode?: boolean; // HUD 浮窗模式
-  };
-  skillLibrary: {
-    storageBasePath: string;
-    maxVersionsToKeep: number;
-    autoUpdate: boolean;
-    updateCheckInterval: number;
-    crawler: {
-      requestDelayMs: number;
-      maxConcurrentRequests: number;
-      timeoutSeconds: number;
-    };
-  };
-  aiModels: {
-    embedding: ModelConfig;
-    multimodal: ModelConfig;
-    aiPersonality?: string; // AI 陪玩角色类型
-    vectorDb: {
-      mode: string;
-      qdrantUrl?: string;
-      localStoragePath?: string;
-    };
-  };
-  screenshot?: {
-    enabled: boolean;
-    captureMode: string;
-    targetWindowId?: number | null;
-    targetWindowName?: string | null;
-    activeIntervalSeconds: number;
-    idleIntervalSeconds: number;
-    quality: number;
-    targetSizeKb: number;
-    autoSendToAi: boolean;
-  };
-  tts?: {
-    enabled: boolean;
-    provider?: string; // 'windows' or 'aliyun'
-    aliyunAccessKey?: string | null;
-    aliyunAccessSecret?: string | null;
-    aliyunAppKey?: string | null;
-    voice?: string;
-    rate: number;
-    volume: number;
-    autoSpeak: boolean; // AI 回复时自动播报
-  };
-}
-
-interface ModelConfig {
-  provider: string;
-  apiBase: string;
-  apiKey?: string | null;
-  modelName: string;
-  enabled: boolean;
-  temperature?: number;
-  maxTokens?: number;
-}
 
 interface WindowInfo {
   id: number;
@@ -138,85 +83,9 @@ const SettingsPanel: React.FC = () => {
   const loadSettings = async () => {
     setLoading(true);
     try {
-      const data = await invoke<any>("get_app_settings");
-
-      // 转换 snake_case 到 camelCase
-      const transformedData: AppSettings = {
-        general: data.general || { language: "zh-CN", theme: "auto" },
-        skillLibrary: {
-          storageBasePath:
-            data.skill_library?.storage_base_path || "./data/skills",
-          maxVersionsToKeep: data.skill_library?.max_versions_to_keep || 3,
-          autoUpdate: data.skill_library?.auto_update || false,
-          updateCheckInterval: data.skill_library?.update_check_interval || 24,
-          crawler: {
-            requestDelayMs:
-              data.skill_library?.crawler?.request_delay_ms || 1000,
-            maxConcurrentRequests:
-              data.skill_library?.crawler?.max_concurrent_requests || 5,
-            timeoutSeconds: data.skill_library?.crawler?.timeout_seconds || 30,
-          },
-        },
-        aiModels: {
-          embedding: {
-            provider: data.ai_models?.embedding?.provider || "local",
-            apiBase:
-              data.ai_models?.embedding?.api_base ||
-              "http://localhost:11434/v1",
-            apiKey: data.ai_models?.embedding?.api_key || null,
-            modelName:
-              data.ai_models?.embedding?.model_name || "qwen3-embedding:4b",
-            enabled: data.ai_models?.embedding?.enabled !== false,
-            temperature: data.ai_models?.embedding?.temperature || 0.0,
-            maxTokens: data.ai_models?.embedding?.max_tokens || 512,
-          },
-          multimodal: {
-            provider: data.ai_models?.multimodal?.provider || "openai",
-            apiBase:
-              data.ai_models?.multimodal?.api_base ||
-              "https://api.openai.com/v1",
-            apiKey: data.ai_models?.multimodal?.api_key || null,
-            modelName: data.ai_models?.multimodal?.model_name || "gpt-4o-mini",
-            enabled: data.ai_models?.multimodal?.enabled !== false,
-            temperature: data.ai_models?.multimodal?.temperature || 0.7,
-            maxTokens: data.ai_models?.multimodal?.max_tokens || 1000,
-          },
-          aiPersonality: data.ai_models?.ai_personality || "sunnyou_male",
-          vectorDb: {
-            mode: data.ai_models?.vector_db?.mode || "local",
-            qdrantUrl:
-              data.ai_models?.vector_db?.qdrant_url || "http://localhost:6333",
-            localStoragePath:
-              data.ai_models?.vector_db?.local_storage_path ||
-              "./data/vector_db",
-          },
-        },
-        screenshot: {
-          enabled: data.screenshot?.enabled || false,
-          captureMode: data.screenshot?.capture_mode || "fullscreen",
-          targetWindowId: data.screenshot?.target_window_id || null,
-          targetWindowName: data.screenshot?.target_window_name || null,
-          activeIntervalSeconds: data.screenshot?.active_interval_seconds || 5,
-          idleIntervalSeconds: data.screenshot?.idle_interval_seconds || 15,
-          quality: data.screenshot?.quality || 85,
-          targetSizeKb: data.screenshot?.target_size_kb || 200,
-          autoSendToAi: data.screenshot?.auto_send_to_ai !== false,
-        },
-        tts: {
-          enabled: data.tts?.enabled || false,
-          provider: data.tts?.provider || "windows",
-          aliyunAccessKey: data.tts?.aliyun_access_key || null,
-          aliyunAccessSecret: data.tts?.aliyun_access_secret || null,
-          aliyunAppKey: data.tts?.aliyun_appkey || null,
-          voice: data.tts?.voice || undefined,
-          rate: data.tts?.rate || 1.0,
-          volume: data.tts?.volume || 0.8,
-          autoSpeak: data.tts?.auto_speak !== false,
-        },
-      };
-
-      setSettings(transformedData);
-      form.setFieldsValue(transformedData);
+      const data = await loadAppSettings();
+      setSettings(data);
+      form.setFieldsValue(data);
       message.success("设置加载成功");
     } catch (error: any) {
       message.error(`加载设置失败: ${error}`);
@@ -233,7 +102,7 @@ const SettingsPanel: React.FC = () => {
       setSaving(true);
 
       // 获取完整表单值（包括未在当前标签页的字段）
-      const values = form.getFieldsValue(true);
+      const values = form.getFieldsValue(true) as AppSettings;
 
       console.log("📝 表单值:", values);
 
@@ -242,79 +111,7 @@ const SettingsPanel: React.FC = () => {
         throw new Error("表单数据不完整，请刷新页面重新加载");
       }
 
-      // 转换回 snake_case 给后端
-      const backendData = {
-        general: values.general,
-        skill_library: {
-          storage_base_path: values.skillLibrary.storageBasePath,
-          max_versions_to_keep: values.skillLibrary.maxVersionsToKeep,
-          auto_update: values.skillLibrary.autoUpdate,
-          update_check_interval: values.skillLibrary.updateCheckInterval,
-          crawler: {
-            request_delay_ms: values.skillLibrary.crawler.requestDelayMs,
-            max_concurrent_requests:
-              values.skillLibrary.crawler.maxConcurrentRequests,
-            timeout_seconds: values.skillLibrary.crawler.timeoutSeconds,
-          },
-        },
-        ai_models: {
-          embedding: {
-            provider: values.aiModels.embedding.provider,
-            api_base: values.aiModels.embedding.apiBase,
-            api_key: values.aiModels.embedding.apiKey || null,
-            model_name: values.aiModels.embedding.modelName,
-            enabled: values.aiModels.embedding.enabled,
-            temperature: values.aiModels.embedding.temperature || 0.0,
-            max_tokens: values.aiModels.embedding.maxTokens || 512,
-          },
-          multimodal: {
-            provider: values.aiModels.multimodal.provider,
-            api_base: values.aiModels.multimodal.apiBase,
-            api_key: values.aiModels.multimodal.apiKey || null,
-            model_name: values.aiModels.multimodal.modelName,
-            enabled: values.aiModels.multimodal.enabled,
-            temperature: values.aiModels.multimodal.temperature || 0.7,
-            max_tokens: values.aiModels.multimodal.maxTokens || 1000,
-          },
-          ai_personality: values.aiModels.aiPersonality || "sunnyou_male",
-          vector_db: {
-            mode: values.aiModels.vectorDb.mode,
-            qdrant_url: values.aiModels.vectorDb.qdrantUrl || null,
-            local_storage_path:
-              values.aiModels.vectorDb.localStoragePath || null,
-          },
-        },
-        screenshot: values.screenshot
-          ? {
-              enabled: values.screenshot.enabled,
-              capture_mode: values.screenshot.captureMode,
-              target_window_id: values.screenshot.targetWindowId || null,
-              target_window_name: values.screenshot.targetWindowName || null,
-              active_interval_seconds: values.screenshot.activeIntervalSeconds,
-              idle_interval_seconds: values.screenshot.idleIntervalSeconds,
-              quality: values.screenshot.quality,
-              target_size_kb: values.screenshot.targetSizeKb,
-              auto_send_to_ai: values.screenshot.autoSendToAi,
-            }
-          : undefined,
-        tts: values.tts
-          ? {
-              enabled: values.tts.enabled,
-              provider: values.tts.provider || "windows",
-              aliyun_access_key: values.tts.aliyunAccessKey || null,
-              aliyun_access_secret: values.tts.aliyunAccessSecret || null,
-              aliyun_appkey: values.tts.aliyunAppKey || null,
-              voice: values.tts.voice || null,
-              rate: values.tts.rate || 1.0,
-              volume: values.tts.volume || 0.8,
-              auto_speak: values.tts.autoSpeak !== false,
-            }
-          : undefined,
-      };
-
-      console.log("📤 发送给后端:", backendData);
-
-      await invoke("save_app_settings", { settings: backendData });
+      await saveAppSettings(values);
       setSettings(values);
       message.success("设置保存成功");
     } catch (error: any) {
@@ -333,7 +130,7 @@ const SettingsPanel: React.FC = () => {
 
   const handleReset = async () => {
     try {
-      const defaultSettings = await invoke<AppSettings>("reset_app_settings");
+      const defaultSettings = await resetAppSettings();
       setSettings(defaultSettings);
       form.setFieldsValue(defaultSettings);
       message.success("已重置为默认设置");

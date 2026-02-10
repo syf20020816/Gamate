@@ -227,7 +227,7 @@ const PrivacyPolicy: React.FC = () => {
                 <Paragraph>
                   GitHub 仓库：
                   <Text code>
-                    https://github.com/yourusername/gamate
+                    https://github.com/syf20020816/Gamate
                   </Text>
                 </Paragraph>
               </section>
@@ -254,7 +254,7 @@ const PrivacyPolicy: React.FC = () => {
                 <Paragraph>
                   <Text strong>GitHub Issues：</Text>{" "}
                   <Text code>
-                    https://github.com/yourusername/gamate/issues
+                    https://github.com/syf20020816/Gamate/issues
                   </Text>
                 </Paragraph>
                 <Paragraph type="secondary" style={{ marginTop: 32 }}>

@@ -10,6 +10,8 @@ pub mod simulation_commands;
 pub mod simulation_engine_commands; // 新增模拟引擎命令
 pub mod skill_library_commands;
 pub mod smart_capture_commands; // 新增智能截图命令
+pub mod steam_auth_commands; // Steam 登录命令
+pub mod steam_wiki_commands; // Steam Wiki 配置命令
 pub mod tts_commands;
 pub mod vdb_test_commands;
 pub mod vector_commands;
@@ -28,6 +30,7 @@ pub use simulation_engine_commands::*; // 导出模拟引擎命令
 pub use skill_library_commands::*;
 pub use smart_capture_commands::*;
 pub use smart_capture_commands::*;
+pub use steam_auth_commands::*; // 导出 Steam 登录命令
 pub use tts_commands::*;
 pub use vdb_test_commands::*;
 pub use vector_commands::*;
