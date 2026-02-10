@@ -29,15 +29,3 @@ export interface DownloadedSkillLibrary {
   };
   status: 'active' | 'outdated' | 'error';
 }
-
-/**
- * 技能库版本历史
- */
-export interface SkillLibraryVersion {
-  timestamp: number;
-  version: string;
-  downloadedAt: string;
-  size: number;
-  path: string;
-  isActive: boolean;
-}

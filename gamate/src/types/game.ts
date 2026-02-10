@@ -91,7 +91,7 @@ export enum SkillStatus {
 }
 
 /**
- * 技能库统计信息
+ * 截图策略配置
  */
 export interface SkillStatistics {
   totalEntries: number; // 总条目数
@@ -101,36 +101,3 @@ export interface SkillStatistics {
   accuracy?: number; // 识别准确率
 }
 
-/**
- * 用户游戏配置（将游戏添加到用户库）
- */
-export interface UserGameConfig {
-  id: string;
-  userId: string;
-  gameId: string;
-  skillConfigId: string;
-  isActive: boolean; // 是否启用
-  customSettings?: {
-    captureAreas?: CaptureArea[];
-    keywords?: string[];
-    templates?: string[];
-  };
-  statistics: {
-    playTime: number; // 游戏时长（秒）
-    recognitionCount: number; // 识别次数
-    lastPlayed?: string;
-  };
-  addedAt: string;
-}
-
-/**
- * 截屏区域定义
- */
-export interface CaptureArea {
-  name: string;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  type: 'ui' | 'text' | 'custom';
-}
