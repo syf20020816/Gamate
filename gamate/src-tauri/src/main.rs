@@ -2,5 +2,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
-    game_partner_skill_lib::run()
+    gamate_lib::run()
 }
