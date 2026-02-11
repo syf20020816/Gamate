@@ -272,59 +272,6 @@ gamate/
 
 ---
 
-## 开发指南
-
-### 本地开发
-
-```bash
-# 启动开发服务器 (热重载)
-pnpm tauri dev
-
-# 检查 Rust 代码
-cargo clippy
-
-# 格式化代码
-cargo fmt
-pnpm format
-
-# 运行测试
-cargo test
-```
-
-### 构建发布版
-
-```bash
-# 构建 Windows 安装包
-pnpm tauri build
-
-# 输出路径
-# src-tauri/target/release/bundle/nsis/Gamate_0.1.0_x64-setup.exe
-```
-
-### 添加新游戏支持
-
-1. **编辑游戏配置**: `config/games.toml`
-
-```toml
-[[games]]
-id = "your_game_id"
-name = "游戏名称"
-category = "恐怖"
-wiki_url = "https://your-game.fandom.com/wiki/"
-tags = ["多人", "合作"]
-```
-
-2. **下载 Wiki 数据**:
-   - 打开软件 → 技能库
-   - 选择新添加的游戏
-   - 点击 "下载"
-
-3. **向量化数据**:
-   - 下载完成后自动触发向量化
-   - 或手动点击 "重新导入"
-
----
-
 ## 参与贡献
 
 我们欢迎所有形式的贡献！

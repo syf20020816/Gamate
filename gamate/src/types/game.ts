@@ -101,3 +101,16 @@ export interface SkillStatistics {
   accuracy?: number; // 识别准确率
 }
 
+/**
+ * 当用户完全不打算下载任何游戏配置时，也想要用AI助手的情况
+ * 这个游戏配置将作为默认值
+ * 注意：必须与后端 Rust 的 DEFAULT_GAME 保持一致
+ */
+export const DEFAULT_GAME: Game = {
+  id: "all",
+  name: "所有游戏",
+  icon: "",
+  description: "所有游戏的通用配置",
+  category: GameType.Other,
+  tags: [],
+};

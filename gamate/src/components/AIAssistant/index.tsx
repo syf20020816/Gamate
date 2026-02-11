@@ -20,6 +20,7 @@ import { VoiceChatPanel } from "../VoiceChatPanel";
 import { ConversationArea } from "../ConversationArea";
 import { SimulationPanel } from "../SimulationPanel";
 import "./index.css";
+import { DEFAULT_GAME } from "../../types/game";
 
 const { TextArea } = Input;
 
@@ -153,6 +154,7 @@ const AIAssistant: React.FC = () => {
           filteredIds.map((id: string) => getGameById(id)),
         );
         const validGames = games.filter(Boolean);
+        validGames.push(DEFAULT_GAME); // 添加默认游戏
         setAvailableGames(validGames);
       } catch (error) {
         console.error("加载游戏配置失败:", error);

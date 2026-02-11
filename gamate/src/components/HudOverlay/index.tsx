@@ -8,6 +8,7 @@ import { getGameById } from "../../services/configService";
 import { useAIAssistantStore } from "../../stores/aiAssistantStore";
 import "./HudOverlay.scss";
 import { Mic, MicOff } from "lucide-react";
+import { DEFAULT_GAME } from "../../types/game";
 
 interface HudState {
   isListening: boolean; // 是否正在监听
@@ -105,7 +106,8 @@ export const HudOverlay: React.FC = () => {
           filteredIds.map((id: string) => getGameById(id)),
         );
         const validGames = games.filter(Boolean);
-
+        // 添加默认游戏
+        validGames.push(DEFAULT_GAME);
         setAvailableGames(validGames);
       } catch (error) {
         console.error("加载游戏配置失败:", error);

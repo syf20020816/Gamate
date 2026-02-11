@@ -13,6 +13,7 @@ import { useAIAssistantStore } from "../../stores/aiAssistantStore";
 import { getGameById } from "../../services/configService";
 import { ConversationArea } from "../../components/ConversationArea";
 import "./index.scss";
+import { DEFAULT_GAME } from "../../types/game";
 
 // 匹配后端的事件类型定义（注意：Rust serde 使用 snake_case）
 type EventType =
@@ -121,7 +122,10 @@ export const LivestreamHudPage: React.FC = () => {
         const games = await Promise.all(
           filteredIds.map((id: string) => getGameById(id)),
         );
-        setAvailableGames(games.filter(Boolean));
+        // 添加默认游戏
+        const validGames = games.filter(Boolean);
+        validGames.push(DEFAULT_GAME);
+        setAvailableGames(validGames);
       } catch (error) {
         console.error("加载游戏列表失败:", error);
       }
