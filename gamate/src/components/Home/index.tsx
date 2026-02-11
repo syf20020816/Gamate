@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { getGameById } from "../../services/configService";
-import { useState, useEffect } from "react";
+import { useState, useEffect} from "react";
 import { invoke } from "@tauri-apps/api/core";
 import "./styles.scss";
 
@@ -27,9 +27,10 @@ const { Title, Paragraph, Text } = Typography;
 
 interface HomeProps {
   onNavigate?: (menu: string) => void;
+  setTourOpen?: (open: boolean) => void;
 }
 
-const Home: React.FC<HomeProps> = ({ onNavigate }) => {
+const Home: React.FC<HomeProps> = ({ onNavigate, setTourOpen }) => {
   const [selectedGames, setSelectedGames] = useState<any[]>([]);
   const [downloadedLibraries, setDownloadedLibraries] = useState<any[]>([]);
   const [hasSkillLibrary, setHasSkillLibrary] = useState(false);
@@ -151,12 +152,15 @@ const Home: React.FC<HomeProps> = ({ onNavigate }) => {
       >
         {/* 欢迎区域 (Hero Section) */}
         <div className="hero-section">
-          <Title
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <Title
             level={1}
             style={{ display: "flex", alignItems: "center", gap: 12 }}
           >
             Gamate
           </Title>
+          <Button type="primary" onClick={() => setTourOpen && setTourOpen(true)}>开启教程</Button>
+          </div>
           <Paragraph
             style={{
               marginBottom: 16,

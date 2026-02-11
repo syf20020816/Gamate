@@ -102,14 +102,12 @@ pub async fn refresh_displays(
 #[tauri::command]
 pub async fn list_windows_command(
 ) -> std::result::Result<Vec<crate::screenshot::WindowInfo>, String> {
-    log::info!("📋 获取窗口列表");
     crate::screenshot::list_windows().map_err(|e| e.to_string())
 }
 
 /// 捕获指定窗口
 #[tauri::command]
 pub async fn capture_window_command(window_id: u32) -> std::result::Result<Screenshot, String> {
-    log::info!("🪟 捕获窗口 ID: {}", window_id);
     crate::screenshot::capture_window(window_id).map_err(|e| e.to_string())
 }
 
@@ -118,21 +116,19 @@ pub async fn capture_window_command(window_id: u32) -> std::result::Result<Scree
 pub async fn capture_screenshot(
     state: State<'_, ScreenshotState>,
 ) -> std::result::Result<String, String> {
-    log::info!("📸 执行快速截图");
-
     // 加载配置
     let settings =
         crate::settings::AppSettings::load().map_err(|e| format!("加载配置失败: {}", e))?;
 
     let screenshot_config = &settings.screenshot;
-    log::info!("📋 截图模式: {}", screenshot_config.capture_mode);
+    println!("截图模式: {}", screenshot_config.capture_mode);
 
     let screenshot = match screenshot_config.capture_mode.as_str() {
         "window" => {
             // 窗口截图
             if let Some(window_id) = screenshot_config.target_window_id {
-                log::info!(
-                    "🪟 捕获窗口: {} (ID: {})",
+                println!(
+                    "捕获窗口: {} (ID: {})",
                     screenshot_config
                         .target_window_name
                         .as_deref()
@@ -153,7 +149,7 @@ pub async fn capture_screenshot(
         }
         "fullscreen" | _ => {
             // 全屏截图 (默认)
-            log::info!("🖥️  全屏截图");
+            println!("全屏截图");
             let capturer = state
                 .get_or_init()
                 .map_err(|e| format!("初始化失败: {}", e))?;

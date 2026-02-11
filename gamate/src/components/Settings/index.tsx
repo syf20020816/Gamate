@@ -990,9 +990,9 @@ const SettingsPanel: React.FC = () => {
                       <strong>自动发送给 AI</strong>: 开启后截图会自动触发 AI
                       分析
                     </li>
-                    <li>
+                    {/* <li>
                       <strong>图片质量</strong>: 建议 80-90,平衡质量与文件大小
-                    </li>
+                    </li> */}
                   </ul>
                 }
                 type="info"
@@ -1152,7 +1152,7 @@ const SettingsPanel: React.FC = () => {
                   />
                 </Form.Item>
 
-                <Form.Item
+                {/* <Form.Item
                   label="截图质量"
                   name={["screenshot", "quality"]}
                   tooltip="JPEG 压缩质量,1-100"
@@ -1192,7 +1192,7 @@ const SettingsPanel: React.FC = () => {
                     style={{ width: "100%" }}
                     addonAfter="KB"
                   />
-                </Form.Item>
+                </Form.Item> */}
 
                 <Form.Item
                   label="自动发送给 AI 分析"
@@ -1202,10 +1202,7 @@ const SettingsPanel: React.FC = () => {
                 >
                   <Switch />
                 </Form.Item>
-              </Card>
 
-              {/* 截图测试 */}
-              <Card type="inner" title="测试截图" style={{ marginTop: 16 }}>
                 <Form.Item
                   noStyle
                   shouldUpdate={(prevValues, currentValues) =>
@@ -1227,13 +1224,7 @@ const SettingsPanel: React.FC = () => {
 
                     return (
                       <>
-                        <Alert
-                          message="测试当前配置"
-                          description="点击下方按钮测试截图功能,查看实际效果"
-                          type="info"
-                          showIcon
-                          style={{ marginBottom: 16 }}
-                        />
+                        
                         <Button
                           type="primary"
                           block

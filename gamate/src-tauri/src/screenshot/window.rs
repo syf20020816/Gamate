@@ -50,8 +50,6 @@ pub fn list_windows() -> Result<Vec<WindowInfo>> {
 
 /// 捕获指定窗口
 pub fn capture_window(window_id: u32) -> Result<Screenshot> {
-    log::info!("🪟 开始捕获窗口 ID: {}", window_id);
-
     // 获取所有窗口
     let windows = Window::all()
         .map_err(|e| ScreenshotError::CaptureFailed(format!("枚举窗口失败: {}", e)))?;
@@ -68,7 +66,7 @@ pub fn capture_window(window_id: u32) -> Result<Screenshot> {
     let app_name = target_window
         .app_name()
         .unwrap_or_else(|_| "Unknown".to_string());
-    log::info!("📸 捕获窗口: {} ({})", title, app_name);
+    log::info!("捕获窗口: {} ({})", title, app_name);
 
     // 捕获窗口图像
     let image = target_window
@@ -78,8 +76,6 @@ pub fn capture_window(window_id: u32) -> Result<Screenshot> {
     let width = image.width();
     let height = image.height();
 
-    log::info!("✅ 捕获成功: {}x{}", width, height);
-
     // 转换为字节
     let raw_data = image.into_raw();
 
@@ -88,26 +84,12 @@ pub fn capture_window(window_id: u32) -> Result<Screenshot> {
     let img = ImageBuffer::<Rgba<u8>, _>::from_raw(width, height, raw_data)
         .ok_or_else(|| ScreenshotError::CaptureFailed("创建图像失败".to_string()))?;
 
-    // 转换为 PNG
-    use std::io::Cursor;
-    let mut png_data = Vec::new();
-    let mut cursor = Cursor::new(&mut png_data);
-
-    // 优化图片大小 (目标 200KB)
+    // 使用智能压缩编码图片
     let dynamic_img = image::DynamicImage::ImageRgba8(img);
-    let optimized_img = optimize_image(dynamic_img, 200 * 1024)?;
-
-    optimized_img
-        .write_to(&mut cursor, image::ImageFormat::Png)
-        .map_err(|e| ScreenshotError::CaptureFailed(format!("PNG 编码失败: {}", e)))?;
-
-    log::info!("📦 窗口截图优化完成: {} KB", png_data.len() / 1024);
-
-    // Base64 编码
-    let base64_data = base64::Engine::encode(&base64::engine::general_purpose::STANDARD, &png_data);
+    let data = encode_image_smart(dynamic_img)?;
 
     Ok(Screenshot {
-        data: format!("data:image/png;base64,{}", base64_data),
+        data,
         width,
         height,
         timestamp: chrono::Utc::now().timestamp() as u64,
@@ -116,31 +98,54 @@ pub fn capture_window(window_id: u32) -> Result<Screenshot> {
     })
 }
 
-/// 优化图片大小 (缩放到目标文件大小)
-fn optimize_image(
-    img: image::DynamicImage,
-    target_size_bytes: usize,
-) -> Result<image::DynamicImage> {
+/// 智能编码图片为 Base64
+/// - 小于 400KB: 不压缩
+/// - 大于 400KB: 压缩到原大小的 70%
+fn encode_image_smart(img: image::DynamicImage) -> Result<String> {
+    use std::io::Cursor;
+
     let (original_width, original_height) = (img.width(), img.height());
 
-    // 估算当前大小
-    let current_estimated_size = (original_width * original_height * 2) as usize;
+    // 先编码一次,获取实际文件大小
+    let mut temp_buffer = Cursor::new(Vec::new());
+    img.write_to(&mut temp_buffer, image::ImageFormat::Png)
+        .map_err(|e| ScreenshotError::EncodeFailed(e.to_string()))?;
 
-    if current_estimated_size <= target_size_bytes {
-        return Ok(img);
-    }
+    let original_size = temp_buffer.into_inner().len();
+    let original_size_kb = original_size / 1024;
 
-    let scale_ratio = (target_size_bytes as f64 / current_estimated_size as f64).sqrt();
-    let new_width = ((original_width as f64) * scale_ratio).round() as u32;
-    let new_height = ((original_height as f64) * scale_ratio).round() as u32;
 
-    log::info!(
-        "🔍 缩放窗口截图: {}x{} → {}x{}",
-        original_width,
-        original_height,
-        new_width,
-        new_height
-    );
+    // 策略1: 小于 400KB, 不压缩
+    let optimized_img = if original_size < 400 * 1024 {
+        img
+    } else {
+        // 策略2: 大于 400KB, 压缩到 80%
+        let target_size = (original_size as f64 * 0.8) as usize;
 
-    Ok(img.resize(new_width, new_height, image::imageops::FilterType::Lanczos3))
+        // 计算缩放比例 (估算 PNG 压缩率为 50-70%, 每像素约 2 字节)
+        let current_estimated_size = (original_width * original_height * 2) as usize;
+        let scale_ratio = (target_size as f64 / current_estimated_size as f64).sqrt();
+        let new_width = ((original_width as f64) * scale_ratio).round() as u32;
+        let new_height = ((original_height as f64) * scale_ratio).round() as u32;
+
+        log::info!(
+            "缩放窗口截图: {}x{} → {}x{} (缩放比 {:.2})",
+            original_width, original_height, new_width, new_height, scale_ratio
+        );
+
+        img.resize(new_width, new_height, image::imageops::FilterType::Lanczos3)
+    };
+
+    // 最终编码
+    let mut final_buffer = Cursor::new(Vec::new());
+    optimized_img
+        .write_to(&mut final_buffer, image::ImageFormat::Png)
+        .map_err(|e| ScreenshotError::EncodeFailed(e.to_string()))?;
+
+    let png_data = final_buffer.into_inner();
+
+    // Base64 编码
+    let base64_data = base64::Engine::encode(&base64::engine::general_purpose::STANDARD, &png_data);
+
+    Ok(format!("data:image/png;base64,{}", base64_data))
 }

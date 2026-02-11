@@ -21,9 +21,13 @@ const { Title, Text } = Typography;
 
 interface RightPanelProps {
   onMenuChange?: (key: string) => void;
+  steamLoginRef?: React.RefObject<any>;
 }
 
-const RightPanel: React.FC<RightPanelProps> = ({ onMenuChange }) => {
+const RightPanel: React.FC<RightPanelProps> = ({
+  onMenuChange,
+  steamLoginRef,
+}) => {
   const [selectedGames, setSelectedGames] = useState<any[]>([]);
   const [downloadedLibraries, setDownloadedLibraries] = useState<any[]>([]);
   const [isVectorDBReady, setIsVectorDBReady] = useState(false);
@@ -33,11 +37,11 @@ const RightPanel: React.FC<RightPanelProps> = ({ onMenuChange }) => {
   useEffect(() => {
     const loadSelectedGames = async () => {
       try {
-        const settings = await invoke<any>('get_app_settings');
+        const settings = await invoke<any>("get_app_settings");
         const selectedGameIds = settings.user?.selected_games || [];
         setSelectedGames(selectedGameIds);
       } catch (error) {
-        console.error('加载游戏配置失败:', error);
+        console.error("加载游戏配置失败:", error);
       }
     };
     loadSelectedGames();
@@ -50,7 +54,7 @@ const RightPanel: React.FC<RightPanelProps> = ({ onMenuChange }) => {
         const libraries = await invoke<any[]>("scan_downloaded_libraries");
         setDownloadedLibraries(libraries);
       } catch (error) {
-        console.error('扫描技能库失败:', error);
+        console.error("扫描技能库失败:", error);
       }
     };
     scanLibraries();
@@ -65,12 +69,13 @@ const RightPanel: React.FC<RightPanelProps> = ({ onMenuChange }) => {
         setIsVectorDBReady(hasVectorDB);
 
         // 检查 LLM 是否配置
-        const settings = await invoke<any>('get_app_settings');
-        const hasAPIKey = settings.ai_models?.multimodal?.api_key || 
-                         settings.ai_models?.multimodal?.provider === 'local';
+        const settings = await invoke<any>("get_app_settings");
+        const hasAPIKey =
+          settings.ai_models?.multimodal?.api_key ||
+          settings.ai_models?.multimodal?.provider === "local";
         setIsLLMReady(!!hasAPIKey);
       } catch (error) {
-        console.error('检查系统状态失败:', error);
+        console.error("检查系统状态失败:", error);
       }
     };
 
@@ -95,11 +100,15 @@ const RightPanel: React.FC<RightPanelProps> = ({ onMenuChange }) => {
       }
 
       message.loading({ content: "正在打开 HUD 窗口...", key: "hud" });
-      
+
       // 调用后端命令打开 HUD 窗口
       await invoke("open_hud_window");
-      
-      message.success({ content: "HUD 窗口已打开，可以开始语音对话了", key: "hud", duration: 2 });
+
+      message.success({
+        content: "HUD 窗口已打开，可以开始语音对话了",
+        key: "hud",
+        duration: 2,
+      });
     } catch (error) {
       console.error("打开 HUD 窗口失败:", error);
       message.error({ content: `打开失败: ${error}`, key: "hud" });
@@ -111,12 +120,12 @@ const RightPanel: React.FC<RightPanelProps> = ({ onMenuChange }) => {
     if (onMenuChange) {
       // 跳转到 AI 助手页面
       onMenuChange("ai-assistant");
-      
+
       // 使用自定义事件通知 AIAssistant 组件切换到模拟场景 Tab
       setTimeout(() => {
         window.dispatchEvent(new CustomEvent("switch-to-simulation-tab"));
       }, 100);
-      
+
       message.success("已切换到模拟场景");
     }
   };
@@ -130,7 +139,10 @@ const RightPanel: React.FC<RightPanelProps> = ({ onMenuChange }) => {
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.3 }}
         >
-          <SteamUserCard onLoginClick={() => onMenuChange?.('steam-login')} />
+          <SteamUserCard
+            ref={steamLoginRef}
+            onLoginClick={() => onMenuChange?.("steam-login")}
+          />
         </motion.div>
 
         {/* 快捷操作区 (固定) */}
@@ -146,20 +158,22 @@ const RightPanel: React.FC<RightPanelProps> = ({ onMenuChange }) => {
             </Title>
             <Space direction="vertical" size="small" style={{ width: "100%" }}>
               {/* 开始语音对话 */}
-              <Button 
-                type="primary" 
-                block 
+              <Button
+                type="primary"
+                block
                 icon={<Mic size={16} />}
                 onClick={handleStartVoiceChat}
-                disabled={selectedGames.length === 0 || downloadedLibraries.length === 0}
+                disabled={
+                  selectedGames.length === 0 || downloadedLibraries.length === 0
+                }
                 size="large"
               >
                 开始语音对话
               </Button>
 
               {/* 开始模拟场景 */}
-              <Button 
-                block 
+              <Button
+                block
                 icon={<PlayCircle size={16} />}
                 onClick={handleStartSimulation}
                 size="large"
@@ -184,7 +198,7 @@ const RightPanel: React.FC<RightPanelProps> = ({ onMenuChange }) => {
 
         <Divider style={{ margin: "16px 0" }} />
 
-        {/* 📊 系统状态区 (固定) */}
+        {/* 系统状态区 (固定) */}
         <motion.div
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
@@ -197,21 +211,27 @@ const RightPanel: React.FC<RightPanelProps> = ({ onMenuChange }) => {
             </Title>
             <Space direction="vertical" size="small" style={{ width: "100%" }}>
               <div className="status-item">
-                <Space style={{ width: "100%", justifyContent: "space-between" }}>
+                <Space
+                  style={{ width: "100%", justifyContent: "space-between" }}
+                >
                   <Text type="secondary">已配置游戏</Text>
                   <Text strong>{selectedGames.length} 个</Text>
                 </Space>
               </div>
 
               <div className="status-item">
-                <Space style={{ width: "100%", justifyContent: "space-between" }}>
+                <Space
+                  style={{ width: "100%", justifyContent: "space-between" }}
+                >
                   <Text type="secondary">已下载技能库</Text>
                   <Text strong>{downloadedLibraries.length} 个</Text>
                 </Space>
               </div>
 
               <div className="status-item">
-                <Space style={{ width: "100%", justifyContent: "space-between" }}>
+                <Space
+                  style={{ width: "100%", justifyContent: "space-between" }}
+                >
                   <Text type="secondary">向量库</Text>
                   <Tag color={isVectorDBReady ? "green" : "red"}>
                     {isVectorDBReady ? "就绪" : "未就绪"}
@@ -220,7 +240,9 @@ const RightPanel: React.FC<RightPanelProps> = ({ onMenuChange }) => {
               </div>
 
               <div className="status-item">
-                <Space style={{ width: "100%", justifyContent: "space-between" }}>
+                <Space
+                  style={{ width: "100%", justifyContent: "space-between" }}
+                >
                   <Text type="secondary">多模态 AI</Text>
                   <Tag color={isLLMReady ? "green" : "orange"}>
                     {isLLMReady ? "就绪" : "未配置"}
@@ -248,40 +270,61 @@ const RightPanel: React.FC<RightPanelProps> = ({ onMenuChange }) => {
               {downloadedLibraries.length > 0 ? (
                 <>
                   <div className="skill-stat">
-                    <Space style={{ width: "100%", justifyContent: "space-between" }}>
+                    <Space
+                      style={{ width: "100%", justifyContent: "space-between" }}
+                    >
                       <Text type="secondary">已下载游戏</Text>
                       <Text strong>
-                        {new Set(downloadedLibraries.map((lib: any) => lib.gameId)).size} 个
+                        {
+                          new Set(
+                            downloadedLibraries.map((lib: any) => lib.gameId),
+                          ).size
+                        }{" "}
+                        个
                       </Text>
                     </Space>
                   </div>
                   <div className="skill-stat">
-                    <Space style={{ width: "100%", justifyContent: "space-between" }}>
+                    <Space
+                      style={{ width: "100%", justifyContent: "space-between" }}
+                    >
                       <Text type="secondary">技能库版本</Text>
                       <Text strong>{downloadedLibraries.length} 个</Text>
                     </Space>
                   </div>
                   <div className="skill-stat">
-                    <Space style={{ width: "100%", justifyContent: "space-between" }}>
+                    <Space
+                      style={{ width: "100%", justifyContent: "space-between" }}
+                    >
                       <Text type="secondary">活跃版本</Text>
                       <Text strong>
-                        {downloadedLibraries.filter((lib: any) => lib.status === "active").length} 个
+                        {
+                          downloadedLibraries.filter(
+                            (lib: any) => lib.status === "active",
+                          ).length
+                        }{" "}
+                        个
                       </Text>
                     </Space>
                   </div>
                   <div className="skill-stat">
-                    <Space style={{ width: "100%", justifyContent: "space-between" }}>
+                    <Space
+                      style={{ width: "100%", justifyContent: "space-between" }}
+                    >
                       <Text type="secondary">总存储大小</Text>
                       <Text strong>
                         {(() => {
                           const totalBytes = downloadedLibraries.reduce(
-                            (sum: number, lib: any) => sum + (lib.storageSize || 0),
-                            0
+                            (sum: number, lib: any) =>
+                              sum + (lib.storageSize || 0),
+                            0,
                           );
                           if (totalBytes === 0) return "0 B";
                           const k = 1024;
                           const sizes = ["B", "KB", "MB", "GB"];
-                          const i = Math.floor(Math.log(totalBytes) / Math.log(k));
+                          const i = Math.floor(
+                            Math.log(totalBytes) / Math.log(k),
+                          );
                           return `${(totalBytes / Math.pow(k, i)).toFixed(1)} ${sizes[i]}`;
                         })()}
                       </Text>
@@ -294,10 +337,10 @@ const RightPanel: React.FC<RightPanelProps> = ({ onMenuChange }) => {
                 </Text>
               )}
             </Space>
-            <Button 
-              type="primary" 
-              ghost 
-              block 
+            <Button
+              type="primary"
+              ghost
+              block
               style={{ marginTop: 12 }}
               onClick={() => onMenuChange?.("skill-database")}
             >
@@ -309,32 +352,32 @@ const RightPanel: React.FC<RightPanelProps> = ({ onMenuChange }) => {
         {/* 📄 底部链接 */}
         <div className="panel-footer" style={{ marginTop: 16 }}>
           <Space direction="vertical" size={8} style={{ width: "100%" }}>
-            <Button 
-              type="text" 
-              size="small" 
+            <Button
+              type="text"
+              size="small"
               block
               style={{ color: "rgba(255,255,255,0.45)", fontSize: 12 }}
               onClick={() => onMenuChange?.("user-agreement")}
             >
               用户服务协议
             </Button>
-            <Button 
-              type="text" 
-              size="small" 
+            <Button
+              type="text"
+              size="small"
               block
               style={{ color: "rgba(255,255,255,0.45)", fontSize: 12 }}
               onClick={() => onMenuChange?.("privacy-policy")}
             >
               隐私政策
             </Button>
-            <Text 
-              type="secondary" 
-              style={{ 
-                fontSize: 11, 
-                textAlign: "center", 
+            <Text
+              type="secondary"
+              style={{
+                fontSize: 11,
+                textAlign: "center",
                 display: "block",
                 marginTop: 8,
-                opacity: 0.4 
+                opacity: 0.4,
               }}
             >
               Gamate {VERSION}

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Layout, Menu, Button } from "antd";
 import {
   Gamepad2,
@@ -20,48 +20,55 @@ type MenuItem = Required<MenuProps>["items"][number];
 interface SidebarProps {
   selectedMenu: string;
   onMenuChange: (key: string) => void;
+  stepRefs: React.RefObject<any>[];
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ selectedMenu, onMenuChange }) => {
+const Sidebar: React.FC<SidebarProps> = ({
+  selectedMenu,
+  onMenuChange,
+  stepRefs,
+}) => {
   const [collapsed, setCollapsed] = useState(false);
 
-  const menuItems: MenuItem[] = [
-    {
-      key: "home",
-      icon: <Home size={20} />,
-      label: "主页",
-    },
-    {
-      key: "wiki-search",
-      icon: <BookOpen size={20} />,
-      label: "Wiki 搜索",
-    },
-    {
-      key: "ai-assistant",
-      icon: <MessageCircle size={20} />,
-      label: "AI 陪玩助手",
-    },
-    {
-      key: "game-library",
-      icon: <Gamepad2 size={20} />,
-      label: "游戏库",
-    },
-    {
-      key: "skill-database",
-      icon: <Database size={20} />,
-      label: "技能库",
-    },
-    // {
-    //   key: "logs",
-    //   icon: <FileText size={20} />,
-    //   label: "日志",
-    // },
-    {
-      key: "settings",
-      icon: <Settings size={20} />,
-      label: "设置",
-    },
-  ];
+  const menuItems: MenuItem[] = useMemo(() => {
+    return [
+      {
+        key: "home",
+        icon: <Home size={20} />,
+        label: "主页",
+      },
+      {
+        key: "wiki-search",
+        icon: <BookOpen size={20} />,
+        label: "Wiki 搜索",
+      },
+      {
+        key: "ai-assistant",
+        icon: <MessageCircle size={20} />,
+        label: <span ref={stepRefs[1]}>AI 陪玩助手</span>,
+      },
+      {
+        key: "game-library",
+        icon: <Gamepad2 size={20} />,
+        label: <span ref={stepRefs[0]}>游戏库</span>,
+      },
+      {
+        key: "skill-database",
+        icon: <Database size={20} />,
+        label: "技能库",
+      },
+      // {
+      //   key: "logs",
+      //   icon: <FileText size={20} />,
+      //   label: "日志",
+      // },
+      {
+        key: "settings",
+        icon: <Settings size={20} />,
+        label: "设置",
+      },
+    ];
+  }, [stepRefs]);
 
   return (
     <Sider

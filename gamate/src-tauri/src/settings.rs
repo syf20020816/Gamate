@@ -141,10 +141,6 @@ pub struct ScreenshotSettings {
     pub active_interval_seconds: u64,
     /// 闲置模式截图间隔 (秒)
     pub idle_interval_seconds: u64,
-    /// 截图质量 (0-100)
-    pub quality: u8,
-    /// 目标文件大小 (KB)
-    pub target_size_kb: u32,
     /// 是否自动发送给 AI 分析
     pub auto_send_to_ai: bool,
 }
@@ -158,8 +154,6 @@ impl Default for ScreenshotSettings {
             target_window_name: None,
             active_interval_seconds: 5,
             idle_interval_seconds: 15,
-            quality: 85,
-            target_size_kb: 200,
             auto_send_to_ai: true,
         }
     }

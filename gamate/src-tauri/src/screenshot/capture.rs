@@ -136,14 +136,14 @@ impl ScreenCapturer {
         Ok(image::imageops::crop_imm(image, x, y, width, height).to_image())
     }
 
-    /// 编码图片为 Base64 (优化版：压缩到 200KB 左右)
+    /// 编码图片为 Base64 (智能压缩)
     fn encode_image(&self, image: &image::RgbaImage) -> Result<String> {
         use image::DynamicImage;
 
         let dynamic_img = DynamicImage::ImageRgba8(image.clone());
 
-        // 优化图片大小 (目标 200KB)
-        let optimized_img = self.optimize_image(dynamic_img, 200 * 1024)?;
+        // 智能优化图片大小
+        let optimized_img = self.smart_optimize_image(dynamic_img)?;
 
         let mut buffer = Cursor::new(Vec::new());
 
@@ -159,24 +159,45 @@ impl ScreenCapturer {
         Ok(format!("data:image/png;base64,{}", base64_data))
     }
 
-    /// 优化图片大小 (缩放到目标文件大小)
-    fn optimize_image(&self, img: DynamicImage, target_size_bytes: usize) -> Result<DynamicImage> {
+    /// 智能优化图片大小
+    /// - 小于 400KB: 不压缩
+    /// - 大于 400KB: 压缩到原大小的 70%
+    fn smart_optimize_image(&self, img: DynamicImage) -> Result<DynamicImage> {
         let (original_width, original_height) = (img.width(), img.height());
 
-        // 估算当前大小 (PNG 压缩率约 50-70%, 假设每像素 2 字节)
-        let current_estimated_size = (original_width * original_height * 2) as usize;
+        // 先编码一次,获取实际文件大小
+        let mut temp_buffer = Cursor::new(Vec::new());
+        img.write_to(&mut temp_buffer, ImageFormat::Png)
+            .map_err(|e| ScreenshotError::EncodeFailed(e.to_string()))?;
 
-        if current_estimated_size <= target_size_bytes {
-            return Ok(img); // 已经足够小
+        let original_size = temp_buffer.into_inner().len();
+        let original_size_kb = original_size / 1024;
+
+        log::info!(
+            "📊 全屏截图原始图片: {}x{}, 大小: {} KB",
+            original_width,
+            original_height,
+            original_size_kb
+        );
+
+        // 策略1: 小于 400KB, 不压缩
+        if original_size < 400 * 1024 {
+            log::info!("✅ 图片已足够小 (< 400KB), 无需压缩");
+            return Ok(img);
         }
 
-        // 计算缩放比例 (保持宽高比)
-        let scale_ratio = (target_size_bytes as f64 / current_estimated_size as f64).sqrt();
+        // 策略2: 400KB以上压缩为原始的70%
+        let target_size = (original_size as f64 * 0.7) as usize;
+        log::info!("🔧 图片超过 400KB, 压缩到 70% (目标: {} KB)", target_size / 1024);
+
+        // 计算缩放比例 (估算 PNG 压缩率为 50-70%, 每像素约 2 字节)
+        let current_estimated_size = (original_width * original_height * 2) as usize;
+        let scale_ratio = (target_size as f64 / current_estimated_size as f64).sqrt();
         let new_width = ((original_width as f64) * scale_ratio).round() as u32;
         let new_height = ((original_height as f64) * scale_ratio).round() as u32;
 
         log::info!(
-            "🔍 缩放图片: {}x{} → {}x{} (缩放比 {:.2})",
+            "🔄 缩放全屏截图: {}x{} → {}x{} (缩放比 {:.2})",
             original_width,
             original_height,
             new_width,

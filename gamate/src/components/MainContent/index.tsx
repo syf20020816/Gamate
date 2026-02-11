@@ -13,13 +13,18 @@ import "./styles.scss";
 interface MainContentProps {
   selectedMenu: string;
   onMenuChange?: (key: string) => void;
+  setTourOpen?: (open: boolean) => void;
 }
 
-const MainContent: React.FC<MainContentProps> = ({ selectedMenu, onMenuChange }) => {
+const MainContent: React.FC<MainContentProps> = ({
+  selectedMenu,
+  onMenuChange,
+  setTourOpen,
+}) => {
   const renderContent = () => {
     switch (selectedMenu) {
       case "home":
-        return <Home onNavigate={onMenuChange} />;
+        return <Home onNavigate={onMenuChange} setTourOpen={setTourOpen} />;
       case "wiki-search":
         return <WikiKnowledgeBase />;
       case "ai-assistant":
