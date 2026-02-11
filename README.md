@@ -291,7 +291,7 @@ gamate/
 
 ## 📄 开源协议
 
-本项目采用 [MIT License](LICENSE) 开源协议。
+本项目采用 [Elastic License 2.0](LICENSE) 开源协议。
 
 ## 🎯 路线图
 
