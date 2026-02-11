@@ -53,19 +53,20 @@ const GameLibrary: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [selectedGameIds, setSelectedGameIds] = useState<string[]>([]);
   const [syncing, setSyncing] = useState(false);
-  const [storageBasePath, setStorageBasePath] = useState<string>("./data/skills");
-  
+  const [storageBasePath, setStorageBasePath] =
+    useState<string>("./data/skills");
+
   // Steam 相关状态
   const [useSteamLibrary, setUseSteamLibrary] = useState(false);
   const [steamUser, setSteamUser] = useState<any>(null);
   const [steamGames, setSteamGames] = useState<any[]>([]);
-  
+
   // 分页相关状态
   const [currentPage, setCurrentPage] = useState(0);
   const [pageSize] = useState(10);
   const [totalGames, setTotalGames] = useState(0);
   const [hasNextPage, setHasNextPage] = useState(false);
-  
+
   // 缓存已加载的页面
   const gamesCache = useRef<Map<number, Game[]>>(new Map());
   const steamGamesCache = useRef<Map<number, any[]>>(new Map());
@@ -76,11 +77,11 @@ const GameLibrary: React.FC = () => {
     const loadData = async () => {
       try {
         const { invoke } = await import("@tauri-apps/api/core");
-        
+
         // 加载技能库配置
         const config = await getSkillLibraryConfig();
         setStorageBasePath(config.storageBasePath);
-        
+
         // 加载选中的游戏
         const settings = await invoke<any>("get_app_settings");
         const selected = settings?.user?.selected_games || [];
@@ -95,6 +96,7 @@ const GameLibrary: React.FC = () => {
   // 检查 Steam 登录状态
   useEffect(() => {
     const checkSteamUser = async () => {
+      setLoading(true);
       try {
         const { invoke } = await import("@tauri-apps/api/core");
         const user = await invoke<any>("get_current_steam_user");
@@ -106,13 +108,17 @@ const GameLibrary: React.FC = () => {
         }
       } catch (error) {
         console.log("未登录 Steam");
+      } finally {
+        setLoading(false);
       }
     };
+
     checkSteamUser();
   }, []);
 
   // 加载 Steam 游戏库（分页）
   const loadSteamLibrary = useCallback(async () => {
+    setLoading(true);
     try {
       const { invoke } = await import("@tauri-apps/api/core");
       const library = await invoke<any>("fetch_steam_library", {
@@ -120,9 +126,35 @@ const GameLibrary: React.FC = () => {
       });
       setSteamGames(library || []);
       setTotalGames(library?.length || 0);
+
+      // 保存 Steam 游戏到 games.toml
+      if (library && library.length > 0) {
+        try {
+          // 准备游戏数据
+          const steamGameData = library.map((game: any) => ({
+            appid: game.appid,
+            name: game.name,
+            img_icon_url: game.img_icon_url
+              ? `https://steamcdn-a.akamaihd.net/steamcommunity/public/images/apps/${game.appid}/${game.img_icon_url}.jpg`
+              : null,
+          }));
+
+          // 调用后端保存到 games.toml
+          await invoke("save_steam_games_to_config", {
+            steamGames: steamGameData,
+          });
+
+          console.log(`✅ 已保存 ${library.length} 个 Steam 游戏到配置文件`);
+        } catch (saveError) {
+          console.error("保存 Steam 游戏到配置失败:", saveError);
+          // 不影响主流程,只记录错误
+        }
+      }
     } catch (error) {
       console.error("加载 Steam 游戏库失败:", error);
       message.error("加载 Steam 游戏库失败");
+    } finally {
+      setLoading(false);
     }
   }, []);
 
@@ -145,7 +177,7 @@ const GameLibrary: React.FC = () => {
           const start = page * pageSize;
           const end = Math.min(start + pageSize, steamGames.length);
           const pageGames = steamGames.slice(start, end);
-          
+
           // 转换为统一的 Game 格式
           const convertedGames: Game[] = pageGames.map((game: any) => ({
             id: `steam_${game.appid}`,
@@ -169,11 +201,11 @@ const GameLibrary: React.FC = () => {
             const start = page * pageSize;
             const end = Math.min(start + pageSize, allGames.length);
             const pageGames = allGames.slice(start, end);
-            
+
             setGames(pageGames);
             setTotalGames(allGames.length);
             setHasNextPage(end < allGames.length);
-            
+
             // 缓存全部游戏（分页）
             for (let i = 0; i < Math.ceil(allGames.length / pageSize); i++) {
               const s = i * pageSize;
@@ -192,7 +224,7 @@ const GameLibrary: React.FC = () => {
         setLoading(false);
       }
     },
-    [useSteamLibrary, steamGames, pageSize]
+    [useSteamLibrary, steamGames, pageSize],
   );
 
   // 初始加载第一页
@@ -254,66 +286,72 @@ const GameLibrary: React.FC = () => {
 
   // 切换游戏源（Steam / 默认库）
   const handleToggleGameSource = (checked: boolean) => {
+    setLoading(true);
     setUseSteamLibrary(checked);
     setCurrentPage(0);
     gamesCache.current.clear();
     steamGamesCache.current.clear();
     loadGamesPage(0);
+    setLoading(false);
   };
 
   const handleAddGame = async (game: Game) => {
     setSelectedGame(game);
-    
+
     // 如果是 Steam 游戏,动态获取 wiki 配置
-    if (game.id.startsWith('steam_')) {
+    if (game.id.startsWith("steam_")) {
       try {
         const { invoke } = await import("@tauri-apps/api/core");
-        const appid = parseInt(game.id.replace('steam_', ''));
-        
+        const appid = parseInt(game.id.replace("steam_", ""));
+
         // 从后端获取 SkillConfig
-        const backendConfigs = await invoke<Array<{
-          id: string;
-          name: string;
-          description: string;
-          repo: string;
-          version: string;
-          source_type: string;
-          max_pages?: number;
-          max_depth?: number;
-          request_delay_ms?: number;
-        }>>('get_steam_game_wiki_configs', { 
-          appid, 
-          gameName: game.name 
+        const backendConfigs = await invoke<
+          Array<{
+            id: string;
+            name: string;
+            description: string;
+            repo: string;
+            version: string;
+            source_type: string;
+            max_pages?: number;
+            max_depth?: number;
+            request_delay_ms?: number;
+          }>
+        >("get_steam_game_wiki_configs", {
+          appid,
+          gameName: game.name,
         });
-        
+
         // 转换为 GameSkillConfig 格式
-        const convertedConfigs: GameSkillConfig[] = backendConfigs.map(skill => ({
-          id: skill.id,
-          gameId: game.id,
-          repo: skill.repo,
-          name: skill.name,
-          description: skill.description,
-          version: skill.version,
-          source: skill.source_type as any,
-          status: SkillStatus.NotDownloaded,
-          statistics: {
-            totalEntries: 0,
-            vectorCount: 0,
-            storageSize: 0,
-          },
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        }));
-        
+        const convertedConfigs: GameSkillConfig[] = backendConfigs.map(
+          (skill) => ({
+            id: skill.id,
+            gameId: game.id,
+            repo: skill.repo,
+            name: skill.name,
+            description: skill.description,
+            version: skill.version,
+            source: skill.source_type as any,
+            status: SkillStatus.NotDownloaded,
+            statistics: {
+              totalEntries: 0,
+              vectorCount: 0,
+              storageSize: 0,
+            },
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          }),
+        );
+
         setSkillConfigs(convertedConfigs);
       } catch (error) {
-        console.error('获取 Steam 游戏 Wiki 配置失败:', error);
-        message.error('获取游戏 Wiki 配置失败');
+        console.error("获取 Steam 游戏 Wiki 配置失败:", error);
+        message.error("获取游戏 Wiki 配置失败");
         return;
       }
     }
     // 默认游戏使用现有的配置加载逻辑(在 useEffect 中已加载)
-    
+
     setSkillModalVisible(true);
   };
 
@@ -464,9 +502,9 @@ const GameLibrary: React.FC = () => {
         transition={{ duration: 0.3 }}
       >
         <div className="library-header">
-          <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
+          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
             <Title level={3}>游戏库</Title>
-            <Paragraph type="secondary" style={{margin: 0}}>
+            <Paragraph type="secondary" style={{ margin: 0 }}>
               选择你要玩的游戏，系统将自动下载对应的Wiki技能库
             </Paragraph>
           </div>
@@ -490,16 +528,16 @@ const GameLibrary: React.FC = () => {
               gap: "16px",
               alignItems: "center",
               justifyContent: "space-between",
-            }
+            },
           }}
         >
-          <Space size="middle" style={{ flex: 1 }}>
+          <Space size="middle" style={{ flex: 1, flexWrap: "wrap" }}>
             <Input
               placeholder="搜索游戏名称..."
               prefix={<Search size={16} />}
               value={searchText}
               onChange={(e) => setSearchText(e.target.value)}
-              style={{ width: 300 }}
+              style={{ flex: 1, minWidth: 300 }}
               allowClear
             />
             <Select
@@ -526,16 +564,17 @@ const GameLibrary: React.FC = () => {
                 />
               </Space>
             )}
+
+            <Tooltip title="检测已下载的技能库并同步到配置">
+              <Button
+                icon={<RefreshCw size={18} />}
+                onClick={handleSyncLibraries}
+                loading={syncing}
+              >
+                检测同步
+              </Button>
+            </Tooltip>
           </Space>
-          <Tooltip title="检测已下载的技能库并同步到配置">
-            <Button
-              icon={<RefreshCw size={18} />}
-              onClick={handleSyncLibraries}
-              loading={syncing}
-            >
-              检测同步
-            </Button>
-          </Tooltip>
         </Card>
 
         {/* 游戏卡片列表 */}
@@ -545,7 +584,12 @@ const GameLibrary: React.FC = () => {
           </Card>
         ) : (
           <>
-            <Flex wrap="wrap" gap={16} align="flex-start" justify="space-between">
+            <Flex
+              wrap="wrap"
+              gap={16}
+              align="flex-start"
+              justify="space-between"
+            >
               {games.map((game, index) => {
                 const isAdded = selectedGameIds.includes(game.id);
 
@@ -638,7 +682,7 @@ const GameLibrary: React.FC = () => {
                 );
               })}
             </Flex>
-            
+
             {/* 分页组件 - 简单模式 */}
             {totalGames > pageSize && (
               <div style={{ marginTop: 24, textAlign: "center" }}>

@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from "react";
 import { Card, Select, Button, message as antdMessage } from "antd";
 import { listen } from "@tauri-apps/api/event";
-import { getCurrentWindow } from "@tauri-apps/api/window";
+// import { getCurrentWindow } from "@tauri-apps/api/window";
 import { invoke } from "@tauri-apps/api/core";
 import { getGameById } from "../../services/configService";
 import { useAIAssistantStore } from "../../stores/aiAssistantStore";
@@ -10,9 +10,9 @@ import "./HudOverlay.scss";
 import { Mic, MicOff } from "lucide-react";
 
 interface HudState {
-  isListening: boolean;      // 是否正在监听
-  aiStatus: string;          // AI 状态文字
-  statusColor: string;       // 状态颜色
+  isListening: boolean; // 是否正在监听
+  aiStatus: string; // AI 状态文字
+  statusColor: string; // 状态颜色
 }
 
 interface ListenerState {
@@ -33,15 +33,15 @@ export const HudOverlay: React.FC = () => {
   // const [listenerState, setListenerState] = useState<ListenerState | null>(null);
   const [availableGames, setAvailableGames] = useState<any[]>([]);
   const [downloadedLibraries, setDownloadedLibraries] = useState<any[]>([]);
-  
+
   // 使用共享的 zustand store
   const { currentGame, setCurrentGame: setStoreGame } = useAIAssistantStore();
-  
+
   // 包装 setCurrentGame,同时通过事件通知主窗口
   const setCurrentGame = async (gameId: string) => {
     // 1. 更新本地 store
     setStoreGame(gameId);
-    
+
     // 2. 发送事件到主窗口
     try {
       const { emit } = await import("@tauri-apps/api/event");
@@ -50,7 +50,7 @@ export const HudOverlay: React.FC = () => {
       console.error("发送事件失败:", error);
     }
   };
-  
+
   const handleGameChange = (gameId: string) => {
     setCurrentGame(gameId);
   };
@@ -60,9 +60,9 @@ export const HudOverlay: React.FC = () => {
     try {
       const backendState = await invoke<ListenerState>("get_listener_state");
       // setListenerState(backendState);
-      
+
       // 同步 isListening 状态
-      setState(prev => ({
+      setState((prev) => ({
         ...prev,
         isListening: backendState.is_listening,
       }));
@@ -75,10 +75,10 @@ export const HudOverlay: React.FC = () => {
   useEffect(() => {
     const loadLibraries = async () => {
       try {
-        const libraries = await invoke<any[]>('scan_downloaded_libraries');
+        const libraries = await invoke<any[]>("scan_downloaded_libraries");
         setDownloadedLibraries(libraries);
       } catch (error) {
-        console.error('扫描技能库失败:', error);
+        console.error("扫描技能库失败:", error);
       }
     };
     loadLibraries();
@@ -88,26 +88,30 @@ export const HudOverlay: React.FC = () => {
   useEffect(() => {
     const loadAvailableGames = async () => {
       try {
-        const settings = await invoke<any>('get_app_settings');
+        const settings = await invoke<any>("get_app_settings");
         const selectedGameIds = settings.user?.selected_games || [];
-        
+
         // 获取有技能库的游戏 ID
-        const gamesWithSkills = [...new Set(downloadedLibraries.map((lib) => lib.gameId))];
-        
+        const gamesWithSkills = [
+          ...new Set(downloadedLibraries.map((lib) => lib.gameId)),
+        ];
+
         // 过滤出既被选择又有技能库的游戏
-        const filteredIds = selectedGameIds.filter((id: string) => gamesWithSkills.includes(id));
-        
+        const filteredIds = selectedGameIds.filter((id: string) =>
+          gamesWithSkills.includes(id),
+        );
+
         const games = await Promise.all(
-          filteredIds.map((id: string) => getGameById(id))
+          filteredIds.map((id: string) => getGameById(id)),
         );
         const validGames = games.filter(Boolean);
-        
+
         setAvailableGames(validGames);
       } catch (error) {
-        console.error('加载游戏配置失败:', error);
+        console.error("加载游戏配置失败:", error);
       }
     };
-    
+
     if (downloadedLibraries.length > 0) {
       loadAvailableGames();
     }
@@ -116,25 +120,28 @@ export const HudOverlay: React.FC = () => {
   useEffect(() => {
     // 初始加载状态
     loadState();
-    
+
     // 定时更新状态(500ms轮询)
     const interval = setInterval(loadState, 500);
-    
+
     // 存储所有的 unlisten 函数
     const unlistenFunctions: Array<() => void> = [];
-    
+
     // 设置所有事件监听器
     const setupListeners = async () => {
       try {
         // 监听来自主窗口的游戏切换事件
-        const unlistenGameChange = await listen<{ gameId: string }>("game-changed", (event) => {
-          setStoreGame(event.payload.gameId);
-        });
+        const unlistenGameChange = await listen<{ gameId: string }>(
+          "game-changed",
+          (event) => {
+            setStoreGame(event.payload.gameId);
+          },
+        );
         unlistenFunctions.push(unlistenGameChange);
 
         // 语音开始
         const unlistenSpeechStarted = await listen("speech_started", () => {
-          setState(prev => ({
+          setState((prev) => ({
             ...prev,
             aiStatus: "正在聆听...",
             statusColor: "#1890ff", // 蓝色
@@ -144,7 +151,7 @@ export const HudOverlay: React.FC = () => {
 
         // 语音结束
         const unlistenSpeechEnded = await listen("speech_ended", () => {
-          setState(prev => ({
+          setState((prev) => ({
             ...prev,
             aiStatus: "识别中...",
             statusColor: "#faad14", // 橙色
@@ -153,24 +160,30 @@ export const HudOverlay: React.FC = () => {
         unlistenFunctions.push(unlistenSpeechEnded);
 
         // 识别完成 (语音转文字完成)
-        const unlistenRecognizeRequest = await listen("aliyun_recognize_request", () => {
-          // 不改变状态,因为马上就要截图了
-        });
+        const unlistenRecognizeRequest = await listen(
+          "aliyun_recognize_request",
+          () => {
+            // 不改变状态,因为马上就要截图了
+          },
+        );
         unlistenFunctions.push(unlistenRecognizeRequest);
-        
+
         // 开始截图
-        const unlistenScreenshotStarted = await listen("screenshot_started", () => {
-          setState(prev => ({
-            ...prev,
-            aiStatus: "正在截图...",
-            statusColor: "#13c2c2", // 青色
-          }));
-        });
+        const unlistenScreenshotStarted = await listen(
+          "screenshot_started",
+          () => {
+            setState((prev) => ({
+              ...prev,
+              aiStatus: "正在截图...",
+              statusColor: "#13c2c2", // 青色
+            }));
+          },
+        );
         unlistenFunctions.push(unlistenScreenshotStarted);
 
         // AI 思考中
         const unlistenAiThinking = await listen("ai_thinking", () => {
-          setState(prev => ({
+          setState((prev) => ({
             ...prev,
             aiStatus: "AI 思考中...",
             statusColor: "#722ed1", // 紫色
@@ -180,7 +193,7 @@ export const HudOverlay: React.FC = () => {
 
         // AI 回答
         const unlistenAiResponse = await listen("ai_response_ready", () => {
-          setState(prev => ({
+          setState((prev) => ({
             ...prev,
             aiStatus: "正在回答...",
             statusColor: "#52c41a", // 绿色
@@ -188,7 +201,7 @@ export const HudOverlay: React.FC = () => {
 
           // 3秒后回到待机
           setTimeout(() => {
-            setState(prev => ({
+            setState((prev) => ({
               ...prev,
               aiStatus: "待机中",
               statusColor: "#666",
@@ -200,12 +213,12 @@ export const HudOverlay: React.FC = () => {
         console.error("[HUD] 设置事件监听器失败:", error);
       }
     };
-    
+
     setupListeners();
-    
+
     return () => {
       // 清理所有监听器
-      unlistenFunctions.forEach(unlisten => unlisten());
+      unlistenFunctions.forEach((unlisten) => unlisten());
       clearInterval(interval);
     };
   }, [setStoreGame]);
@@ -235,24 +248,33 @@ export const HudOverlay: React.FC = () => {
   };
 
   // 双击最小化
-  const handleDoubleClick = async () => {
-    try {
-      const hudWindow = getCurrentWindow();
-      await hudWindow.minimize();
-    } catch (error) {
-      console.error("最小化失败:", error);
-    }
-  };
+  // const handleDoubleClick = async () => {
+  //   try {
+  //     const hudWindow = getCurrentWindow();
+  //     await hudWindow.minimize();
+  //   } catch (error) {
+  //     console.error("最小化失败:", error);
+  //   }
+  // };
 
   return (
-    <div 
-      className="hud-overlay-container"
-    >
-      <Card className="hud-card" bordered={false}>
+    <div className="hud-overlay-container">
+      <Card
+        className="hud-card"
+        bordered={false}
+        style={{ margin: 0, padding: 0, backgroundColor: "#00000040" }}
+        styles={{
+          body: {
+            margin: 0,
+            padding: 12,
+            backgroundColor: "transparent"
+          },
+        }}
+      >
         <div className="hud-content">
           {/* 状态指示灯 */}
           <div className="status-indicator">
-            <div 
+            <div
               className={`status-light ${state.isListening ? "active" : "inactive"}`}
               title={state.isListening ? "监听中" : "已暂停"}
             />
@@ -260,10 +282,7 @@ export const HudOverlay: React.FC = () => {
 
           {/* 状态文字 */}
           <div className="status-text-container">
-            <div 
-              className="status-text"
-              style={{ color: state.statusColor }}
-            >
+            <div className="status-text" style={{ color: state.statusColor }}>
               {state.aiStatus}
             </div>
           </div>
@@ -290,7 +309,13 @@ export const HudOverlay: React.FC = () => {
         <div className="hud-controls" style={{ marginTop: 8 }}>
           <Button
             type={state.isListening ? "default" : "primary"}
-            icon={state.isListening ? <MicOff size={18}></MicOff> : <Mic size={18}></Mic>}
+            icon={
+              state.isListening ? (
+                <MicOff size={18}></MicOff>
+              ) : (
+                <Mic size={18}></Mic>
+              )
+            }
             onClick={handleToggleConversation}
             block
             danger={state.isListening}
@@ -300,9 +325,9 @@ export const HudOverlay: React.FC = () => {
         </div>
 
         {/* 提示文字 */}
-        <div className="hud-hint" onDoubleClick={handleDoubleClick}>
+        {/* <div className="hud-hint" onDoubleClick={handleDoubleClick}>
           双击此处最小化 · 拖动调整位置
-        </div>
+        </div> */}
       </Card>
     </div>
   );

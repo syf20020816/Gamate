@@ -36,9 +36,7 @@ pub async fn open_hud_window(app: AppHandle) -> Result<(), String> {
     let hud_window = WebviewWindowBuilder::new(&app, "hud", WebviewUrl::App("/hud".into()))
         .title("AI 助手 HUD")
         .position(pos_x, pos_y) // 使用保存的位置
-        .inner_size(320.0, 180.0) // 窗口大小
-        .min_inner_size(280.0, 180.0) // 最小尺寸
-        .max_inner_size(400.0, 180.0) // 最大尺寸
+        .inner_size(240.0, 120.0) // 窗口大小
         .resizable(false) // 禁止调整大小
         .decorations(false) // 无边框
         .transparent(true) // 透明背景
@@ -169,8 +167,7 @@ pub async fn open_livestream_hud_window(app: AppHandle) -> Result<(), String> {
     )
     .title("直播间 HUD")
     .position(pos_x, pos_y) // 使用保存的位置
-    .inner_size(400.0, 600.0) // 更大的窗口
-    .min_inner_size(400.0, 600.0) // 最小尺寸
+    .inner_size(380.0, 480.0) // 更大的窗口
     .resizable(false) // 禁止调整大小
     .decorations(false) // 无边框
     .transparent(true) // 透明背景

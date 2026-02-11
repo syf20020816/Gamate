@@ -60,14 +60,14 @@ export const LivestreamHudPage: React.FC = () => {
   const eventListenerRef = useRef<UnlistenFn | null>(null);
   const smartCaptureListenerRef = useRef<UnlistenFn | null>(null);
   
-  // 🔥 截图缺失计数器（连续2次双截图都缺失才报错）
+  //  截图缺失计数器（连续2次双截图都缺失才报错）
   const screenshotErrorCountRef = useRef(0);
   const isProcessingRecognitionRef = useRef(false); // 防止重复处理
   
-  // 🔥 防止 React.StrictMode 导致事件监听器重复注册
+  //  防止 React.StrictMode 导致事件监听器重复注册
   const eventListenerSetupRef = useRef(false);
   
-  // 🔥 防止重复处理同一个事件（通过 timestamp 去重）
+  //  防止重复处理同一个事件（通过 timestamp 去重）
   const processedEventTimestampsRef = useRef<Set<number>>(new Set());
 
   const livestream = config.livestream!;
@@ -159,7 +159,7 @@ export const LivestreamHudPage: React.FC = () => {
     };
   }, []); // 保持空依赖数组，只在组件挂载时注册一次
 
-  // 🔥 监听智能截图事件
+  // 监听智能截图事件
   useEffect(() => {
     const setupSmartCaptureListener = async () => {
       // 临时存储截图数据
@@ -172,7 +172,7 @@ export const LivestreamHudPage: React.FC = () => {
 
         switch (data.type) {
           case "SpeechStarted":
-            message.info("检测到语音，已截图", 1);
+            // message.info("检测到语音，已截图", 1);
             
             // 保存第一张截图
             currentScreenshotBefore = data.screenshot_start?.data || null;
@@ -297,7 +297,7 @@ export const LivestreamHudPage: React.FC = () => {
           currentScreenshotBefore = null;
           currentScreenshotAfter = null;
         } finally {
-          // 🔥 释放处理锁
+          // 释放处理锁
           isProcessingRecognitionRef.current = false;
         }
       });
@@ -428,7 +428,7 @@ export const LivestreamHudPage: React.FC = () => {
         setIsLivestreaming(false);
         message.info("直播已停止");
 
-        // 🔥 停止智能截图
+        // 停止智能截图
         if (isSmartCaptureRunning) {
           try {
             await invoke("stop_smart_capture");
@@ -481,7 +481,7 @@ export const LivestreamHudPage: React.FC = () => {
           await invoke("start_smart_capture", { config: smartCaptureConfig });
           
           setIsSmartCaptureRunning(true);
-          message.success("智能截图已启动，开始监听语音...", 2);
+          // message.success("智能截图已启动，开始监听语音...", 2);
         } catch (error) {
           console.error("启动智能截图失败:", error);
           message.error(`智能截图启动失败: ${error}`, 3);
@@ -526,7 +526,7 @@ export const LivestreamHudPage: React.FC = () => {
       </Card>
 
       {/* 主内容区 */}
-      <div className="main-content">
+      <div className="main-content_hud">
         {/* 左侧: 弹幕对话窗 */}
         <Card className="chat-card" title="弹幕对话" size="small">
           <ConversationArea
@@ -626,7 +626,7 @@ export const LivestreamHudPage: React.FC = () => {
         <Button
           block
           type={isLivestreaming ? "default" : "primary"}
-          size="large"
+          
           danger={isLivestreaming}
           disabled={!currentGame}
           icon={

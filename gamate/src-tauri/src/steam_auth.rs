@@ -140,14 +140,14 @@ impl SteamAuthClient {
             .await
             .map_err(|e| format!("读取响应失败: {}", e))?;
 
-        println!("Steam API 响应: {}", &text[..text.len().min(500)]); // 只打印前500字符
+        // println!("Steam API 响应: {}", &text[..text.len().min(500)]); // 只打印前500字符
 
         // 解析 JSON
         let data: GetOwnedGamesResponse = serde_json::from_str(&text)
             .map_err(|e| format!("解析响应失败: {}。响应内容: {}", e, &text[..text.len().min(200)]))?;
 
         let games = data.response.games.unwrap_or_default();
-        log::info!("✅ 成功获取 {} 个游戏", games.len());
+        // log::info!("✅ 成功获取 {} 个游戏", games.len());
 
         Ok(games)
     }

@@ -590,7 +590,7 @@ export const VoiceChatPanel: React.FC = () => {
           </div>
         </div>
         <p className="hint-text">
-          💡 提示: 说话结束后系统会自动检测静音并开始识别
+          提示: 说话结束后系统会自动检测静音并开始识别
         </p>
       </div> */}
     </div>

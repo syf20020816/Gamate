@@ -480,7 +480,7 @@ const SkillDatabase: React.FC = () => {
                   className="game-skill-card"
                   title={
                     <Space>
-                      <Database size={20} />
+                      
                       <span>{game?.name || gameId}</span>
                       <Tag color="blue">{libraries.length} 个版本</Tag>
                     </Space>
@@ -519,7 +519,7 @@ const SkillDatabase: React.FC = () => {
                                   {library.status === "error" && (
                                     <Badge status="error" text="错误" />
                                   )}
-                                  <Text strong>{library.skillConfigName}</Text>
+                                  <Text strong>{game?.name || library.gameName}</Text>
                                   <Tag>{library.version}</Tag>
                                 </Space>
 

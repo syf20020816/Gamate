@@ -131,7 +131,7 @@ async fn test_get_user_library(api_key: &str) {
         Ok(games) => {
             if games.is_empty() {
                 println!("⚠️  游戏库为空或设置为私密");
-                println!("\n💡 提示:");
+                println!("\n提示:");
                 println!("   1. 确保 Steam 个人资料设置为公开");
                 println!("   2. 游戏详情设置为公开");
                 println!("   3. 或使用自己的 Steam ID 测试");

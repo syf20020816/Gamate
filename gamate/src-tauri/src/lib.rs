@@ -187,6 +187,8 @@ pub fn run() {
             verify_steam_login,
             // Steam Wiki 配置命令
             get_steam_game_wiki_configs,
+            // Steam 游戏配置管理
+            save_steam_games_to_config,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

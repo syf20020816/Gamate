@@ -63,6 +63,7 @@ const AIAssistant: React.FC = () => {
     clearMessages,
     deleteMessage,
   } = useAIAssistantStore();
+  
 
   const [downloadedLibraries, setDownloadedLibraries] = useState<any[]>([]);
   const [availableGames, setAvailableGames] = useState<any[]>([]);
@@ -136,18 +137,16 @@ const AIAssistant: React.FC = () => {
   useEffect(() => {
     const loadAvailableGames = async () => {
       try {
-        const settings = await invoke<any>("get_app_settings");
-        const selectedGameIds = settings.user?.selected_games || [];
-
+        // const settings = await invoke<any>("get_app_settings");
+        // const selectedGameIds = settings.user?.selected_games || [];
         // 获取有技能库的游戏 ID
         const gamesWithSkills = [
           ...new Set(downloadedLibraries.map((lib) => lib.gameId)),
         ];
-
-        // 过滤出既被选择又有技能库的游戏
-        const filteredIds = selectedGameIds.filter((id: string) =>
-          gamesWithSkills.includes(id),
-        );
+        
+        // 修改逻辑: 只要有技能库就显示,不需要在 selected_games 中
+        // 原因: Steam 游戏下载后可能没有添加到 selected_games
+        const filteredIds = gamesWithSkills;
 
         // 使用 Promise.all 等待所有异步调用完成
         const games = await Promise.all(

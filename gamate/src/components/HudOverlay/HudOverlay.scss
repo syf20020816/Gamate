@@ -9,12 +9,11 @@
   -webkit-app-region: drag; // 启用拖拽区域
   margin: 0;
   .hud-card {
-    background: rgba(0, 0, 0, 0.65);
     backdrop-filter: blur(10px);
     border-radius: 12px;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
-    padding: 0px 8px;
-    min-width: 320px;
+    padding: 0px 0px;
+    margin: 0px;
+    min-width: 240px;
     width: 100%;
     transition: all 0.2s ease;
 
@@ -32,8 +31,8 @@
   // 状态指示灯
   .status-indicator {
     .status-light {
-      width: 16px;
-      height: 16px;
+      width: 12px;
+      height: 12px;
       border-radius: 50%;
       transition: all 0.3s ease;
       box-shadow: 0 0 10px currentColor;

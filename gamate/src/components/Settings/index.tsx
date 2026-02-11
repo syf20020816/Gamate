@@ -64,10 +64,10 @@ const SettingsPanel: React.FC = () => {
   // 检查 HUD 预览窗口是否打开
   const checkHudPreview = async () => {
     try {
-      const visible = await invoke<boolean>('is_hud_window_visible');
+      const visible = await invoke<boolean>("is_hud_window_visible");
       setHudPreviewVisible(visible);
     } catch (error) {
-      console.error('检查 HUD 可见性失败:', error);
+      console.error("检查 HUD 可见性失败:", error);
     }
   };
 
@@ -208,14 +208,13 @@ const SettingsPanel: React.FC = () => {
                   valuePropName="checked"
                   tooltip="启用后,应用最小化到托盘时,HUD浮窗会保持显示。关闭后,HUD浮窗会随主窗口一起隐藏"
                 >
-                  <Switch 
-                    checkedChildren="开启" 
-                    unCheckedChildren="关闭"
-                  />
+                  <Switch checkedChildren="开启" unCheckedChildren="关闭" />
                 </Form.Item>
 
                 <Form.Item label="HUD 位置预览">
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <div
+                    style={{ display: "flex", alignItems: "center", gap: 8 }}
+                  >
                     <span style={{ fontSize: 14 }}>预览窗口:</span>
                     <Switch
                       checked={hudPreviewVisible}
@@ -224,7 +223,9 @@ const SettingsPanel: React.FC = () => {
                           if (checked) {
                             await invoke("open_hud_window");
                             setHudPreviewVisible(true);
-                            message.success("HUD 浮窗已打开,您可以拖动调整位置,位置会自动保存");
+                            message.success(
+                              "HUD 浮窗已打开,您可以拖动调整位置,位置会自动保存",
+                            );
                           } else {
                             await invoke("close_hud_window");
                             setHudPreviewVisible(false);
@@ -247,13 +248,16 @@ const SettingsPanel: React.FC = () => {
                   description={
                     <ul style={{ marginBottom: 0, paddingLeft: 20 }}>
                       <li>
-                        <strong>HUD 浮窗模式</strong>: 控制最小化时是否保持 HUD 显示
+                        <strong>HUD 浮窗模式</strong>: 控制最小化时是否保持 HUD
+                        显示
                       </li>
                       <li>
-                        <strong>预览位置</strong>: 打开 HUD 浮窗进行位置调整,拖动后会自动保存位置
+                        <strong>预览位置</strong>: 打开 HUD
+                        浮窗进行位置调整,拖动后会自动保存位置
                       </li>
                       <li>
-                        <strong>主窗口关闭</strong>: 点击关闭按钮会最小化到托盘,右键托盘图标可退出应用
+                        <strong>主窗口关闭</strong>:
+                        点击关闭按钮会最小化到托盘,右键托盘图标可退出应用
                       </li>
                       <li>
                         <strong>双击托盘</strong>: 快速显示/隐藏主窗口
@@ -1012,9 +1016,7 @@ const SettingsPanel: React.FC = () => {
                   tooltip="选择全屏或窗口截图模式"
                 >
                   <Select>
-                    <Select.Option value="fullscreen">
-                      全屏截图
-                    </Select.Option>
+                    <Select.Option value="fullscreen">全屏截图</Select.Option>
                     <Select.Option value="window">窗口截图</Select.Option>
                   </Select>
                 </Form.Item>
@@ -1053,7 +1055,10 @@ const SettingsPanel: React.FC = () => {
                                     placeholder="请选择窗口"
                                     showSearch
                                     optionFilterProp="label"
-                                    style={{ maxWidth: "calc(100% - 84px)", marginRight: 8 }}
+                                    style={{
+                                      maxWidth: "calc(100% - 84px)",
+                                      marginRight: 8,
+                                    }}
                                     options={windows.map((w) => ({
                                       label: `${w.title} - ${w.app_name} (${w.width}x${w.height})`,
                                       value: w.id,
@@ -1528,7 +1533,7 @@ const SettingsPanel: React.FC = () => {
                                 }
                               }}
                             >
-                              🔊 测试播报
+                              测试播报
                             </Button>
                             <Button
                               onClick={async () => {
@@ -1542,13 +1547,13 @@ const SettingsPanel: React.FC = () => {
                                 }
                               }}
                             >
-                              ⏹ 停止
+                              停止
                             </Button>
                           </Space>
                         </Form.Item>
 
                         <Alert
-                          message="💡 提示"
+                          message="提示"
                           description='保存设置后,语速和音量将在下次播报时生效。你也可以点击"测试播报"立即体验。'
                           type="success"
                           showIcon
