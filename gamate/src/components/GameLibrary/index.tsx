@@ -65,7 +65,7 @@ const GameLibrary: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(0);
   const [pageSize] = useState(10);
   const [totalGames, setTotalGames] = useState(0);
-  const [hasNextPage, setHasNextPage] = useState(false);
+  const [_hasNextPage, setHasNextPage] = useState(false);
 
   // 缓存已加载的页面
   const gamesCache = useRef<Map<number, Game[]>>(new Map());

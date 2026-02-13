@@ -131,11 +131,19 @@ pub async fn is_hud_window_visible(app: AppHandle) -> Result<bool, String> {
 /// 打开 HUD 窗口的 DevTools
 #[tauri::command]
 pub async fn open_hud_devtools(app: AppHandle) -> Result<(), String> {
-    if let Some(window) = app.get_webview_window("hud") {
-        window.open_devtools();
-        Ok(())
-    } else {
-        Err("HUD 窗口不存在".to_string())
+    #[cfg(debug_assertions)]
+    {
+        if let Some(window) = app.get_webview_window("hud") {
+            window.open_devtools();
+            Ok(())
+        } else {
+            Err("HUD 窗口不存在".to_string())
+        }
+    }
+    
+    #[cfg(not(debug_assertions))]
+    {
+        Err("DevTools 仅在开发模式下可用".to_string())
     }
 }
 

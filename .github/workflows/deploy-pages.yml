@@ -1,0 +1,31 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches:
+      - gh-pages
+    paths:
+      - 'index.html'
+      - '.github/workflows/deploy-pages.yml' 
+  workflow_dispatch:  # 允许手动触发
+
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout 代码
+        uses: actions/checkout@v4
+      
+      - name: 部署到 GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: .  
+          publish_branch: gh-pages  # 部署到 gh-pages 分支
+          keep_files: false  # 清除旧文件
+          force_orphan: true  # 创建独立的 gh-pages 分支（不保留历史）
+          commit_message: "Deploy: ${{ github.event.head_commit.message }}"
