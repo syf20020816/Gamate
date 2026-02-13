@@ -12,6 +12,8 @@ import {
 import { invoke } from "@tauri-apps/api/core";
 import "./index.css";
 import WikiSearch from "../WikiSearch";
+import { DEFAULT_GAME } from "../../types/game";
+import { getGameById } from "../../services/configService";
 
 const { Text } = Typography;
 
@@ -42,16 +44,16 @@ const WikiKnowledgeBase: React.FC = () => {
   // ✅ 从后端扫描已下载的技能库
   const loadDownloadedLibraries = async () => {
     try {
-      const libraries = await invoke<any[]>('scan_downloaded_libraries');
+      const libraries = await invoke<any[]>("scan_downloaded_libraries");
       const gameIds = [...new Set(libraries.map((lib: any) => lib.gameId))];
       setGamesWithSkills(gameIds);
-      
+
       // 如果还没选择游戏,自动选择第一个有技能库的游戏
       if (!selectedGame && gameIds.length > 0) {
         setSelectedGame(gameIds[0]);
       }
     } catch (error) {
-      console.error('扫描技能库失败:', error);
+      console.error("扫描技能库失败:", error);
     }
   };
 
@@ -74,11 +76,24 @@ const WikiKnowledgeBase: React.FC = () => {
 
   const loadGamesConfig = async () => {
     try {
-      const config = await invoke<{ games: Game[] }>("get_games_config");
-      setAvailableGames(config.games);
+      const libraries = await invoke<any[]>("scan_downloaded_libraries");
+      const settings = await invoke<any>("get_app_settings");
+      const selectedGameIds = settings.user?.selected_games || [];
+
+      const gamesWithSkills = [...new Set(libraries.map((lib) => lib.gameId))];
+      const filteredIds = selectedGameIds.filter((id: string) =>
+        gamesWithSkills.includes(id),
+      );
+
+      const games = await Promise.all(
+        filteredIds.map((id: string) => getGameById(id)),
+      );
+      // 添加默认游戏
+      const validGames = games.filter(Boolean);
+      validGames.push(DEFAULT_GAME);
+      setAvailableGames(validGames);
     } catch (error) {
-      console.error("加载游戏配置失败:", error);
-      message.error("加载游戏列表失败");
+      console.error("加载游戏列表失败:", error);
     } finally {
       setLoading(false);
     }
