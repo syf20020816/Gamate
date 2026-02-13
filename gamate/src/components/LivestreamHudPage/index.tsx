@@ -444,7 +444,8 @@ export const LivestreamHudPage: React.FC = () => {
         }
       } else {
         // 开始直播
-        await invoke("start_livestream_simulation");
+        console.warn("current", currentGame);
+        await invoke("start_livestream_simulation", { gameId: currentGame });
         setIsLivestreaming(true);
         message.success("直播已开始！AI 员工开始活跃...");
 

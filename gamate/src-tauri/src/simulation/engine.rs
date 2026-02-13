@@ -30,10 +30,12 @@ pub struct SimulationEngine {
     pub employees: Vec<EmployeeConfig>,
     gift_frequency: String,
     pub ai_analyzer: Option<AIAnalyzer>,
-    /// 🔥 智能模式开关：true = 等待语音触发, false = 自动循环发送
+    /// 智能模式开关：true = 等待语音触发, false = 自动循环发送
     pub enable_smart_mode: bool,
-    /// 🔥 TTS 引擎（用于语音播报）
+    /// TTS 引擎（用于语音播报）
     pub tts_engine: Option<Arc<TtsEngine>>,
+    /// 当前游戏 ID
+    pub game_id: Option<String>,
 }
 
 impl SimulationEngine {
@@ -45,9 +47,16 @@ impl SimulationEngine {
             employees: Vec::new(),
             gift_frequency: "medium".to_string(),
             ai_analyzer: None,
-            enable_smart_mode: true, // 🔥 默认启用智能模式
-            tts_engine: None,        // 🔥 TTS 引擎延迟初始化
+            enable_smart_mode: true, //  默认启用智能模式
+            tts_engine: None,        //  TTS 引擎延迟初始化
+            game_id: None,           //  游戏 ID
         }
+    }
+    
+    /// 设置当前游戏 ID
+    pub fn set_game_id(&mut self, game_id: String) {
+        self.game_id = Some(game_id);
+        log::info!("✅ 设置直播游戏: {:?}", self.game_id);
     }
 
     /// 加载配置
@@ -418,6 +427,7 @@ impl SimulationEngine {
             screenshot_before: screenshot_before.to_string(),
             screenshot_after: screenshot_after.to_string(),
             employees: employee_contexts,
+            game_id: self.game_id.clone(),
         };
 
         // 调用 AI 分析
@@ -464,7 +474,7 @@ impl SimulationEngine {
                         });
 
                         let _ = app.emit("simulation_event", event);
-                        println!("💬 [{}] {}", emp.nickname, content);
+                        // println!("[{}] {}", emp.nickname, content);
 
                         // 如果需要送礼物
                         if send_gift {
@@ -479,7 +489,7 @@ impl SimulationEngine {
                             });
 
                             let _ = app.emit("simulation_event", event);
-                            println!("🎁 [{}] 送出 {} x{}", emp.nickname, gift, gift_count);
+                            // println!("🎁 [{}] 送出 {} x{}", emp.nickname, gift, gift_count);
                         }
                     });
                 }

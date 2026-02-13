@@ -21,10 +21,14 @@ impl SimulationState {
 pub async fn start_livestream_simulation(
     app: AppHandle,
     state: State<'_, SimulationState>,
+    game_id: String,
 ) -> Result<(), String> {
     // 创建新引擎
     let mut engine = SimulationEngine::new(app.clone());
     engine.load_config()?;
+    
+    // 设置当前游戏
+    engine.set_game_id(game_id);
 
     // 启动模拟
     engine.start().await?;

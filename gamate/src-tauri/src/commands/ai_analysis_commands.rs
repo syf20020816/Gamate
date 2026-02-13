@@ -55,7 +55,7 @@ pub async fn trigger_ai_analysis(
     request: AIAnalysisRequest,
 ) -> Result<String, String> {
     // 获取必要的数据并在锁外调用
-    let (app, employees, memory, ai_analyzer, tts_engine) = {
+    let (app, employees, memory, ai_analyzer, tts_engine, game_id) = {
         let engine_lock = state.engine.lock().unwrap();
         if let Some(engine) = engine_lock.as_ref() {
             (
@@ -64,6 +64,7 @@ pub async fn trigger_ai_analysis(
                 engine.memory.clone(),
                 engine.ai_analyzer.clone(),
                 engine.tts_engine.clone(),
+                engine.game_id.clone(),
             )
         } else {
             log::warn!("⚠️ 直播间已停止，忽略 AI 分析请求");
@@ -99,6 +100,7 @@ pub async fn trigger_ai_analysis(
         screenshot_before: request.screenshot_before.clone(),
         screenshot_after: request.screenshot_after.clone(),
         employees: employee_contexts,
+        game_id: game_id.clone(),
     };
 
     // 如果没有 AI 分析器，返回错误

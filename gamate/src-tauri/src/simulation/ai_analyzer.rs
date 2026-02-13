@@ -22,6 +22,10 @@ pub struct AIAnalysisRequest {
 
     /// 员工列表及其对话历史
     pub employees: Vec<EmployeeContext>,
+    
+    /// 当前游戏 ID
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub game_id: Option<String>,
 }
 
 /// 员工上下文信息
@@ -188,15 +192,23 @@ impl AIAnalyzer {
             2 => "- 图片1：主播开始说话时的游戏状态\n- 图片2：主播结束说话时的游戏状态\n请分析游戏画面中发生了什么变化（如角色移动、战斗、得分等）",
             _ => "- 多张游戏截图\n请分析游戏画面变化",
         };
+        
+        // 添加游戏信息
+        let game_context = if let Some(ref game_id) = request.game_id {
+            format!("## 当前游戏\n游戏: {}\n根据此游戏的玩法和特点，生成更贴合游戏场景的弹幕。\n\n", game_id)
+        } else {
+            String::new()
+        };
 
         let mut prompt = format!(
             "# 直播间互动分析任务\n\n\
+            {}\
             ## 主播语音识别结果\n\
             \"{}\"\n\n\
             ## 游戏画面变化\n\
             {}\n\n\
             ## AI 员工信息\n",
-            request.streamer_speech, screenshot_info
+            game_context, request.streamer_speech, screenshot_info
         );
 
         // 添加每个员工的信息
@@ -302,6 +314,7 @@ mod tests {
                     },
                 ],
             }],
+            game_id: Some("phasmophobia".to_string()),
         };
 
         let prompt = analyzer.build_prompt(&request, 0);
